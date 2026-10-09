@@ -1,5 +1,6 @@
 <resources>
     <!-- Mirrors color-background / color-primary CSS vars in frontend/src/index.css -->
+    <color name="launcher_background">#FF0E0C08</color>
     <color name="background">#FF0B0C10</color>
     <color name="primary">#FF7C3AED</color>
 </resources>
