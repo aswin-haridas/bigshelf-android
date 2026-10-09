@@ -1,0 +1,213 @@
+package com.bigshelf.app.ui.photos
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.bigshelf.app.data.Photo
+import com.bigshelf.app.state.SelectionStore
+import com.bigshelf.app.state.ViewerList
+import com.bigshelf.app.ui.theme.BsColors
+import com.bigshelf.app.ui.theme.BsText
+import com.bigshelf.app.ui.theme.BsWeight
+import com.bigshelf.app.ui.theme.MonoFamily
+import kotlinx.coroutines.flow.distinctUntilChanged
+import java.text.NumberFormat
+import java.time.Month
+import java.time.format.TextStyle
+import java.util.Locale
+
+/** One Month-Year section of the timeline (web `DateGroup`). */
+private data class DateGroup(val key: String, val label: String, val photos: MutableList<Photo> = mutableListOf())
+
+private val YEAR_MONTH = Regex("""^(\d{4})-(\d{2})""")
+
+// Same grouping as useImagesGrid.getGroupInfo: "May 2024", undated photos last-seen as "Undated"
+private fun groupInfo(date: String?): Pair<String, String> {
+    val match = date?.let(YEAR_MONTH::find) ?: return "unknown" to "Undated"
+    val (year, month) = match.destructured
+    val name = Month.of(month.toInt()).getDisplayName(TextStyle.FULL, Locale.US)
+    return "$year-$month" to "$name $year"
+}
+
+private fun groupByMonth(photos: List<Photo>): List<DateGroup> {
+    val map = LinkedHashMap<String, DateGroup>()
+    for (photo in photos) {
+        val (key, label) = groupInfo(photo.takenAt ?: photo.createdAt)
+        map.getOrPut(key) { DateGroup(key, label) }.photos += photo
+    }
+    return map.values.toList()
+}
+
+// Responsive column count from useImagesGrid (container width in dp ~ CSS px)
+private fun columnsFor(widthDp: Float) = when {
+    widthDp >= 1900 -> 7
+    widthDp >= 1300 -> 6
+    widthDp >= 950 -> 5
+    widthDp >= 700 -> 4
+    else -> 3
+}
+
+fun photoCount(n: Int) = "${NumberFormat.getIntegerInstance(Locale.US).format(n)} ${if (n == 1) "photo" else "photos"}"
+
+/**
+ * Port of modules/home/components/images-grid.tsx: 3:4 tiles in responsive columns,
+ * Month-Year headers (`text-xs font-semibold text-muted-soft uppercase font-mono`),
+ * infinite scroll, and the "Loading…" / "No photos found" / total footer.
+ *
+ * Tap opens a photo, or toggles it while a selection is active (web usePhotoSelectClick).
+ */
+@Composable
+fun ImagesGrid(
+    photos: List<Photo>,
+    onOpen: (Photo) -> Unit,
+    modifier: Modifier = Modifier,
+    fetchNextPage: (() -> Unit)? = null,
+    hasNextPage: Boolean = false,
+    isFetchingNextPage: Boolean = false,
+    totalCount: Int? = null,
+    groupByDate: Boolean = true,
+) {
+    // Publish this grid's photos as the current view; cleared when the grid leaves
+    DisposableEffect(photos) {
+        SelectionStore.visible = photos
+        onDispose { SelectionStore.visible = emptyList() }
+    }
+    val groups = remember(photos, groupByDate) { if (groupByDate) groupByMonth(photos) else emptyList() }
+    val state = rememberLazyGridState()
+    val loadMore by rememberUpdatedState(fetchNextPage)
+    val canLoad by rememberUpdatedState(hasNextPage && !isFetchingNextPage)
+
+    // Fetch the next page when the last few rows come into view (rootMargin: 400px)
+    LaunchedEffect(state) {
+        snapshotFlow {
+            val info = state.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            info.totalItemsCount > 0 && last >= info.totalItemsCount - 12
+        }.distinctUntilChanged().collect { nearEnd -> if (nearEnd && canLoad) loadMore?.invoke() }
+    }
+    // A page that didn't fill the screen still needs the next one
+    LaunchedEffect(photos.size, hasNextPage, isFetchingNextPage) {
+        val info = state.layoutInfo
+        val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+        if (canLoad && info.totalItemsCount > 0 && last >= info.totalItemsCount - 12) loadMore?.invoke()
+    }
+
+    val selectionActive = SelectionStore.count > 0
+    val open: (Photo) -> Unit = { photo ->
+        if (selectionActive) SelectionStore.toggle(photo)
+        else {
+            ViewerList.photos = photos
+            onOpen(photo)
+        }
+    }
+
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val cols = columnsFor(maxWidth.value)
+        val gap = if (maxWidth.value >= 640) 4.dp else 2.dp
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(cols),
+            state = state,
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalArrangement = Arrangement.spacedBy(gap),
+            // Room for the floating selection bar
+            contentPadding = PaddingValues(bottom = if (selectionActive) 72.dp else 0.dp),
+        ) {
+            if (groupByDate && groups.isNotEmpty()) {
+                groups.forEach { group ->
+                    item(key = "header-${group.key}", span = { GridItemSpan(maxLineSpan) }) {
+                        DateHeader(group.label, group.photos.size)
+                    }
+                    items(group.photos, key = { it.id }) { photo -> Tile(photo, selectionActive, open) }
+                }
+            } else {
+                items(photos, key = { it.id }) { photo -> Tile(photo, selectionActive, open) }
+            }
+            item(key = "footer", span = { GridItemSpan(maxLineSpan) }) {
+                when {
+                    isFetchingNextPage -> FooterText("Loading…", 16.dp)
+                    photos.isEmpty() -> FooterText("No photos found", 64.dp)
+                    !hasNextPage && totalCount != null -> FooterText(photoCount(totalCount), 24.dp, BsText.Xs)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Tile(photo: Photo, selectionActive: Boolean, open: (Photo) -> Unit) {
+    ImageCard(
+        photo = photo,
+        selected = SelectionStore.isSelected(photo.id),
+        selectionActive = selectionActive,
+        onClick = { open(photo) },
+        onToggle = { SelectionStore.toggle(photo) },
+    )
+}
+
+@Composable
+private fun DateHeader(label: String, count: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(bottom = 10.dp)
+            .background(BsColors.Background.copy(alpha = 0.85f))
+            .drawBehind {
+                drawLine(BsColors.Border.copy(alpha = 0.4f), Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
+            }
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label.uppercase(Locale.US),
+            style = BsText.Xs.copy(
+                fontWeight = BsWeight.Semibold,
+                fontFamily = MonoFamily,
+                letterSpacing = BsText.TrackingWider,
+            ),
+            color = BsColors.MutedSoft,
+        )
+        Text(
+            "$count ${if (count == 1) "photo" else "photos"}",
+            style = BsText.Xs2.copy(fontFamily = MonoFamily),
+            color = BsColors.MutedFaint,
+        )
+    }
+}
+
+@Composable
+private fun FooterText(text: String, vertical: androidx.compose.ui.unit.Dp, style: androidx.compose.ui.text.TextStyle = BsText.Sm) {
+    Text(
+        text,
+        Modifier.fillMaxWidth().padding(vertical = vertical),
+        style = style,
+        color = BsColors.Muted,
+        textAlign = TextAlign.Center,
+    )
+}
+

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext is allowed so a local dev backend (http://10.0.2.2:8000) works; use https in production -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
