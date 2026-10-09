@@ -1,5 +1,5 @@
 <resources>
-    <!-- Mirrors --color-background / --color-primary in frontend/src/index.css -->
+    <!-- Mirrors color-background / color-primary CSS vars in frontend/src/index.css -->
     <color name="background">#FF0B0C10</color>
     <color name="primary">#FF7C3AED</color>
 </resources>
