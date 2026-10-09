@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.SystemStats
 import com.bigshelf.app.ui.components.BsButton
+import com.bigshelf.app.ui.components.BsIconButton
+import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsProgress
 import com.bigshelf.app.ui.components.BsSwitch
@@ -67,7 +70,7 @@ private fun Modifier.divider(show: Boolean) = drawBehind {
 @Composable
 private fun SettingRow(label: String, hint: String, modifier: Modifier = Modifier, control: @Composable () -> Unit) {
     Row(
-        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -97,7 +100,7 @@ private fun SectionTitle(title: String, description: String) {
 
 /** Port of modules/settings/settings.tsx - the parts that apply to the Android app. */
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onBack: () -> Unit) {
     val api = BigShelfApp.api
     val settings = BigShelfApp.settings
     val scope = rememberCoroutineScope()
@@ -120,22 +123,12 @@ fun SettingsScreen() {
         }
     }
 
+    Column(Modifier.fillMaxSize()) {
+    PageHeader("Settings", leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
     Column(
-        Modifier.fillMaxSize().background(BsColors.Background).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .drawBehind { drawLine(BsColors.Border, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx()) }
-                .padding(bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            BsIcon(BsIcons.Gear, size = 20.dp, tint = BsColors.Muted)
-            Text("Settings", style = BsText.Lg.copy(fontWeight = BsWeight.Semibold))
-        }
-
         SettingsCard {
             ToggleRow("AI images in Home page", "Show ChatGPT images in the Home grid.", settings.showAi, settings::updateShowAi)
             ToggleRow(
@@ -200,5 +193,6 @@ fun SettingsScreen() {
             }
         }
         Box(Modifier.height(8.dp))
+    }
     }
 }

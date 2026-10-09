@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -78,7 +79,7 @@ fun FavouritesScreen(onOpenPhoto: (String) -> Unit) {
 
 /** Port of modules/bin/bin.tsx. Restore / delete permanently live in the selection bar. */
 @Composable
-fun BinScreen(onOpenPhoto: (String) -> Unit) {
+fun BinScreen(onOpenPhoto: (String) -> Unit, onBack: () -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val feed = rememberPagedPhotos("bin", invalidatedBy = setOf("bin-photos")) { api.bin(it) }
@@ -87,11 +88,11 @@ fun BinScreen(onOpenPhoto: (String) -> Unit) {
     val total = feed.total ?: feed.photos.size
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Bin", count = countLabel(total, "photo")) {
+        PageHeader("Bin", count = countLabel(total, "photo"), leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) }) {
             if (total > 0) {
                 BsButton(onClick = { confirm = true }, variant = ButtonVariant.Secondary, enabled = !emptying, contentColor = BsColors.Danger) {
                     if (emptying) Spinner(size = 14.dp) else BsIcon(BsIcons.Trash, size = 14.dp)
-                    Text("Empty Bin")
+                    Text("Empty")
                 }
             }
         }
@@ -140,7 +141,7 @@ fun folderLabel(id: String): String = runCatching {
 
 /** Port of modules/archive/archive.tsx (folder list): one folder per download batch. */
 @Composable
-fun ArchiveScreen(onFolder: (String) -> Unit) {
+fun ArchiveScreen(onFolder: (String) -> Unit, onBack: () -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val folders = rememberQuery("archive-folders", invalidatedBy = setOf("archive-photos")) { api.archiveFolders() }
@@ -165,7 +166,7 @@ fun ArchiveScreen(onFolder: (String) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Archive", count = countLabel(list.size, "folder")) {
+        PageHeader("Archive", count = countLabel(list.size, "folder"), leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) }) {
             if (list.isNotEmpty()) {
                 BsButton(
                     onClick = { confirmEmpty = true },
@@ -174,7 +175,7 @@ fun ArchiveScreen(onFolder: (String) -> Unit) {
                     contentColor = BsColors.Danger,
                 ) {
                     if (emptying) Spinner(size = 14.dp) else BsIcon(BsIcons.Trash, size = 14.dp)
-                    Text("Empty archive")
+                    Text("Empty")
                 }
             }
         }
@@ -183,8 +184,9 @@ fun ArchiveScreen(onFolder: (String) -> Unit) {
             list.isEmpty() -> EmptyState("Archive is empty", description = "Downloaded photos land here, one folder per download.")
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(list, key = { it.id }) { folder ->
                     FolderCard(folder, busy?.takeIf { it.first == folder.id }?.second, onOpen = { onFolder(folder.id) }) { delete ->
@@ -257,7 +259,7 @@ private fun FolderCard(folder: ArchiveFolder, busyAction: String?, onOpen: () ->
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                BsIcon(BsIcons.Folder, size = 12.dp, tint = Color.White.copy(alpha = 0.8f))
+                BsIcon(BsIcons.Folder, size = 14.dp, tint = Color.White.copy(alpha = 0.8f))
                 Text(
                     folderLabel(folder.id),
                     style = BsText.Xs,

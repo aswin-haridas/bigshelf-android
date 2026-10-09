@@ -37,6 +37,7 @@ import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
+import com.bigshelf.app.ui.theme.BsMotion
 
 /**
  * Port of components/CustomModal.tsx: `bg-black/50` backdrop, `bg-background rounded-xl
@@ -54,7 +55,7 @@ fun BsModal(
         // The window's own dim would stack on our bg-black/50 scrim
         (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
         val enter = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { enter.animateTo(1f, tween(200)) }
+        LaunchedEffect(Unit) { enter.animateTo(1f, BsMotion.spec()) }
 
         Box(
             Modifier

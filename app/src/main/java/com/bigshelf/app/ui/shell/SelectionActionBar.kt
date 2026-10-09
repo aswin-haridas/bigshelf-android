@@ -1,14 +1,17 @@
 package com.bigshelf.app.ui.shell
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,7 +47,6 @@ import com.bigshelf.app.ui.components.BsInput
 import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.ConfirmModal
-import com.bigshelf.app.ui.components.FloatingActionBar
 import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
@@ -59,7 +61,8 @@ import kotlinx.coroutines.launch
 private fun plural(n: Int) = "$n photo${if (n > 1) "s" else ""}"
 
 /**
- * Port of components/SelectionActionBar.tsx: one floating bulk bar for the whole app.
+ * Port of components/SelectionActionBar.tsx: one bulk bar for the whole app, docked in place
+ * of the bottom nav while anything is selected.
  * Bin and Archive get restore / unarchive instead of the library actions; a person's page
  * adds Untag. Back clears the selection (the web's Escape).
  */
@@ -104,44 +107,61 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
     }
 
     @Composable
-    fun Action(name: String, icon: ImageVector, label: String, danger: Boolean = false, onClick: () -> Unit) {
-        BsButton(
-            onClick = onClick,
-            variant = ButtonVariant.Secondary,
-            enabled = !busy,
-            contentColor = if (danger) Neutral.Rose400 else BsColors.Foreground,
+    fun RowScope.Action(name: String, icon: ImageVector, label: String, danger: Boolean = false, onClick: () -> Unit) {
+        val tint = if (danger) BsColors.Danger else BsColors.Foreground
+        Column(
+            Modifier.weight(1f).fillMaxHeight().bsClickable(enabled = !busy, scale = 0.94f, onClick = onClick),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            if (pending == name) Spinner(size = 14.dp) else BsIcon(icon, size = 14.dp)
-            Text(label)
+            if (pending == name) Spinner(size = 24.dp, tint = tint) else BsIcon(icon, size = 24.dp, tint = tint)
+            Text(
+                label,
+                Modifier.padding(top = 4.dp),
+                style = BsText.Xs2.copy(fontWeight = BsWeight.Medium),
+                color = if (danger) BsColors.Danger else BsColors.MutedSoft,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 
-    AnimatedVisibility(
-        visible = count > 0,
-        modifier = modifier,
-        enter = fadeIn() + slideInVertically { it / 4 },
-        exit = fadeOut() + slideOutVertically { it / 4 },
+    // Docked where the bottom nav sits: count row, then the actions laid out like nav tabs
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(BsColors.Background)
+            .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
+            .navigationBarsPadding(),
     ) {
-        FloatingActionBar {
-            Text(
-                "$count selected",
-                Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
-                color = Neutral.N300,
-            )
-            BsButton(onClick = SelectionStore::clear, variant = ButtonVariant.Secondary, enabled = !busy) { Text("Clear all") }
-            if (unselected.isNotEmpty()) {
-                BsButton(onClick = { SelectionStore.selectMany(unselected) }, variant = ButtonVariant.Secondary, enabled = !busy) {
-                    Text("Select all (${SelectionStore.visible.size})")
-                }
+        Row(
+            Modifier.fillMaxWidth().height(48.dp).padding(start = 4.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(48.dp).clip(BsShapes.Full).bsClickable(enabled = !busy, onClick = SelectionStore::clear), contentAlignment = Alignment.Center) {
+                BsIcon(BsIcons.XBold, size = 20.dp, tint = BsColors.Foreground, contentDescription = "Clear selection")
             }
+            Text("$count selected", Modifier.weight(1f), style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+            if (unselected.isNotEmpty()) {
+                Text(
+                    "Select all",
+                    Modifier
+                        .clip(BsShapes.Md)
+                        .bsClickable(enabled = !busy, scale = 0.96f) { SelectionStore.selectMany(unselected) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = BsText.Sm.copy(fontWeight = BsWeight.Medium),
+                    color = Neutral.N300,
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth().height(64.dp)) {
             if (mode == "bin") {
                 Action("restore", BsIcons.ArrowCounterClockwise, "Restore") {
                     runBulk("restore", { "${plural(it)} restored" }, "Failed to restore photos") { api.flagDeleted(it, false) }
                 }
-                Action("permanent-delete", BsIcons.Trash, "Delete permanently", danger = true) { confirmPurge = true }
+                Action("permanent-delete", BsIcons.Trash, "Delete forever", danger = true) { confirmPurge = true }
             } else {
-                Action("album", BsIcons.Stack, "Add to album") { albumOpen = true }
+                Action("album", BsIcons.Stack, "Album") { albumOpen = true }
                 if (personId != null) {
                     Action("untag", BsIcons.Tag, "Untag") {
                         runBulk("untag", { "Untagged ${plural(it)}" }, "Failed to untag photos") {
@@ -178,7 +198,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                         runBulk("archive", { "${plural(it)} archived" }, "Failed to archive photos") { api.flagArchived(it, true) }
                     }
                 }
-                Action("delete", BsIcons.Trash, "Move to Bin", danger = true) {
+                Action("delete", BsIcons.Trash, "Bin", danger = true) {
                     runBulk("delete", { "${plural(it)} moved to Bin" }, "Failed to move photos to Bin") { api.flagDeleted(it, true) }
                 }
             }

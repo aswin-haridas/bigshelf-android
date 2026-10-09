@@ -2,6 +2,7 @@ package com.bigshelf.app.ui.screens.people
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,8 @@ import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.BsInput
+import com.bigshelf.app.ui.components.BsModal
+import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.BsSearchBar
 import com.bigshelf.app.ui.components.BsTabs
 import com.bigshelf.app.ui.components.ButtonVariant
@@ -58,19 +61,33 @@ enum class PeopleTab { People, Faces, Untagged }
 // Shared by every People-section page so the tab bar stays identical (web PEOPLE_TABS)
 private val PEOPLE_TABS = listOf(
     TabItem(PeopleTab.People, "People"),
-    TabItem(PeopleTab.Faces, "Detected Faces"),
-    TabItem(PeopleTab.Untagged, "Untagged Photos"),
+    TabItem(PeopleTab.Faces, "Faces"),
+    TabItem(PeopleTab.Untagged, "Untagged"),
 )
 
-/** Square face grid: `grid-cols-2 gap-2` on phones, like people-grid.tsx. */
+/** Square face grid, three across with 16dp gutters. */
 @Composable
 private fun FaceGrid(content: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
     )
+}
+
+/** "People" title over the shared tab bar, with 16dp gutters. */
+@Composable
+private fun PeopleHeader(active: PeopleTab, onTab: (PeopleTab) -> Unit, below: @Composable () -> Unit = {}) {
+    PageHeader("People")
+    Column(
+        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        BsTabs(PEOPLE_TABS, active, onTab)
+        below()
+    }
 }
 
 /** Port of people-grid.tsx: tabs, people search, named people with photos. */
@@ -84,8 +101,7 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            BsTabs(PEOPLE_TABS, PeopleTab.People, onTab)
+        PeopleHeader(PeopleTab.People, onTab) {
             BsSearchBar(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "Search people")
         }
         when {
@@ -109,7 +125,7 @@ fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     val query = rememberQuery("faces", invalidatedBy = setOf("faces")) { BigShelfApp.api.faces() }
     val faces = query.data.orEmpty().filterNot { it.isIgnored }
     Column(Modifier.fillMaxSize()) {
-        BsTabs(PEOPLE_TABS, PeopleTab.Faces, onTab, Modifier.padding(bottom = 16.dp))
+        PeopleHeader(PeopleTab.Faces, onTab)
         when {
             query.isLoading -> LoadingText()
             faces.isEmpty() -> EmptyState("No detected faces", description = "Faces found in new photos will show up here.")
@@ -132,7 +148,7 @@ fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
 fun UntaggedScreen(onOpenPhoto: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     val query = rememberQuery("untagged", invalidatedBy = setOf("people")) { BigShelfApp.api.untaggedPhotos() }
     Column(Modifier.fillMaxSize()) {
-        BsTabs(PEOPLE_TABS, PeopleTab.Untagged, onTab, Modifier.padding(bottom = 16.dp))
+        PeopleHeader(PeopleTab.Untagged, onTab)
         if (query.isLoading) LoadingText()
         else ImagesGrid(
             photos = query.data?.items.orEmpty(),
@@ -181,59 +197,35 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        PageHeader(
+            data?.person?.name ?: "…",
+            count = data?.total?.let(::photoCountLabel),
+            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
         ) {
-            BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BsButton(
-                    onClick = {
-                        val items = data?.items.orEmpty()
-                        downloading = true
-                        scope.launch {
-                            try {
-                                Downloads.save(context, items)
-                                toast.success("Downloading ${items.size} photos")
-                            } catch (_: Exception) {
-                                toast.error("Download failed")
-                            } finally {
-                                downloading = false
-                            }
+            BsIconButton(BsIcons.PencilSimple, "Rename", onClick = {
+                name = data?.person?.name.orEmpty()
+                editing = true
+            }, enabled = data != null)
+            BsIconButton(
+                BsIcons.DownloadSimple,
+                "Download all",
+                onClick = {
+                    val items = data?.items.orEmpty()
+                    downloading = true
+                    scope.launch {
+                        try {
+                            Downloads.save(context, items)
+                            toast.success("Downloading ${items.size} photos")
+                        } catch (_: Exception) {
+                            toast.error("Download failed")
+                        } finally {
+                            downloading = false
                         }
-                    },
-                    variant = ButtonVariant.Secondary,
-                    enabled = !downloading && !data?.items.isNullOrEmpty(),
-                ) {
-                    if (downloading) Spinner(size = 14.dp) else BsIcon(BsIcons.DownloadSimple, size = 14.dp, contentDescription = "Download all")
-                }
-                if (editing) {
-                    BsInput(
-                        value = name,
-                        onValueChange = { name = it },
-                        modifier = Modifier.width(160.dp),
-                        textStyle = BsText.Lg.copy(fontWeight = BsWeight.Semibold),
-                        autoFocus = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { save() }),
-                    )
-                    BsButton(onClick = ::save, variant = ButtonVariant.Secondary, enabled = !saving && name.isNotBlank(), textStyle = BsText.Xs) {
-                        Text("Save")
                     }
-                } else {
-                    Text(
-                        data?.person?.name ?: "…",
-                        Modifier.bsClickable(scale = 1f) {
-                            name = data?.person?.name.orEmpty()
-                            editing = true
-                        },
-                        style = BsText.Lg.copy(fontWeight = BsWeight.Semibold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+                },
+                enabled = !data?.items.isNullOrEmpty(),
+                loading = downloading,
+            )
         }
         when {
             query.isLoading -> LoadingText()
@@ -246,6 +238,25 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
             )
         }
     }
+
+    if (editing) {
+        BsModal(
+            title = "Rename person",
+            onClose = { editing = false },
+            footer = {
+                BsButton(onClick = { editing = false }, variant = ButtonVariant.Ghost) { Text("Cancel") }
+                BsButton(onClick = ::save, enabled = !saving && name.isNotBlank(), loading = saving) { Text("Save") }
+            },
+        ) {
+            BsInput(
+                value = name,
+                onValueChange = { name = it },
+                autoFocus = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+            )
+        }
+    }
 }
 
 /** Photos of one detected face group. */
@@ -254,19 +265,11 @@ fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -
     val query = rememberQuery("face", faceId, invalidatedBy = setOf("faces")) { BigShelfApp.api.facePhotos(faceId) }
     val data = query.data
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground)
-            Text(
-                data?.face?.faceName ?: "Unnamed face",
-                style = BsText.Lg.copy(fontWeight = BsWeight.Semibold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        PageHeader(
+            data?.face?.faceName ?: "Unnamed face",
+            count = data?.total?.let(::photoCountLabel),
+            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
+        )
         when {
             query.isLoading -> LoadingText()
             data == null || data.items.isEmpty() -> EmptyState("No photos found")

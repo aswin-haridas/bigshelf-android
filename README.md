@@ -38,11 +38,11 @@ Every visual value comes from `frontend/src/index.css` and the shared web compon
 | `Input.tsx`, `Field.tsx` (password eye, hint) | `BsInput`, `BsField` |
 | `SearchBar.tsx` | `BsSearchBar` |
 | `CustomModal.tsx` | `BsModal` (+ `ConfirmModal` in place of `window.confirm`) |
-| `FloatingActionBar.tsx` | `FloatingActionBar` |
 | `ui/Tabs.tsx`, `ui/Switch.tsx`, `ui/Progress.tsx`, `ui/EmptyState.tsx` | `BsTabs`, `BsSwitch`, `BsProgress`, `EmptyState` |
 | sonner `<Toaster>` (compact, top-center) | `Toaster` + `toast.success/error/info` |
 | `image-card.tsx`, `face-tile.tsx`, `images-grid.tsx` | `ImageCard`, `FaceTile`, `ImagesGrid` |
-| `SelectionActionBar.tsx`, `UploadProgressModal.tsx`, `sidebar.tsx` | same names under `ui/shell/` |
+| `SelectionActionBar.tsx`, `UploadProgressModal.tsx` | same names under `ui/shell/` |
+| `sidebar.tsx` | bottom nav in `AppShell` + the Library tab (`ui/shell/Library.kt`) |
 
 The same rules apply as on the web (see `../AGENTS.MD`): use the shared components as they
 are, take colours only from `BsColors`, keep icons at 12 / 14 / 16 / 20 / 24 / 32 dp, page
@@ -61,15 +61,21 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   cookie, like the web.
 - Home timeline with month headers, infinite scroll, text search and the "show AI images"
   setting. Uploads go through the same presigned flow as the web, with the progress box.
-- Photo viewer: swipe between photos, plus favourite, mark as AI, rotate, download,
-  delete, and the Info panel with tagged faces.
+- Bottom navigation (Photos, Favourites, People, Library); Library holds upload, Archive,
+  Bin, the tools, Settings and Log out.
+- Photo viewer: swipe between photos (the bars stay put, a tap hides them), plus favourite,
+  mark as AI, rotate, download, delete, and an Info sheet with tagged faces.
 - People: the People, Detected Faces and Untagged Photos tabs, a person page with rename
   and download all, and face groups.
 - Favourites, Bin (restore, delete permanently, empty Bin), Archive folders, Settings.
-- A global selection bar: add to album, untag, download, archive or unarchive, move to Bin.
+- A selection bar that takes the bottom nav's place while photos are selected: add to album,
+  untag, download, archive or unarchive, move to Bin.
+- Pipelines (run, progress, run detail with step logs - polled instead of the web's SSE),
+  Duplicates (one pair at a time, keep / keep both / pick the best, undo) and Organize
+  (review buckets, select / download all, reprocess failed).
 
-Framer, Triptych, Triplets, Composer, Duplicates, Pipelines and Organize are in the sidebar
-but show an "open BigShelf on the web" placeholder for now. The web features they depend on
+Framer, Triptych, Triplets and Composer are listed in Library but show an "open BigShelf
+on the web" placeholder for now. The web features they depend on
 (face tagging modal, crop, split, merge, reverse image search) aren't ported yet either.
 
 ## Layout
@@ -81,6 +87,6 @@ app/src/main/java/com/bigshelf/app/
   ui/theme/  design tokens
   ui/components/  shared component library
   ui/photos/ grid, tiles
-  ui/shell/  app shell: drawer sidebar, selection bar, upload progress
+  ui/shell/  app shell: bottom nav, Library tab, selection bar, upload progress
   ui/screens/ pages
 ```

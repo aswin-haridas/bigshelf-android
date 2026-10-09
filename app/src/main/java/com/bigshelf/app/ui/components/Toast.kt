@@ -31,6 +31,7 @@ import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.delay
+import com.bigshelf.app.ui.theme.BsMotion
 
 /**
  * Port of the web's sonner `<Toaster position="top-center">` with its compact overrides
@@ -78,7 +79,7 @@ fun Toaster(modifier: Modifier = Modifier) {
                     toast.dismiss(item.id)
                 }
                 val visible = remember { MutableTransitionState(false).apply { targetState = true } }
-                AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { -it }, exit = fadeOut()) {
+                AnimatedVisibility(visible, enter = fadeIn(BsMotion.spec()) + slideInVertically(BsMotion.spec()) { -it }, exit = fadeOut(BsMotion.fast())) {
                     Row(
                         Modifier
                             .width(280.dp)

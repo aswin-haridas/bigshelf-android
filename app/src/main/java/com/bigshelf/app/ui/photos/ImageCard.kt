@@ -31,6 +31,7 @@ import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
+import com.bigshelf.app.ui.theme.BsMotion
 
 /**
  * Port of modules/common/components/image-card.tsx: sharp-cornered 3:4 tile with the
@@ -86,19 +87,19 @@ fun ImageCard(
         AnimatedVisibility(
             visible = selected || selectionActive,
             modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
-            enter = fadeIn() + scaleIn(initialScale = 0.95f),
-            exit = fadeOut() + scaleOut(targetScale = 0.95f),
+            enter = fadeIn(BsMotion.fast()) + scaleIn(BsMotion.fast(), initialScale = 0.9f),
+            exit = fadeOut(BsMotion.fast()) + scaleOut(BsMotion.fast(), targetScale = 0.9f),
         ) {
             Box(
                 Modifier
-                    .size(20.dp)
+                    .size(24.dp)
                     .clip(BsShapes.Full)
                     .background(if (selected) BsColors.Primary else Color.Black.copy(alpha = 0.4f))
                     .border(1.dp, BsColors.Muted.copy(alpha = 0.7f), BsShapes.Full)
                     .bsClickable(onClick = onToggle),
                 contentAlignment = Alignment.Center,
             ) {
-                if (selected) BsIcon(BsIcons.CheckBold, size = 12.dp, tint = BsColors.Foreground)
+                if (selected) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)
             }
         }
 
