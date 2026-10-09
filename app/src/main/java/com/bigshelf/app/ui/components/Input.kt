@@ -54,7 +54,7 @@ fun BsInput(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "",
-    textStyle: TextStyle = BsText.Xs,
+    textStyle: TextStyle = BsText.Base,
     singleLine: Boolean = true,
     autoFocus: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -85,7 +85,7 @@ fun BsInput(
                     .clip(BsShapes.Xl)
                     .background(BsColors.Surface)
                     .border(1.dp, border, BsShapes.Xl)
-                    .padding(start = 14.dp, end = if (trailing != null) 12.dp else 14.dp, top = 10.dp, bottom = 10.dp),
+                    .padding(start = 14.dp, end = if (trailing != null) 12.dp else 14.dp, top = 14.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -134,7 +134,7 @@ fun BsField(
                     BsIcon(
                         if (show) BsIcons.EyeSlash else BsIcons.Eye,
                         Modifier.bsClickable { show = !show },
-                        size = 16.dp,
+                        size = 20.dp,
                         tint = BsColors.MutedFaint,
                         contentDescription = if (show) "Hide password" else "Show password",
                     )

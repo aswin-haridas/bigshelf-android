@@ -101,8 +101,8 @@ fun Toaster(modifier: Modifier = Modifier) {
                         Text(
                             item.text,
                             color = ToastText,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             fontWeight = BsWeight.Medium,
                         )
                     }

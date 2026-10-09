@@ -16,7 +16,6 @@ object AuthStore {
     var user by mutableStateOf<User?>(null)
         private set
     var error by mutableStateOf<String?>(null)
-        private set
 
     private val api get() = BigShelfApp.api
 
