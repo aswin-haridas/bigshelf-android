@@ -42,6 +42,7 @@ import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.Neutral
 import androidx.compose.runtime.LaunchedEffect
+import com.bigshelf.app.ui.theme.BsMotion
 
 /**
  * Port of components/Input.tsx:
@@ -64,7 +65,7 @@ fun BsInput(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val border by animateColorAsState(if (focused) BsColors.BorderFocus else BsColors.Border, label = "inputBorder")
+    val border by animateColorAsState(if (focused) BsColors.BorderFocus else BsColors.Border, BsMotion.fast(), label = "inputBorder")
     val focusRequester = remember { FocusRequester() }
     if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -165,8 +166,8 @@ fun BsSearchBar(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg by animateColorAsState(if (focused) Neutral.N700 else Neutral.N800, label = "searchBg")
-    val style = BsText.Sm.copy(fontWeight = BsWeight.Medium)
+    val bg by animateColorAsState(if (focused) Neutral.N700 else Neutral.N800, BsMotion.fast(), label = "searchBg")
+    val style = BsText.Sm
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -179,14 +180,14 @@ fun BsSearchBar(
         decorationBox = { inner ->
             Row(
                 Modifier
-                    .height(32.dp)
-                    .clip(BsShapes.Md)
+                    .height(48.dp)
+                    .clip(BsShapes.Xl)
                     .background(bg)
-                    .padding(start = 12.dp, end = 12.dp),
+                    .padding(start = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BsIcon(BsIcons.MagnifyingGlass, Modifier.size(16.dp), tint = Neutral.N400)
-                Box(Modifier.padding(start = 8.dp).weight(1f)) {
+                BsIcon(BsIcons.MagnifyingGlass, Modifier.size(20.dp), tint = Neutral.N400)
+                Box(Modifier.padding(start = 12.dp).weight(1f)) {
                     if (value.isEmpty()) Text(placeholder, style = style, color = Neutral.N400, maxLines = 1)
                     inner()
                 }

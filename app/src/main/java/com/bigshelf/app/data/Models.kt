@@ -62,6 +62,8 @@ data class Photo(
     @SerialName("is_archived") val isArchived: Boolean = false,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
     @SerialName("is_video") val isVideo: Boolean = false,
+    // Framer score within a group (duplicate pair); the group's pick is marked best
+    val quality: PhotoQuality? = null,
 ) {
     /** Same fallback as web `withIsAi`: server flag, else the ChatGPT filename rule. */
     val isAiImage get() = isAi || filename.lowercase().startsWith("chatgpt")
@@ -172,3 +174,90 @@ data class SystemStats(
 
 @Serializable
 data class JobStatus(val status: String = "")
+
+@Serializable
+data class PhotoQuality(val score: Double = 0.0, val best: Boolean = false)
+
+// ---------- Pipelines (modules/ai/types.ts) ----------
+
+@Serializable
+data class Pipeline(val id: String, val name: String = "", val description: String = "")
+
+/** Face detection runs per upload, so it's a snapshot count rather than a Run. */
+@Serializable
+data class FaceTagging(val total: Int = 0, val done: Int = 0, val failed: Int = 0)
+
+@Serializable
+data class RunStage(
+    val id: String,
+    val name: String = "",
+    val done: Int = 0,
+    val failed: Int = 0,
+    val secs: Double = 0.0,
+)
+
+@Serializable
+data class RunLog(
+    val timestamp: String = "",
+    val level: String = "",
+    // "select", "run", "refresh", or a RunStage id
+    val step: String = "",
+    val message: String = "",
+)
+
+@Serializable
+data class Run(
+    val id: String,
+    val pipeline: String = "",
+    // queued | running | success | failed | cancelled
+    val status: String = "queued",
+    val total: Int = 0,
+    val done: Int = 0,
+    val failed: Int = 0,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("started_at") val startedAt: String? = null,
+    @SerialName("finished_at") val finishedAt: String? = null,
+    // 0 = executing now, n = waiting behind n runs, null = finished
+    @SerialName("queue_position") val queuePosition: Int? = null,
+    val stages: List<RunStage> = emptyList(),
+    val stage: String? = null,
+    val logs: List<RunLog> = emptyList(),
+) {
+    val isActive get() = status == "queued" || status == "running"
+
+    /** 0-100; a successful run always reads full, even if its total was a placeholder. */
+    val percent: Int
+        get() = if (status == "success") 100 else if (total > 0) ((done + failed) * 100f / total).toInt() else 0
+}
+
+@Serializable
+data class PipelinesData(
+    val pipelines: List<Pipeline> = emptyList(),
+    val runs: List<Run> = emptyList(),
+    @SerialName("face_tagging") val faceTagging: FaceTagging? = null,
+)
+
+// ---------- Duplicates ----------
+
+@Serializable
+data class DuplicateGroup(val id: String, val similarity: Double = 0.0, val items: List<Photo> = emptyList()) {
+    /** Order-independent key the backend stores for "Keep both" (sorted ids joined by |). */
+    val key get() = items.map { it.id }.sorted().joinToString("|").ifEmpty { id }
+}
+
+@Serializable
+data class DuplicatesResponse(
+    @SerialName("total_groups") val totalGroups: Int = 0,
+    @SerialName("auto_removed_count") val autoRemovedCount: Int? = null,
+    val groups: List<DuplicateGroup> = emptyList(),
+    // Below the requested threshold when nothing matched at that strictness
+    @SerialName("threshold_used") val thresholdUsed: Double? = null,
+)
+
+@Serializable
+data class ClearedResponse(@SerialName("cleared_count") val clearedCount: Int = 0)
+
+// ---------- Organize ----------
+
+@Serializable
+data class Bucket(val count: Int = 0, val items: List<Photo> = emptyList())

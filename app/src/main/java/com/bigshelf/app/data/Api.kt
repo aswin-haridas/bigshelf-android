@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -300,6 +302,40 @@ class Api(context: Context, val baseUrl: String) {
             put("photo_ids", ids(photoIds))
         },
     )
+
+    suspend fun prioritize(id: String) = send("POST", "/api/v1/photos/$id/priority", Photo.serializer())
+
+    // ---------- Pipelines ----------
+
+    suspend fun pipelines() = get("/api/v1/pipelines", PipelinesData.serializer())
+
+    suspend fun startRun(pipelineId: String) = send("POST", "/api/v1/pipelines/$pipelineId/runs", Run.serializer())
+
+    suspend fun run(runId: String) = get("/api/v1/pipelines/runs/$runId", Run.serializer())
+
+    suspend fun cancelRun(runId: String) = sendUnit("POST", "/api/v1/pipelines/runs/$runId/cancel")
+
+    // ---------- Duplicates & organize ----------
+
+    suspend fun duplicates(limit: Int, threshold: Double) =
+        get("/api/v1/photos/duplicates", DuplicatesResponse.serializer(), mapOf("limit" to limit, "threshold" to threshold))
+
+    /** "Keep both": the backend stops pairing these photos. */
+    suspend fun dismissDuplicate(group: DuplicateGroup) = sendUnit(
+        "POST", "/api/v1/photos/duplicates/dismiss",
+        buildJsonObject {
+            put("photo_ids", ids(group.items.map { it.id }))
+            put("group_key", group.key)
+        },
+    )
+
+    suspend fun undismissDuplicate(groupKey: String) =
+        sendUnit("DELETE", "/api/v1/photos/duplicates/dismiss", params = mapOf("group_key" to groupKey))
+
+    suspend fun clearDismissed() = send("DELETE", "/api/v1/photos/duplicates/dismiss", ClearedResponse.serializer())
+
+    suspend fun organize(limit: Int) =
+        get("/api/v1/photos/organize", MapSerializer(String.serializer(), Bucket.serializer()), mapOf("limit" to limit))
 
     // ---------- System ----------
 

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.Composable
@@ -32,6 +33,7 @@ import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.Neutral
+import com.bigshelf.app.ui.theme.BsMotion
 
 enum class ButtonVariant { Primary, Secondary, Ghost }
 
@@ -64,7 +66,7 @@ fun BsButton(
         else -> if (pressed) Neutral.N800 else Color.Transparent
     }
     // `transition-all duration-300`
-    val bg by animateColorAsState(target, tween(300), label = "buttonBg")
+    val bg by animateColorAsState(target, BsMotion.fast(), label = "buttonBg")
     val clickable = enabled && !loading
 
     Row(
@@ -108,11 +110,11 @@ fun BsIconButton(
             .clip(BsShapes.Lg)
             .background(BsColors.Surface)
             .border(1.dp, if (active) BsColors.BorderFocus else BsColors.Border, BsShapes.Lg)
-            .padding(8.dp),
+            .size(44.dp),
         contentAlignment = Alignment.Center,
     ) {
         val color = tint ?: if (active) BsColors.Foreground else BsColors.Muted
-        if (loading) Spinner(size = 16.dp, tint = color)
-        else BsIcon(icon, size = 16.dp, tint = color, contentDescription = contentDescription)
+        if (loading) Spinner(size = 20.dp, tint = color)
+        else BsIcon(icon, size = 20.dp, tint = color, contentDescription = contentDescription)
     }
 }

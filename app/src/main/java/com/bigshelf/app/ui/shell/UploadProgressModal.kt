@@ -7,7 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,11 +32,11 @@ fun UploadProgressModal(modifier: Modifier = Modifier) {
     val upload = UploadStore.upload ?: return
     val done = upload.progress >= 100
     // Linear easing keeps the steps between updates fluid, like the web's ease-linear
-    val shown by animateFloatAsState(upload.progress.toFloat(), tween(500, easing = LinearEasing), label = "upload")
+    val shown by animateFloatAsState(upload.progress.toFloat(), tween(250, easing = LinearEasing), label = "upload")
     Column(
         modifier
             .padding(16.dp)
-            .width(288.dp)
+            .fillMaxWidth()
             .shadow(10.dp, BsShapes.Md)
             .clip(BsShapes.Md)
             .background(Neutral.N800)

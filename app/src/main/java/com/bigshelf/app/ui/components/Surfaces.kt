@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,17 +12,16 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,32 +29,8 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
-import com.bigshelf.app.ui.theme.Neutral
-
-/**
- * Port of components/FloatingActionBar.tsx (mobile layout: `inset-x-3 bottom-3`):
- * `rounded-xl bg-neutral-900/90 shadow-lg ring-1 ring-white/10`, one scrollable row `gap-2 p-1.5`.
- * The caller places it at the bottom of the screen.
- */
-@Composable
-fun FloatingActionBar(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
-    Box(
-        modifier
-            .fillMaxWidth()
-            .padding(12.dp)
-            .shadow(10.dp, BsShapes.Xl)
-            .clip(BsShapes.Xl)
-            .background(Neutral.N900.copy(alpha = 0.9f))
-            .border(1.dp, Color.White.copy(alpha = 0.1f), BsShapes.Xl),
-    ) {
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            content = content,
-        )
-    }
-}
+import com.bigshelf.app.ui.theme.MonoFamily
+import com.bigshelf.app.ui.theme.BsMotion
 
 data class TabItem<T>(val id: T, val label: String)
 
@@ -68,24 +42,25 @@ data class TabItem<T>(val id: T, val label: String)
 fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
-            .height(32.dp)
-            .clip(BsShapes.Md)
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(BsShapes.Lg)
             .background(BsColors.Surface)
-            .border(1.dp, BsColors.Border, BsShapes.Md)
-            .padding(2.dp)
-            .horizontalScroll(rememberScrollState()),
+            .border(1.dp, BsColors.Border, BsShapes.Lg)
+            .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         tabs.forEach { tab ->
             val selected = tab.id == active
-            val bg by animateColorAsState(if (selected) Color.White.copy(alpha = 0.1f) else Color.Transparent, label = "tabBg")
+            val bg by animateColorAsState(if (selected) Color.White.copy(alpha = 0.1f) else Color.Transparent, BsMotion.fast(), label = "tabBg")
             Box(
                 Modifier
+                    .weight(1f)
                     .fillMaxHeight()
-                    .clip(BsShapes.Sm)
+                    .clip(BsShapes.Md)
                     .background(bg)
                     .bsClickable(scale = 1f) { onChange(tab.id) }
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -93,6 +68,7 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
                     style = BsText.Sm.copy(fontWeight = BsWeight.Medium),
                     color = if (selected) BsColors.Foreground else BsColors.Muted,
                     maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             }
         }
@@ -105,18 +81,18 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
  */
 @Composable
 fun BsSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    val track by animateColorAsState(if (checked) BsColors.Primary else BsColors.BorderFocus.copy(alpha = 0.8f), label = "track")
-    val x by animateDpAsState(if (checked) 14.dp else 0.dp, label = "thumb")
+    val track by animateColorAsState(if (checked) BsColors.Primary else BsColors.BorderFocus.copy(alpha = 0.8f), BsMotion.fast(), label = "track")
+    val x by animateDpAsState(if (checked) 20.dp else 0.dp, BsMotion.spec(), label = "thumb")
     Box(
         modifier
-            .size(width = 32.dp, height = 18.4.dp)
+            .size(width = 48.dp, height = 28.dp)
             .clip(BsShapes.Full)
             .background(track)
             .bsClickable(enabled = enabled, scale = 1f) { onCheckedChange(!checked) }
-            .padding(1.dp),
+            .padding(2.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.offset(x = x).size(16.dp).clip(BsShapes.Full).background(BsColors.Foreground))
+        Box(Modifier.offset(x = x).size(24.dp).clip(BsShapes.Full).background(BsColors.Foreground))
     }
 }
 
@@ -166,7 +142,10 @@ fun LoadingText(modifier: Modifier = Modifier, text: String = "Loading…") {
     )
 }
 
-/** Page header: `text-lg font-semibold` title + `text-xs text-muted` count, actions on the right. */
+/**
+ * Mobile top bar: optional back button, `text-lg font-semibold` title with the count under it,
+ * actions on the right. Carries its own 16dp gutters so grids below can run edge to edge.
+ */
 @Composable
 fun PageHeader(
     title: String,
@@ -176,14 +155,20 @@ fun PageHeader(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
-        modifier.fillMaxWidth().padding(bottom = 16.dp),
+        modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         leading?.invoke()
-        Text(title, style = BsText.Lg.copy(fontWeight = BsWeight.Semibold), maxLines = 1)
-        if (count != null) Text(count, style = BsText.Xs, color = BsColors.Muted)
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), content = actions)
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = BsText.Lg.copy(fontWeight = BsWeight.Semibold),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            if (count != null) Text(count, style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
     }
 }
-

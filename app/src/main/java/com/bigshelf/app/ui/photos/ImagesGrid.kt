@@ -2,8 +2,8 @@ package com.bigshelf.app.ui.photos
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -134,9 +134,10 @@ fun ImagesGrid(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(gap),
             verticalArrangement = Arrangement.spacedBy(gap),
-            // Room for the floating selection bar
-            contentPadding = PaddingValues(bottom = if (selectionActive) 72.dp else 0.dp),
         ) {
+            // Fixed first item: the grid anchors on it, so pages arriving above the footer
+            // don't drag the view down to "Loading…"
+            item(key = "top", span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.fillMaxWidth()) }
             if (groupByDate && groups.isNotEmpty()) {
                 groups.forEach { group ->
                     item(key = "header-${group.key}", span = { GridItemSpan(maxLineSpan) }) {
@@ -174,12 +175,12 @@ private fun DateHeader(label: String, count: Int, modifier: Modifier = Modifier)
     Row(
         modifier
             .fillMaxWidth()
-            .padding(bottom = 10.dp)
+            .padding(top = 8.dp, bottom = 4.dp)
             .background(BsColors.Background.copy(alpha = 0.85f))
             .drawBehind {
                 drawLine(BsColors.Border.copy(alpha = 0.4f), Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
             }
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
