@@ -103,6 +103,7 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PeopleHeader(PeopleTab.People, onTab) {
             BsSearchBar(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "Search people")
+            FaceReviewBanner()
         }
         when {
             query.isLoading -> LoadingText()
@@ -125,7 +126,7 @@ fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     val query = rememberQuery("faces", invalidatedBy = setOf("faces")) { BigShelfApp.api.faces() }
     val faces = query.data.orEmpty().filterNot { it.isIgnored }
     Column(Modifier.fillMaxSize()) {
-        PeopleHeader(PeopleTab.Faces, onTab)
+        PeopleHeader(PeopleTab.Faces, onTab) { FaceReviewBanner() }
         when {
             query.isLoading -> LoadingText()
             faces.isEmpty() -> EmptyState("No detected faces", description = "Faces found in new photos will show up here.")

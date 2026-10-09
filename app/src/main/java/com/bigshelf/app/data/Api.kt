@@ -286,6 +286,27 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun facePhotos(id: String) = get("/api/v1/faces/$id/photos", FacePhotos.serializer())
 
+    suspend fun faceReview() = get("/api/v1/faces/confirmations", FaceReview.serializer())
+
+    /** Submit one grid screen; the response is the next one. */
+    suspend fun resolveFaceReview(personId: String, confirmed: Collection<String>, rejected: Collection<String>) = send(
+        "POST", "/api/v1/faces/confirmations", FaceReview.serializer(),
+        buildJsonObject {
+            put("person_id", personId)
+            put("confirmed_face_ids", ids(confirmed))
+            put("rejected_face_ids", ids(rejected))
+        },
+    )
+
+    /** "Different people": never suggest this pair again. */
+    suspend fun markDistinct(personIds: Collection<String>) = send(
+        "POST", "/api/v1/faces/confirmations/distinct", FaceReview.serializer(),
+        buildJsonObject { put("person_ids", ids(personIds)) },
+    )
+
+    suspend fun mergePeople(sourceId: String, targetId: String) =
+        sendUnit("POST", "/api/v1/people/$sourceId/merge", buildJsonObject { put("target_person_id", targetId) })
+
     // ---------- Albums ----------
 
     suspend fun albums() = get("/api/v1/albums", AlbumList.serializer(), mapOf("size" to 50)).items

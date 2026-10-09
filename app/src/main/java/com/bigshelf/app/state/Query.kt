@@ -18,8 +18,8 @@ import kotlinx.coroutines.launch
  * refetches whenever one of [keys] is invalidated through [PhotoEvents].
  */
 class QueryState<T>(private val scope: CoroutineScope, private val fetch: suspend () -> T) {
+    /** Settable so a mutation's response can stand in for a refetch (web `setQueryData`). */
     var data by mutableStateOf<T?>(null)
-        private set
     var isLoading by mutableStateOf(true)
         private set
     var isError by mutableStateOf(false)

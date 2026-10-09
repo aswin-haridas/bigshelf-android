@@ -261,3 +261,37 @@ data class ClearedResponse(@SerialName("cleared_count") val clearedCount: Int = 
 
 @Serializable
 data class Bucket(val count: Int = 0, val items: List<Photo> = emptyList())
+
+// ---------- Face review (web useFaceConfirmations) ----------
+
+@Serializable
+data class FaceReviewItem(
+    @SerialName("face_id") val faceId: String,
+    @SerialName("photo_id") val photoId: String,
+    @SerialName("face_thumbnail") val faceThumbnail: String? = null,
+)
+
+/** One grid screen: "Are these all [personName]?" */
+@Serializable
+data class FaceReviewBatch(
+    @SerialName("person_id") val personId: String,
+    @SerialName("person_name") val personName: String,
+    val reference: FaceReviewItem,
+    val faces: List<FaceReviewItem> = emptyList(),
+)
+
+@Serializable
+data class MergeSuggestionPerson(
+    @SerialName("person_id") val personId: String,
+    @SerialName("person_name") val personName: String,
+    @SerialName("face_thumbnail") val faceThumbnail: String? = null,
+    @SerialName("face_count") val faceCount: Int = 0,
+)
+
+/** Two people who look nearly identical: [merge] folds into [keep] on "Same person". */
+@Serializable
+data class MergeSuggestion(val keep: MergeSuggestionPerson, val merge: MergeSuggestionPerson)
+
+/** The current review screen; [merge] is asked before any face grid. */
+@Serializable
+data class FaceReview(val batch: FaceReviewBatch? = null, val merge: MergeSuggestion? = null, val total: Int = 0)

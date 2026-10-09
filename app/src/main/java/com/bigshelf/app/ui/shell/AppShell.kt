@@ -128,8 +128,10 @@ fun AppShell() {
 
     val selecting = SelectionStore.count > 0
     val inViewer = path.startsWith("photos/")
+    // Landscape-locked Duplicates needs every bit of height, so it drops the bottom bar too
+    val fullScreen = inViewer || path == Routes.DUPLICATES
     // Something sits in the bottom slot unless the viewer has the screen to itself
-    val docked = selecting || !inViewer
+    val docked = selecting || !fullScreen
     Column(Modifier.fillMaxSize().background(BsColors.Background)) {
         Box(
             Modifier
@@ -147,7 +149,7 @@ fun AppShell() {
                 path = if (inViewer) from.value else path,
                 onPersonGone = { go(Routes.PEOPLE) },
             )
-            !inViewer -> BottomBar(active = tabFor(path), onSelect = ::go)
+            !fullScreen -> BottomBar(active = tabFor(path), onSelect = ::go)
         }
     }
 }
