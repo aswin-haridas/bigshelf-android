@@ -50,7 +50,7 @@ fun BsButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     contentColor: Color = BsColors.Foreground,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     textStyle: TextStyle = BsText.Sm,
     gap: Dp = 6.dp,
     content: @Composable RowScope.() -> Unit,

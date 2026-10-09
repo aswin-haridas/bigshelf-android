@@ -67,7 +67,7 @@ fun AuthLayout(content: @Composable ColumnScope.() -> Unit) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(380.dp)
+                .height(220.dp)
                 .clip(BsShapes.Xl)
                 .background(BsColors.PrimaryDeep),
         ) {
@@ -142,9 +142,10 @@ fun LoginScreen(onRegister: () -> Unit) {
     val loading = AuthStore.status == AuthStore.Status.Loading
     // `required` + `minLength={8}` from the web form
     val submit = {
-        if (identifier.isNotBlank() && password.length >= 8 && !loading) {
-            scope.launch { AuthStore.login(identifier.trim(), password) }
-        }
+        if (loading) Unit
+        else if (identifier.isBlank()) AuthStore.error = "Enter your username or email."
+        else if (password.length < 8) AuthStore.error = "Password must be at least 8 characters."
+        else scope.launch { AuthStore.login(identifier.trim(), password) }
     }
 
     AuthHeader("Sign In Account", "Enter your credentials to access your account.")
@@ -166,7 +167,7 @@ fun LoginScreen(onRegister: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
         AuthError(AuthStore.error)
-        BsButton(onClick = { submit() }, enabled = !loading) {
+        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading) {
             Text(if (loading) "Logging in..." else "Log in")
         }
     }
@@ -182,13 +183,13 @@ fun RegisterScreen(onLogin: () -> Unit) {
     var password by rememberSaveable { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val loading = AuthStore.status == AuthStore.Status.Loading
-    val valid = listOf(firstName, lastName, email, username).all { it.isNotBlank() } && password.length >= 8
     // Sign up, then sign straight in - same as the web Register page
     val submit = {
-        if (valid && !loading) {
-            scope.launch {
-                if (AuthStore.register(email.trim(), username.trim(), password)) AuthStore.login(email.trim(), password)
-            }
+        if (loading) Unit
+        else if (listOf(firstName, lastName, email, username).any { it.isBlank() }) AuthStore.error = "Fill in all fields."
+        else if (password.length < 8) AuthStore.error = "Password must be at least 8 characters."
+        else scope.launch {
+            if (AuthStore.register(email.trim(), username.trim(), password)) AuthStore.login(email.trim(), password)
         }
     }
 
@@ -211,7 +212,7 @@ fun RegisterScreen(onLogin: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
         AuthError(AuthStore.error)
-        BsButton(onClick = { submit() }, enabled = !loading) {
+        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading) {
             Text(if (loading) "Signing up..." else "Sign Up")
         }
     }
