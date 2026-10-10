@@ -54,6 +54,7 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   starts a selection.
 - Face tiles always show their name caption.
 - The upload drop zone opens the system photo picker.
+- Images shared from another app (Gallery, Photos, Files) via the share sheet are uploaded.
 
 ## What's in the app
 
