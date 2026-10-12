@@ -40,6 +40,7 @@ import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Downloads
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.SelectionStore
+import com.bigshelf.app.ui.screens.explore.AlbumPickerModal
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
@@ -57,6 +58,8 @@ import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.Neutral
 import kotlinx.coroutines.launch
+import com.bigshelf.app.ui.screens.sendLink
+import com.bigshelf.app.data.userMessage
 
 private fun plural(n: Int) = "$n photo${if (n > 1) "s" else ""}"
 
@@ -72,35 +75,59 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var pending by remember { mutableStateOf<String?>(null) }
-    var albumOpen by remember { mutableStateOf(false) }
+    // "copy" (add to album) or "move" (out of this album into another)
+    var albumPicker by remember { mutableStateOf<String?>(null) }
     var confirmPurge by remember { mutableStateOf(false) }
     val busy = pending != null
     val api = BigShelfApp.api
 
-    BackHandler(enabled = count > 0 && !albumOpen) { SelectionStore.clear() }
+    BackHandler(enabled = count > 0 && albumPicker == null) { SelectionStore.clear() }
 
+    // Inside an album, photos can be moved to another album or taken out of this one
+    val albumId = Regex("""^albums/([^/]+)$""").find(path)?.groupValues?.get(1)
     val mode = when {
         path.startsWith("bin") -> "bin"
         path.startsWith("archive") -> "archive"
+        albumId != null -> "album"
         else -> "library"
     }
     val personId = Regex("""^people/([^/]+)$""").find(path)?.groupValues?.get(1)?.takeIf { it != "untagged" }
     val unselected = SelectionStore.visible.filterNot { SelectionStore.isSelected(it.id) }
 
     // Every action moves photos out of the view they're in, so all photo views refresh after
-    fun runBulk(name: String, success: (Int) -> String, failure: String, request: suspend (Set<String>) -> Unit) {
+    // [undo] puts the photos back; it's offered on the success toast
+    fun runBulk(
+        name: String,
+        success: (Int) -> String,
+        failure: String,
+        undo: (suspend (Set<String>) -> Unit)? = null,
+        request: suspend (Set<String>) -> Unit,
+    ) {
         if (count == 0 || busy) return
         val ids = SelectionStore.ids
         pending = name
         scope.launch {
             try {
                 request(ids)
-                toast.success(success(ids.size))
+                if (undo == null) toast.success(success(ids.size))
+                else toast.success(success(ids.size), "Undo") {
+                    scope.launch {
+                        try {
+                            undo(ids)
+                        } catch (_: Exception) {
+                            toast.error("Couldn't undo")
+                        } finally {
+                            PhotoEvents.invalidateAll()
+                            PhotoEvents.invalidate("albums")
+                        }
+                    }
+                }
                 SelectionStore.clear()
             } catch (_: Exception) {
                 toast.error(failure)
             } finally {
                 PhotoEvents.invalidateAll()
+                PhotoEvents.invalidate("albums")
                 pending = null
             }
         }
@@ -161,11 +188,37 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                 }
                 Action("permanent-delete", BsIcons.Trash, "Delete forever", danger = true) { confirmPurge = true }
             } else {
-                Action("album", BsIcons.Stack, "Album") { albumOpen = true }
+                if (albumId != null) {
+                    Action("move", BsIcons.ArrowBendUpRight, "Move") { albumPicker = "move" }
+                    Action("copy", BsIcons.Copy, "Copy") { albumPicker = "copy" }
+                    Action("remove", BsIcons.MinusCircle, "Remove") {
+                        runBulk(
+                            "remove", { "Removed ${plural(it)} from album" }, "Failed to remove from album",
+                            undo = { api.addToAlbum(albumId, it) },
+                        ) { api.removeFromAlbum(albumId, it) }
+                    }
+                } else {
+                    Action("album", BsIcons.Stack, "Album") { albumPicker = "copy" }
+                }
                 if (personId != null) {
                     Action("untag", BsIcons.Tag, "Untag") {
                         runBulk("untag", { "Untagged ${plural(it)}" }, "Failed to untag photos") {
                             if (api.untagPhotos(personId, it).personDeleted) onPersonGone()
+                        }
+                    }
+                }
+                Action("share", BsIcons.ShareNetwork, "Share") {
+                    val ids = SelectionStore.ids
+                    pending = "share"
+                    scope.launch {
+                        try {
+                            sendLink(context, api.createShare(photoIds = ids))
+                            PhotoEvents.invalidate("shares")
+                            SelectionStore.clear()
+                        } catch (e: Exception) {
+                            toast.error(e.userMessage("Couldn't create a link"))
+                        } finally {
+                            pending = null
                         }
                     }
                 }
@@ -195,11 +248,17 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                     }
                 } else {
                     Action("archive", BsIcons.Archive, "Archive") {
-                        runBulk("archive", { "${plural(it)} archived" }, "Failed to archive photos") { api.flagArchived(it, true) }
+                        runBulk(
+                            "archive", { "${plural(it)} archived" }, "Failed to archive photos",
+                            undo = { api.flagArchived(it, false) },
+                        ) { api.flagArchived(it, true) }
                     }
                 }
                 Action("delete", BsIcons.Trash, "Bin", danger = true) {
-                    runBulk("delete", { "${plural(it)} moved to Bin" }, "Failed to move photos to Bin") { api.flagDeleted(it, true) }
+                    runBulk(
+                        "delete", { "${plural(it)} moved to Bin" }, "Failed to move photos to Bin",
+                        undo = { api.flagDeleted(it, false) },
+                    ) { api.flagDeleted(it, true) }
                 }
             }
         }
@@ -218,92 +277,25 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
             onClose = { confirmPurge = false },
         )
     }
-    if (albumOpen) AddToAlbumModal(onClose = { albumOpen = false })
-}
-
-/** Add-to-album picker: create a new album or add to an existing one (web AddToAlbumModal). */
-@Composable
-private fun AddToAlbumModal(onClose: () -> Unit) {
-    val api = BigShelfApp.api
-    val scope = rememberCoroutineScope()
-    var title by remember { mutableStateOf("") }
-    var saving by remember { mutableStateOf(false) }
-    val albums = rememberQuery("albums", invalidatedBy = setOf("albums")) { api.albums() }
-
-    fun save(request: suspend () -> Unit, success: String, failure: String) {
-        saving = true
-        scope.launch {
-            try {
-                request()
-                PhotoEvents.invalidate("albums")
-                toast.success(success)
-                SelectionStore.clear()
-                onClose()
-            } catch (_: Exception) {
-                toast.error(failure)
-            } finally {
-                saving = false
-            }
+    albumPicker?.let { kind ->
+        val moving = kind == "move"
+        // Copy adds to the picked album; Move also takes the photos out of this one
+        suspend fun into(targetId: String, label: String) {
+            val ids = SelectionStore.ids
+            api.addToAlbum(targetId, ids)
+            if (moving && albumId != null) api.removeFromAlbum(albumId, ids)
+            PhotoEvents.invalidate("albums")
+            toast.success("${if (moving) "Moved" else "Added"} ${plural(ids.size)} to $label")
+            SelectionStore.clear()
         }
-    }
-
-    val create = {
-        val clean = title.trim()
-        if (clean.isNotEmpty()) save({ api.createAlbum(clean, SelectionStore.ids) }, "Album created", "Failed to create album")
-    }
-
-    BsModal(
-        title = "Add to album",
-        onClose = onClose,
-        footer = {
-            BsButton(onClick = create, enabled = !saving && title.isNotBlank(), textStyle = BsText.Xs) {
-                Text(if (saving) "Saving…" else "Create album")
-            }
-        },
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            BsInput(
-                value = title,
-                onValueChange = { title = it },
-                placeholder = "New album title",
-                autoFocus = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { create() }),
-            )
-            Column(
-                Modifier.heightIn(max = 224.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                val items = albums.data.orEmpty()
-                items.forEach { album ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .bsClickable(enabled = !saving, scale = 0.98f) {
-                                save({ api.addToAlbum(album.id, SelectionStore.ids) }, "Added to album", "Failed to add to album")
-                            }
-                            .clip(BsShapes.Sm)
-                            .background(BsColors.Surface)
-                            .border(1.dp, BsColors.Border, BsShapes.Sm)
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            album.title,
-                            Modifier.weight(1f),
-                            style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text("${album.photoCount}", Modifier.padding(start = 8.dp), style = BsText.Xs, color = BsColors.Muted)
-                    }
-                }
-                if (items.isEmpty() && !albums.isLoading) {
-                    Text("No albums yet — create one above.", style = BsText.Xs, color = BsColors.Muted)
-                }
-            }
-        }
+        AlbumPickerModal(
+            title = if (moving) "Move to album" else "Add to album",
+            onClose = { albumPicker = null },
+            exclude = albumId,
+            onCreate = { title ->
+                val album = api.createAlbum(title)
+                into(album.id, album.title)
+            },
+        ) { album -> if (album != null) into(album.id, album.title) }
     }
 }
-

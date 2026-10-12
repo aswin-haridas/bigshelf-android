@@ -1,8 +1,5 @@
 package com.bigshelf.app.ui.shell
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +26,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.state.AuthStore
-import com.bigshelf.app.state.UploadStore
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.Routes
 import com.bigshelf.app.ui.components.BsIcon
@@ -46,7 +42,7 @@ import kotlin.math.log10
 import kotlin.math.pow
 
 // Decimal units, like Google Photos ("23.8 GB") - web sidebar formatBytes
-private fun formatBytes(bytes: Long): String {
+fun formatBytes(bytes: Long): String {
     val units = listOf("B", "KB", "MB", "GB", "TB")
     val i = if (bytes > 0) minOf(floor(log10(bytes.toDouble()) / 3).toInt(), units.lastIndex) else 0
     val value = bytes / 1000.0.pow(i)
@@ -108,9 +104,7 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val storage = rememberQuery("storage", invalidatedBy = setOf("photos")) { BigShelfApp.api.storage() }
     // System photo picker stands in for the web dropzone / file dialog
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
-        UploadStore.start(uris)
-    }
+    val upload = rememberUploadPicker()
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Library", count = storage.data?.let { "${formatBytes(it.usedBytes)} used" })
@@ -120,11 +114,14 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
         ) {
             Group {
                 LibraryRow("Upload photos", BsIcons.UploadSimple, caret = false, onClick = {
-                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                    upload()
                 })
             }
             Group {
-                LibraryRow("Archive", BsIcons.Archive, onClick = { onNavigate(Routes.ARCHIVE) })
+                LibraryRow("Favourites", BsIcons.Heart, onClick = { onNavigate(Routes.FAVOURITES) })
+                LibraryRow("Backup & storage", BsIcons.CloudArrowUp, divider = true, onClick = { onNavigate(Routes.BACKUP) })
+                LibraryRow("Sharing", BsIcons.ShareNetwork, divider = true, onClick = { onNavigate(Routes.SHARING) })
+                LibraryRow("Archive", BsIcons.Archive, divider = true, onClick = { onNavigate(Routes.ARCHIVE) })
                 LibraryRow("Bin", BsIcons.Trash, divider = true, onClick = { onNavigate(Routes.BIN) })
             }
             Group("Tools") {

@@ -1,11 +1,17 @@
 package com.bigshelf.app.data
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.OpenableColumns
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -35,7 +41,10 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /** A failed API call; [message] is already human readable (FastAPI `detail`). */
-class ApiException(val code: Int, message: String) : IOException(message)
+open class ApiException(val code: Int, message: String) : IOException(message)
+
+/** The presigned PUT to storage failed (expired URL, timeout, storage down): worth retrying. */
+class StorageUploadException(code: Int) : ApiException(code, "Upload failed")
 
 /** Web `getErrorMessage`: the error's message, or [fallback] for non-API failures. */
 fun Throwable.userMessage(fallback: String = "Request failed"): String =
@@ -206,15 +215,41 @@ class Api(context: Context, val baseUrl: String) {
 
     // ---------- Photos ----------
 
-    suspend fun photos(page: Int, favorite: Boolean? = null) =
-        get("/api/v1/photos", PhotoPage.serializer(), mapOf("page" to page, "size" to PAGE_SIZE, "favorite" to favorite))
+    suspend fun photos(page: Int, favorite: Boolean? = null, size: Int = PAGE_SIZE, filter: PhotoFilter? = null) =
+        get(
+            "/api/v1/photos", PhotoPage.serializer(),
+            mapOf("page" to page, "size" to size, "favorite" to favorite) + filterParams(filter),
+        )
+
+    private fun filterParams(filter: PhotoFilter?): Map<String, Any?> = mapOf(
+        "taken_from" to filter?.takenFrom,
+        "taken_to" to filter?.takenTo,
+        "bbox" to filter?.bbox?.joinToString(","),
+        "unorganized" to filter?.unorganized?.takeIf { it },
+    )
+
+    // ---------- Search tab groupings ----------
+
+    suspend fun locations() = get("/api/v1/photos/locations", LocationList.serializer()).items
+
+    suspend fun places() = get("/api/v1/photos/places", PlaceList.serializer()).items
+
+    suspend fun events(offset: Int = 0, limit: Int = 30) =
+        get("/api/v1/photos/events", EventList.serializer(), mapOf("offset" to offset, "limit" to limit))
+
+    suspend fun bursts(offset: Int = 0, limit: Int = 10) =
+        get("/api/v1/photos/bursts", BurstList.serializer(), mapOf("offset" to offset, "limit" to limit))
+
+    suspend fun photosByColor(color: String, page: Int) =
+        get("/api/v1/photos/by-color", PhotoPage.serializer(), mapOf("color" to color, "page" to page, "size" to PAGE_SIZE))
 
     suspend fun searchPhotos(q: String) =
         get("/api/v1/photos/search", PhotoPage.serializer(), mapOf("q" to q)).items
 
     suspend fun photo(id: String) = get("/api/v1/photos/$id", Photo.serializer())
 
-    suspend fun bin(page: Int) = get("/api/v1/photos/bin", PhotoPage.serializer(), mapOf("page" to page, "size" to PAGE_SIZE))
+    suspend fun bin(page: Int, size: Int = PAGE_SIZE) =
+        get("/api/v1/photos/bin", PhotoPage.serializer(), mapOf("page" to page, "size" to size))
 
     suspend fun emptyBin() = send("POST", "/api/v1/photos/bin/empty", CountResponse.serializer())
 
@@ -307,22 +342,63 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun mergePeople(sourceId: String, targetId: String) =
         sendUnit("POST", "/api/v1/people/$sourceId/merge", buildJsonObject { put("target_person_id", targetId) })
 
+    /** Name a detected face: an existing person by id, or a new (or matching) name. */
+    suspend fun tagFace(faceId: String, name: String? = null, personId: String? = null) = send(
+        "POST", "/api/v1/faces/$faceId/tag", FaceTagResult.serializer(),
+        buildJsonObject {
+            if (personId != null) put("person_id", personId) else put("name", name)
+        },
+    )
+
     // ---------- Albums ----------
 
-    suspend fun albums() = get("/api/v1/albums", AlbumList.serializer(), mapOf("size" to 50)).items
+    /** Every album by default; [parentId] lists one album's sub-albums, [topLevel] the roots. */
+    suspend fun albums(parentId: String? = null, topLevel: Boolean = false) = get(
+        "/api/v1/albums", AlbumList.serializer(),
+        mapOf("size" to 100, "parent_id" to parentId, "top_level" to topLevel.takeIf { it }),
+    ).items
+
+    suspend fun album(id: String) = get("/api/v1/albums/$id", AlbumListItem.serializer())
+
+    suspend fun albumPhotos(id: String, page: Int) =
+        get("/api/v1/albums/$id/photos", PhotoPage.serializer(), mapOf("page" to page, "size" to PAGE_SIZE))
 
     suspend fun addToAlbum(albumId: String, photoIds: Collection<String>) = sendUnit(
         "POST", "/api/v1/albums/$albumId/photos",
         buildJsonObject { put("photo_ids", ids(photoIds)) },
     )
 
-    suspend fun createAlbum(title: String, photoIds: Collection<String>) = sendUnit(
-        "POST", "/api/v1/albums",
+    suspend fun removeFromAlbum(albumId: String, photoIds: Collection<String>) = sendUnit(
+        "DELETE", "/api/v1/albums/$albumId/photos",
+        buildJsonObject { put("photo_ids", ids(photoIds)) },
+    )
+
+    /** New album with [photoIds], inside [parentId], plus every photo [filter] matches (smart album). */
+    suspend fun createAlbum(
+        title: String,
+        photoIds: Collection<String> = emptyList(),
+        parentId: String? = null,
+        filter: PhotoFilter? = null,
+    ) = send(
+        "POST", "/api/v1/albums", AlbumListItem.serializer(),
         buildJsonObject {
             put("title", title)
             put("photo_ids", ids(photoIds))
+            parentId?.let { put("parent_id", it) }
+            filter?.takenFrom?.let { put("taken_from", it) }
+            filter?.takenTo?.let { put("taken_to", it) }
+            filter?.bbox?.let { box -> put("bbox", JsonArray(box.map(::JsonPrimitive))) }
         },
     )
+
+    suspend fun renameAlbum(id: String, title: String) =
+        send("PATCH", "/api/v1/albums/$id", AlbumListItem.serializer(), buildJsonObject { put("title", title) })
+
+    /** Move inside [parentId]; null moves it to the top level. */
+    suspend fun moveAlbum(id: String, parentId: String?) =
+        send("PATCH", "/api/v1/albums/$id", AlbumListItem.serializer(), buildJsonObject { put("parent_id", parentId) })
+
+    suspend fun deleteAlbum(id: String) = sendUnit("DELETE", "/api/v1/albums/$id")
 
     suspend fun prioritize(id: String) = send("POST", "/api/v1/photos/$id/priority", Photo.serializer())
 
@@ -358,6 +434,37 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun organize(limit: Int) =
         get("/api/v1/photos/organize", MapSerializer(String.serializer(), Bucket.serializer()), mapOf("limit" to limit))
 
+    // ---------- Sharing ----------
+
+    /** Web address of a share link: the web app serves /s/{token} on the API's origin. */
+    fun shareUrl(token: String) = "$baseUrl/s/$token"
+
+    suspend fun shares() = get("/api/v1/shares", ListSerializer(ShareLink.serializer()))
+
+    /** A public link to [albumId], or to [photoIds] when no album is given. */
+    suspend fun createShare(albumId: String? = null, photoIds: Collection<String> = emptyList()) = send(
+        "POST", "/api/v1/shares", ShareLink.serializer(),
+        buildJsonObject { if (albumId != null) put("album_id", albumId) else put("photo_ids", ids(photoIds)) },
+    )
+
+    suspend fun deleteShare(id: String) = sendUnit("DELETE", "/api/v1/shares/$id")
+
+    /** Albums other people shared with you. */
+    suspend fun sharedAlbums() = get("/api/v1/albums/shared", AlbumList.serializer()).items
+
+    suspend fun albumMembers(albumId: String) =
+        get("/api/v1/albums/$albumId/members", ListSerializer(AlbumMember.serializer()))
+
+    /** Shares the album with a user, by username or email. Returns everyone in it. */
+    suspend fun addAlbumMember(albumId: String, identifier: String) = send(
+        "POST", "/api/v1/albums/$albumId/members", ListSerializer(AlbumMember.serializer()),
+        buildJsonObject { put("identifier", identifier) },
+    )
+
+    /** The owner removes someone; with your own id, you leave. */
+    suspend fun removeAlbumMember(albumId: String, userId: String) =
+        sendUnit("DELETE", "/api/v1/albums/$albumId/members/$userId")
+
     // ---------- System ----------
 
     suspend fun systemStats() = get("/api/v1/system/stats", SystemStats.serializer())
@@ -369,9 +476,10 @@ class Api(context: Context, val baseUrl: String) {
     /**
      * Same three steps as the web `useUpload`: reserve a job, PUT the file straight to
      * storage with the presigned URL, then tell the API it landed so Celery processes it.
-     * [onProgress] gets bytes sent so far.
+     * [onProgress] gets bytes sent so far. With [contentHash] (SHA-256 hex) the API refuses
+     * a file already in the library with a 409 before any bytes are sent.
      */
-    suspend fun upload(uri: Uri, onProgress: (Long) -> Unit) {
+    suspend fun upload(uri: Uri, contentHash: String? = null, albumId: String? = null, onProgress: (Long) -> Unit) {
         val resolver = appContext.contentResolver
         var name = "upload"
         var size = -1L
@@ -386,13 +494,15 @@ class Api(context: Context, val baseUrl: String) {
             put("filename", name)
             put("size", size.coerceAtLeast(0))
             put("content_type", contentType)
+            if (contentHash != null) put("content_hash", contentHash)
         })
-        withContext(Dispatchers.IO) {
+        // Interruptible so cancelling the caller (backup paused) aborts the PUT mid-file
+        runInterruptible(Dispatchers.IO) {
             val body = object : RequestBody() {
                 override fun contentType(): MediaType? = contentType.toMediaTypeOrNull()
                 override fun contentLength() = size
                 override fun writeTo(sink: BufferedSink) {
-                    resolver.openInputStream(uri)!!.source().use { source ->
+                    openOriginal(uri).source().use { source ->
                         var sent = 0L
                         while (true) {
                             val read = source.read(sink.buffer, 64 * 1024L)
@@ -406,13 +516,30 @@ class Api(context: Context, val baseUrl: String) {
             }
             val put = Request.Builder().url(init.url).put(body).build()
             bareClient.newCall(put).execute().use { res: Response ->
-                if (!res.isSuccessful) throw ApiException(res.code, "Upload failed")
+                if (!res.isSuccessful) throw StorageUploadException(res.code)
             }
         }
         sendUnit("POST", "/api/v1/photos/uploads/${init.jobId}/complete", buildJsonObject {
             put("key", init.key)
             put("filename", name)
+            // Lands in this album once processed (yours, or one shared with you)
+            if (albumId != null) put("album_id", albumId)
         })
+    }
+
+    /**
+     * The file with its EXIF location intact. Android strips GPS from picked and shared photos
+     * unless the app holds ACCESS_MEDIA_LOCATION and asks MediaStore for the original; picker
+     * URIs that don't allow that (or no permission) fall back to the redacted copy.
+     */
+    private fun openOriginal(uri: Uri): java.io.InputStream {
+        val resolver = appContext.contentResolver
+        val canAsk = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            uri.authority == MediaStore.AUTHORITY &&
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_MEDIA_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (canAsk) runCatching { resolver.openInputStream(MediaStore.setRequireOriginal(uri)) }.getOrNull()?.let { return it }
+        return resolver.openInputStream(uri) ?: throw IOException("Can't read $uri")
     }
 
     fun fileSize(uri: Uri): Long =

@@ -47,6 +47,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
+    // Automatic backup runs as a periodic background job
+    implementation(libs.androidx.work.runtime)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -62,4 +64,6 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     // Same icon set as the web app (@phosphor-icons/react)
     implementation(libs.phosphor.icons)
+    // Map of where photos were taken: OpenStreetMap tiles, no API key
+    implementation(libs.osmdroid)
 }

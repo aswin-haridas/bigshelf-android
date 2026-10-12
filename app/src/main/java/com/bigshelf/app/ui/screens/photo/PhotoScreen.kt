@@ -6,6 +6,35 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import com.bigshelf.app.data.CameraInfo
+import com.bigshelf.app.data.FaceBox
+import com.bigshelf.app.data.PlaceNames
+import com.bigshelf.app.data.userMessage
+import com.bigshelf.app.state.rememberQuery
+import com.bigshelf.app.ui.components.BsButton
+import com.bigshelf.app.ui.components.BsInput
+import com.bigshelf.app.ui.components.BsModal
+import com.bigshelf.app.ui.components.ButtonVariant
+import com.bigshelf.app.ui.photos.personImageSrc
+import com.bigshelf.app.ui.photos.photoCountLabel
+import com.bigshelf.app.ui.screens.explore.rememberPlaceName
+import com.bigshelf.app.ui.shell.formatBytes
+import com.bigshelf.app.ui.theme.MonoFamily
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -87,10 +116,11 @@ private fun formatDate(iso: String?): String? = iso?.let {
  * Port of modules/home/preview.tsx as a mobile viewer: edge-to-edge photo, a back button on
  * top and the actions along the bottom, both hidden by a tap. Info opens as a bottom sheet.
  * Swipe left/right walks the grid it was opened from (web: arrow keys / ImageNav); only the
- * photo moves - the bars stay put and follow the current page.
+ * photo moves - the bars stay put and follow the current page. Pinch or double-tap zooms (and
+ * holds the pager still); at 1x, swiping down closes the viewer and swiping up opens Info.
  */
 @Composable
-fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit) {
+fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit, onMap: (Double, Double) -> Unit) {
     // The grid's list if it contains this photo, else just this one
     val list = remember(photoId) {
         ViewerList.photos.takeIf { l -> l.any { it.id == photoId } } ?: listOf(Photo(id = photoId))
@@ -100,15 +130,27 @@ fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit)
     var chrome by rememberSaveable { mutableStateOf(true) }
     // Detail records by id, filled by the pages and read by the fixed bars
     val details = remember { mutableStateMapOf<String, Photo>() }
+    // A zoomed-in photo pans instead of paging
+    var zoomed by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        HorizontalPager(pager, Modifier.fillMaxSize(), key = { list[it].id }, beyondViewportPageCount = 1) { page ->
+        HorizontalPager(
+            pager,
+            Modifier.fillMaxSize(),
+            key = { list[it].id },
+            beyondViewportPageCount = 1,
+            userScrollEnabled = !zoomed,
+        ) { page ->
             val id = list[page].id
             PhotoPage(
                 gridPhoto = list[page],
                 image = details[id],
+                isCurrent = page == pager.currentPage,
                 onLoaded = { details[id] = it },
                 onToggleChrome = { chrome = !chrome },
+                onZoomChange = { zoomed = it },
+                onSwipeDown = onBack,
+                onSwipeUp = { if (details[id] != null) showInfo = true },
             )
         }
 
@@ -120,14 +162,123 @@ fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit)
             AnimatedVisibility(chrome, Modifier.align(Alignment.BottomCenter), enter = fadeIn(BsMotion.fast()), exit = fadeOut(BsMotion.fast())) {
                 ActionBar(current, onInfo = { showInfo = true }, onChanged = { details[it.id] = it }, onDeleted = onBack)
             }
-            if (showInfo) InfoSheet(current, onPerson, onDismiss = { showInfo = false })
+            if (showInfo) InfoSheet(current, onPerson, onMap, onDismiss = { showInfo = false })
         }
     }
 }
 
+/** One photo's zoom: scale, pan offset, and the vertical drag of a swipe at 1x. */
+private class ZoomState {
+    var scale by mutableFloatStateOf(1f)
+    var offset by mutableStateOf(Offset.Zero)
+    var drag by mutableFloatStateOf(0f)
+
+    fun reset() {
+        scale = 1f
+        offset = Offset.Zero
+    }
+}
+
+private const val MAX_ZOOM = 5f
+private const val DOUBLE_TAP_ZOOM = 2.5f
+private val SWIPE_CLOSE = 96.dp
+
+// How far the scaled photo may move: until its edge reaches the screen's
+private fun PointerInputScope.clamp(offset: Offset, scale: Float): Offset {
+    val maxX = size.width * (scale - 1) / 2
+    val maxY = size.height * (scale - 1) / 2
+    return Offset(offset.x.coerceIn(-maxX, maxX), offset.y.coerceIn(-maxY, maxY))
+}
+
+/**
+ * Pinch / double-tap zoom and pan. One finger at 1x is left to the pager when it moves
+ * sideways; a mostly vertical move is a swipe ([onSwipeDown] closes, [onSwipeUp] opens Info).
+ */
+private fun Modifier.zoomable(
+    state: ZoomState,
+    onTap: () -> Unit,
+    onSwipeDown: () -> Unit,
+    onSwipeUp: () -> Unit,
+): Modifier = this
+    .pointerInput(state) {
+        detectTapGestures(
+            onTap = { onTap() },
+            onDoubleTap = { tap ->
+                if (state.scale > 1f) {
+                    state.reset()
+                } else {
+                    // Zoom in on the tapped spot
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    state.scale = DOUBLE_TAP_ZOOM
+                    state.offset = clamp((center - tap) * (DOUBLE_TAP_ZOOM - 1), DOUBLE_TAP_ZOOM)
+                }
+            },
+        )
+    }
+    .pointerInput(state) {
+        val slop = viewConfiguration.touchSlop
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            // 0 undecided, 1 zoom/pan, 2 vertical swipe, 3 left to the pager
+            var mode = 0
+            var travel = Offset.Zero
+            do {
+                val event = awaitPointerEvent()
+                val fingers = event.changes.count { it.pressed }
+                if (mode == 0 || mode == 3) {
+                    if (fingers > 1 || state.scale > 1f) {
+                        mode = 1
+                    } else if (mode == 0) {
+                        travel += event.calculatePan()
+                        if (travel.getDistance() > slop) mode = if (abs(travel.y) > abs(travel.x) * 1.5f) 2 else 3
+                    }
+                }
+                when (mode) {
+                    1 -> {
+                        val centroid = event.calculateCentroid(useCurrent = true)
+                        if (centroid != Offset.Unspecified) {
+                            // Keep the point under the fingers still while scaling around it
+                            val newScale = (state.scale * event.calculateZoom()).coerceIn(1f, MAX_ZOOM)
+                            val c = centroid - Offset(size.width / 2f, size.height / 2f)
+                            val moved = c - (c - state.offset) * (newScale / state.scale) + event.calculatePan()
+                            state.scale = newScale
+                            state.offset = clamp(moved, newScale)
+                        }
+                        event.changes.forEach { if (it.positionChanged()) it.consume() }
+                    }
+                    2 -> {
+                        state.drag += event.calculatePan().y
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            } while (event.changes.any { it.pressed })
+            if (mode == 2) {
+                val threshold = SWIPE_CLOSE.toPx()
+                if (state.drag > threshold) onSwipeDown() else if (state.drag < -threshold) onSwipeUp()
+                state.drag = 0f
+            }
+            if (state.scale <= 1.01f) state.reset()
+        }
+    }
+
 @Composable
-private fun PhotoPage(gridPhoto: Photo, image: Photo?, onLoaded: (Photo) -> Unit, onToggleChrome: () -> Unit) {
+private fun PhotoPage(
+    gridPhoto: Photo,
+    image: Photo?,
+    isCurrent: Boolean,
+    onLoaded: (Photo) -> Unit,
+    onToggleChrome: () -> Unit,
+    onZoomChange: (Boolean) -> Unit,
+    onSwipeDown: () -> Unit,
+    onSwipeUp: () -> Unit,
+) {
     val api = BigShelfApp.api
+    val zoom = remember { ZoomState() }
+    val zoomedIn = zoom.scale > 1f
+    // Only the page on screen drives the pager lock; one swiped away starts fresh next time
+    LaunchedEffect(zoomedIn, isCurrent) {
+        if (isCurrent) onZoomChange(zoomedIn) else zoom.reset()
+    }
     var notFound by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
 
@@ -159,7 +310,15 @@ private fun PhotoPage(gridPhoto: Photo, image: Photo?, onLoaded: (Photo) -> Unit
         Box(
             Modifier
                 .fillMaxSize()
-                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onToggleChrome),
+                .zoomable(zoom, onTap = onToggleChrome, onSwipeDown = onSwipeDown, onSwipeUp = onSwipeUp)
+                .graphicsLayer {
+                    scaleX = zoom.scale
+                    scaleY = zoom.scale
+                    translationX = zoom.offset.x
+                    // A swipe down drags the photo along (and fades it) before closing
+                    translationY = zoom.offset.y + zoom.drag.coerceAtLeast(0f)
+                    alpha = 1f - (zoom.drag.coerceAtLeast(0f) / (size.height.coerceAtLeast(1f))).coerceIn(0f, 0.5f)
+                },
             contentAlignment = Alignment.Center,
         ) {
             when {
@@ -375,7 +534,9 @@ private fun ActionBar(image: Photo, onInfo: () -> Unit, onChanged: (Photo) -> Un
 /** Port of image-info-sidebar.tsx as a bottom sheet on the surface colour. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onDismiss: () -> Unit) {
+private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onMap: (Double, Double) -> Unit, onDismiss: () -> Unit) {
+    // An untagged face picked for naming
+    var naming by remember { mutableStateOf<FaceBox?>(null) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = BsColors.Surface,
@@ -393,7 +554,29 @@ private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onDismiss: () ->
                 InfoField(if (image.takenAt != null) "Taken" else "Uploaded") { Text(date, style = BsText.Sm, color = BsColors.MutedSoft) }
             }
             if (image.width != null && image.height != null) {
-                InfoField("Dimensions") { Text("${image.width} × ${image.height}", style = BsText.Sm, color = BsColors.MutedSoft) }
+                val megapixels = image.width * image.height / 1_000_000.0
+                InfoField("Dimensions") {
+                    Text(
+                        "${image.width} × ${image.height}" + if (megapixels >= 0.1) String.format(Locale.US, " · %.1f MP", megapixels) else "",
+                        style = BsText.Sm,
+                        color = BsColors.MutedSoft,
+                    )
+                }
+            }
+            InfoField("File") {
+                Text(image.filename, style = BsText.Sm, color = BsColors.MutedSoft)
+                Text(
+                    listOfNotNull(image.mimeType, image.sizeBytes?.let(::formatBytes)).joinToString(" · "),
+                    style = BsText.Xs,
+                    color = BsColors.Muted,
+                )
+            }
+            image.exif?.let { camera -> CameraField(camera) }
+            if (image.latitude != null && image.longitude != null) {
+                LocationField(image.latitude, image.longitude, onMap = {
+                    onDismiss()
+                    onMap(image.latitude, image.longitude)
+                })
             }
             // Faces only exist for images; a video would sit at "Detecting…" forever
             if (!image.isVideo) {
@@ -412,12 +595,16 @@ private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onDismiss: () ->
                                     row.forEach { face ->
                                         FaceTile(
                                             imageSrc = face.thumbnailUrl,
-                                            name = face.personName ?: "Untagged",
+                                            name = face.personName ?: face.suggestedName?.let { "$it?" } ?: "Add name",
                                             subtitle = null,
+                                            // Tagged faces open the person; untagged ones get a name
                                             onClick = {
-                                                face.personId?.let {
+                                                val person = face.personId
+                                                if (person != null) {
                                                     onDismiss()
-                                                    onPerson(it)
+                                                    onPerson(person)
+                                                } else if (face.faceId != null) {
+                                                    naming = face
                                                 }
                                             },
                                             modifier = Modifier.weight(1f),
@@ -434,6 +621,124 @@ private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onDismiss: () ->
                 InfoField("Tagged") { Text("$name (no face detected)", style = BsText.Sm, color = BsColors.MutedSoft) }
             }
             Box(Modifier.height(8.dp))
+        }
+    }
+    naming?.let { NameFaceModal(it, onClose = { naming = null }) }
+}
+
+// "1/120 s" under a second, "2 s" above
+private fun exposure(seconds: Double): String =
+    if (seconds < 1) "1/${(1 / seconds).roundToInt()} s" else "${String.format(Locale.US, "%.1f", seconds).removeSuffix(".0")} s"
+
+/** Camera, lens and exposure settings from the upload's EXIF. */
+@Composable
+private fun CameraField(camera: CameraInfo) {
+    // "Google Pixel 8", without doubling a make the model already starts with ("Apple iPhone")
+    val name = listOfNotNull(
+        camera.make?.takeUnless { make -> camera.model?.startsWith(make, ignoreCase = true) == true },
+        camera.model,
+    ).joinToString(" ")
+    val settings = listOfNotNull(
+        camera.fNumber?.let { "ƒ/${String.format(Locale.US, "%.1f", it).removeSuffix(".0")}" },
+        camera.exposureTime?.takeIf { it > 0 }?.let(::exposure),
+        camera.iso?.let { "ISO $it" },
+        camera.focalLength?.let { "${String.format(Locale.US, "%.1f", it).removeSuffix(".0")} mm" },
+    ).joinToString(" · ")
+    if (name.isEmpty() && settings.isEmpty() && camera.lens == null) return
+    InfoField("Camera") {
+        if (name.isNotEmpty()) Text(name, style = BsText.Sm, color = BsColors.MutedSoft)
+        camera.lens?.let { Text(it, style = BsText.Xs, color = BsColors.Muted) }
+        if (settings.isNotEmpty()) Text(settings, style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted)
+    }
+}
+
+/** Where it was taken: the town (Geocoder), the coordinates, and a way onto the map. */
+@Composable
+private fun LocationField(lat: Double, lon: Double, onMap: () -> Unit) {
+    val place = rememberPlaceName(lat, lon)
+    InfoField("Location") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(place ?: PlaceNames.coordinates(lat, lon), style = BsText.Sm, color = BsColors.MutedSoft)
+                if (place != null) Text(PlaceNames.coordinates(lat, lon), style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted)
+            }
+            BsButton(onClick = onMap, variant = ButtonVariant.Secondary, textStyle = BsText.Xs) {
+                BsIcon(BsIcons.MapTrifold, size = 14.dp)
+                Text("Map")
+            }
+        }
+    }
+}
+
+/**
+ * Name an untagged face: an existing person (filtered as you type) or a new name. The backend
+ * also tags other faces that match it closely, so naming one face groups its lookalikes.
+ */
+@Composable
+private fun NameFaceModal(face: FaceBox, onClose: () -> Unit) {
+    val api = BigShelfApp.api
+    val scope = rememberCoroutineScope()
+    val people = rememberQuery("people-all", invalidatedBy = setOf("people")) { api.people().items }
+    var name by remember { mutableStateOf(face.suggestedName.orEmpty()) }
+    var saving by remember { mutableStateOf(false) }
+
+    fun tag(personId: String?, label: String) {
+        val faceId = face.faceId ?: return
+        if (saving) return
+        saving = true
+        scope.launch {
+            try {
+                val result = api.tagFace(faceId, name = label, personId = personId)
+                PhotoEvents.invalidate("photo", "people", "faces", "photos")
+                toast.success(
+                    "Tagged as ${result.personName.ifEmpty { label }}" +
+                        if (result.autoTaggedCount > 0) " (+${result.autoTaggedCount} similar)" else "",
+                )
+                onClose()
+            } catch (e: Exception) {
+                toast.error(e.userMessage("Failed to tag face"))
+            } finally {
+                saving = false
+            }
+        }
+    }
+
+    val clean = name.trim()
+    val matches = people.data.orEmpty()
+        .filter { !it.isSkipped && (clean.isEmpty() || it.name.contains(clean, ignoreCase = true)) }
+        .take(12)
+    BsModal(
+        title = "Who is this?",
+        onClose = onClose,
+        footer = {
+            BsButton(onClick = { tag(null, clean) }, enabled = clean.isNotEmpty() && !saving, loading = saving, textStyle = BsText.Xs) {
+                Text(if (clean.isEmpty()) "Add name" else "Tag as \"$clean\"")
+            }
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                FaceTile(imageSrc = face.thumbnailUrl, name = null, subtitle = null, onClick = {}, modifier = Modifier.size(64.dp))
+                BsInput(value = name, onValueChange = { name = it }, placeholder = "Name", autoFocus = true, modifier = Modifier.weight(1f))
+            }
+            Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                matches.forEach { person ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(BsShapes.Md)
+                            .bsClickable(enabled = !saving, scale = 0.98f) { tag(person.id, person.name) }
+                            .background(BsColors.Surface)
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        FaceTile(imageSrc = personImageSrc(person), name = null, subtitle = null, onClick = { tag(person.id, person.name) }, modifier = Modifier.size(36.dp))
+                        Text(person.name, Modifier.weight(1f), style = BsText.Sm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(photoCountLabel(person.photoCount), style = BsText.Xs, color = BsColors.Muted)
+                    }
+                }
+            }
         }
     }
 }

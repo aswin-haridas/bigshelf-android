@@ -18,6 +18,22 @@ import com.adamglin.phosphoricons.fill.Users as FillUsers
 import com.adamglin.phosphoricons.fill.Info as FillInfo
 import com.adamglin.phosphoricons.fill.Play as FillPlay
 import com.adamglin.phosphoricons.fill.WarningCircle as FillWarningCircle
+import com.adamglin.phosphoricons.fill.MagnifyingGlass as FillMagnifyingGlass
+import com.adamglin.phosphoricons.regular.AirplaneTilt
+import com.adamglin.phosphoricons.regular.Aperture
+import com.adamglin.phosphoricons.regular.ArrowBendUpRight
+import com.adamglin.phosphoricons.regular.CalendarBlank
+import com.adamglin.phosphoricons.regular.Camera
+import com.adamglin.phosphoricons.regular.Crosshair
+import com.adamglin.phosphoricons.regular.DotsThreeVertical
+import com.adamglin.phosphoricons.regular.File
+import com.adamglin.phosphoricons.regular.FolderSimplePlus
+import com.adamglin.phosphoricons.regular.MapPin
+import com.adamglin.phosphoricons.regular.MapTrifold
+import com.adamglin.phosphoricons.regular.MinusCircle
+import com.adamglin.phosphoricons.regular.Palette
+import com.adamglin.phosphoricons.regular.Plus
+import com.adamglin.phosphoricons.regular.Sparkle
 import com.adamglin.phosphoricons.regular.Archive
 import com.adamglin.phosphoricons.regular.Broom
 import com.adamglin.phosphoricons.regular.Star
@@ -28,6 +44,11 @@ import com.adamglin.phosphoricons.regular.Funnel
 import com.adamglin.phosphoricons.regular.FlowArrow
 import com.adamglin.phosphoricons.regular.Copy
 import com.adamglin.phosphoricons.regular.Clock
+import com.adamglin.phosphoricons.regular.CloudArrowUp
+import com.adamglin.phosphoricons.regular.Pause
+import com.adamglin.phosphoricons.regular.ShareNetwork
+import com.adamglin.phosphoricons.regular.UserPlus
+import com.adamglin.phosphoricons.regular.Play
 import com.adamglin.phosphoricons.regular.ArrowUpRight
 import com.adamglin.phosphoricons.regular.ArrowUUpLeft
 import com.adamglin.phosphoricons.regular.ArrowClockwise
@@ -65,9 +86,31 @@ import com.adamglin.phosphoricons.regular.Users
  */
 object BsIcons {
     val Archive: ImageVector get() = PhosphorIcons.Regular.Archive
+    // Search tab, albums, places, events, viewer Info
+    val AirplaneTilt: ImageVector get() = PhosphorIcons.Regular.AirplaneTilt
+    val Aperture: ImageVector get() = PhosphorIcons.Regular.Aperture
+    val ArrowBendUpRight: ImageVector get() = PhosphorIcons.Regular.ArrowBendUpRight
+    val CalendarBlank: ImageVector get() = PhosphorIcons.Regular.CalendarBlank
+    val Camera: ImageVector get() = PhosphorIcons.Regular.Camera
+    val Crosshair: ImageVector get() = PhosphorIcons.Regular.Crosshair
+    val DotsThreeVertical: ImageVector get() = PhosphorIcons.Regular.DotsThreeVertical
+    val File: ImageVector get() = PhosphorIcons.Regular.File
+    val FolderSimplePlus: ImageVector get() = PhosphorIcons.Regular.FolderSimplePlus
+    val MagnifyingGlassFill: ImageVector get() = PhosphorIcons.Fill.FillMagnifyingGlass
+    val MapPin: ImageVector get() = PhosphorIcons.Regular.MapPin
+    val MapTrifold: ImageVector get() = PhosphorIcons.Regular.MapTrifold
+    val MinusCircle: ImageVector get() = PhosphorIcons.Regular.MinusCircle
+    val Palette: ImageVector get() = PhosphorIcons.Regular.Palette
+    val Plus: ImageVector get() = PhosphorIcons.Regular.Plus
+    val Sparkle: ImageVector get() = PhosphorIcons.Regular.Sparkle
     val ArrowUUpLeft: ImageVector get() = PhosphorIcons.Regular.ArrowUUpLeft
     val ArrowUpRight: ImageVector get() = PhosphorIcons.Regular.ArrowUpRight
     val Clock: ImageVector get() = PhosphorIcons.Regular.Clock
+    val CloudArrowUp: ImageVector get() = PhosphorIcons.Regular.CloudArrowUp
+    val Pause: ImageVector get() = PhosphorIcons.Regular.Pause
+    val ShareNetwork: ImageVector get() = PhosphorIcons.Regular.ShareNetwork
+    val UserPlus: ImageVector get() = PhosphorIcons.Regular.UserPlus
+    val Play: ImageVector get() = PhosphorIcons.Regular.Play
     val Copy: ImageVector get() = PhosphorIcons.Regular.Copy
     val FlowArrow: ImageVector get() = PhosphorIcons.Regular.FlowArrow
     val Funnel: ImageVector get() = PhosphorIcons.Regular.Funnel

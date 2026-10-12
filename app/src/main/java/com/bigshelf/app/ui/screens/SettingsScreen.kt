@@ -1,5 +1,7 @@
 package com.bigshelf.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -16,8 +18,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -27,8 +31,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
+import androidx.work.WorkInfo
 import com.bigshelf.app.BigShelfApp
+import com.bigshelf.app.data.Backup
+import com.bigshelf.app.data.BackupWorker
 import com.bigshelf.app.data.SystemStats
+import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.PageHeader
@@ -39,13 +47,18 @@ import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
+import com.bigshelf.app.ui.shell.formatBytes
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val SYSTEM_STATS_POLL_MS = 3000L
 
@@ -188,6 +201,82 @@ fun SettingsScreen(onBack: () -> Unit) {
                     ) {
                         if (regenerating) Spinner(size = 16.dp) else BsIcon(BsIcons.ArrowsClockwise, size = 16.dp)
                         Text("Regenerate")
+                    }
+                }
+            }
+        }
+        Box(Modifier.height(8.dp))
+    }
+    }
+}
+
+/** Automatic backup of this phone's photos and videos, and the storage they take on BigShelf. */
+@Composable
+fun BackupScreen(onBack: () -> Unit) {
+    val api = BigShelfApp.api
+    val backup = BigShelfApp.backup
+    val work by remember { backup.workInfo() }.collectAsState(emptyList())
+    val progress = work.firstOrNull { it.state == WorkInfo.State.RUNNING }?.progress
+    val total = progress?.getInt(BackupWorker.TOTAL, 0) ?: 0
+    // Recounted as the run moves on; null without media permission
+    val waiting by produceState<Int?>(null, backup.enabled, backup.paused, progress) {
+        value = if (backup.hasPermission()) withContext(Dispatchers.IO) { backup.pending().size } else null
+    }
+    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (backup.hasPermission()) backup.updateEnabled(true)
+        else toast.error("Allow access to photos and videos to back them up")
+    }
+    val storage = rememberQuery("storage", invalidatedBy = setOf("photos")) { api.storage() }
+    val counts = rememberQuery("storage-counts", invalidatedBy = setOf("photos", "bin-photos", "archive-photos")) {
+        coroutineScope {
+            val library = async { api.photos(1, size = 1).total }
+            val archive = async { api.archiveFolders().sumOf { it.count } }
+            val bin = async { api.bin(1, size = 1).total }
+            listOf("Library" to library.await(), "Archive" to archive.await(), "Bin" to bin.await())
+        }
+    }
+
+    val (status, statusHint) = when {
+        backup.paused -> "Paused" to (waiting?.let { "$it waiting" } ?: "Resume to keep backing up.")
+        total > 0 -> "Backing up ${progress!!.getInt(BackupWorker.DONE, 0) + 1} of $total" to "Keeps going after you leave the app."
+        waiting == 0 -> "Up to date" to "New photos upload within 15 minutes."
+        else -> (waiting?.let { "$it waiting" } ?: "On") to "Uploads run on Wi-Fi when the battery isn't low."
+    }
+
+    Column(Modifier.fillMaxSize()) {
+    PageHeader("Backup & storage", leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        SettingsCard {
+            ToggleRow("Back up this phone", "Upload its photos and videos to BigShelf automatically.", backup.enabled, { on ->
+                if (on) permissions.launch(Backup.requestedPermissions.toTypedArray()) else backup.updateEnabled(false)
+            })
+            if (backup.enabled) {
+                SettingRow(status, statusHint, Modifier.divider(true)) {
+                    BsButton(onClick = { backup.updatePaused(!backup.paused) }, variant = ButtonVariant.Secondary) {
+                        BsIcon(if (backup.paused) BsIcons.Play else BsIcons.Pause, size = 16.dp)
+                        Text(if (backup.paused) "Resume" else "Pause")
+                    }
+                }
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionTitle("Storage", "Space your originals take on BigShelf. Archive and Bin count until they're deleted for good.")
+            SettingsCard {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(
+                        storage.data?.let { formatBytes(it.usedBytes) } ?: if (storage.isError) "Unavailable" else "…",
+                        style = BsText.Xl2.copy(fontWeight = BsWeight.Medium),
+                    )
+                    Text("used", style = BsText.Xs, color = BsColors.Muted)
+                }
+                counts.data?.forEach { (label, n) ->
+                    Row(Modifier.fillMaxWidth().divider(true).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(label, Modifier.weight(1f), style = BsText.Sm)
+                        Text("%,d %s".format(n, if (n == 1) "item" else "items"), style = BsText.Sm, color = BsColors.Muted)
                     }
                 }
             }
