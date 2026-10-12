@@ -62,13 +62,25 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   cookie, like the web.
 - Home timeline with month headers, infinite scroll, text search and the "show AI images"
   setting. Uploads go through the same presigned flow as the web, with the progress box.
-- Bottom navigation (Photos, Favourites, People, Library); Library holds upload, Archive,
-  Bin, the tools, Settings and Log out.
-- Photo viewer: swipe between photos (the bars stay put, a tap hides them), plus favourite,
-  mark as AI, rotate, download, delete, and an Info sheet with tagged faces.
+- Bottom navigation (Photos, Search, People, Library); Library holds upload, Favourites,
+  Archive, Bin, the tools, Settings and Log out.
+- Search tab: albums with sub-albums, places (named by the phone's Geocoder) and a map of
+  where photos were taken (OpenStreetMap via osmdroid, no API key), events and trips grouped
+  by time and distance from home, colour chips, Best shots (bursts with the best frame marked,
+  keep best with Undo) and Unorganized (in no album, not a favourite). Typing matches
+  people, albums, places and colours by name, plus photos by content, file name and tagged
+  person. Places, events and map areas can be saved as albums that fill themselves, and a
+  new album can be filled from a date range and/or a place.
+- Photo viewer: swipe between photos (the bars stay put, a tap hides them), pinch or
+  double-tap to zoom, swipe down to close and up for Info, plus favourite, mark as AI, rotate,
+  download and delete. Info shows the file, camera and exposure, where it was taken (with a
+  link to the map) and the faces; tapping an untagged face names it.
+- Location: uploads ask for media location access, since Android strips GPS from picked
+  photos without it. The backend reads GPS and camera details at upload; photos uploaded
+  before that have none, because the stored originals were re-encoded without metadata.
 - People: the People, Detected Faces and Untagged Photos tabs, a person page with rename
   and download all, and face groups.
-- Favourites, Bin (restore, delete permanently, empty Bin), Archive folders, Settings.
+- Favourites (in Library), Bin (restore, delete permanently, empty Bin), Archive folders, Settings.
 - Backup & storage (Library): automatic backup of every photo and video on the phone. It runs
   as a WorkManager job every 15 minutes on Wi-Fi when the battery isn't low, with a progress
   notification (with a Pause button), Pause / Resume, and notices when an upload fails or
@@ -81,8 +93,10 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   shared with you and your links, to share again or revoke. Links open on the web app at
   `/s/<token>`, so they point at `bigshelf.apiUrl` and only work where the web app is served
   from the same origin (as in production behind Caddy).
-- A selection bar that takes the bottom nav's place while photos are selected: add to album,
-  untag, download, archive or unarchive, move to Bin.
+- A selection bar that takes the bottom nav's place while photos are selected: add to album
+  (by full album path), untag, download, archive or unarchive, move to Bin; inside an album,
+  move, copy or remove. Archive, Bin and Remove offer Undo, and while selecting, a month
+  header's circle selects the whole month.
 - Pipelines (run, progress, run detail with step logs - polled instead of the web's SSE),
   Duplicates (one pair at a time, keep / keep both / pick the best, undo) and Organize
   (review buckets, select / download all, reprocess failed).

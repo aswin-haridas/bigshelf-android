@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.explore
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -49,6 +52,7 @@ import com.bigshelf.app.state.rememberPagedPhotos
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.Routes
 import com.bigshelf.app.ui.components.BsButton
+import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.BsInput
 import com.bigshelf.app.ui.components.BsModal
@@ -151,6 +155,7 @@ fun AlbumScreen(albumId: String, onBack: () -> Unit, onNavigate: (String) -> Uni
     val children = rememberQuery("album-children", albumId, invalidatedBy = setOf("albums")) { api.albums(parentId = albumId) }
     val feed = rememberPagedPhotos("album", albumId, invalidatedBy = setOf("albums", "photos")) { api.albumPhotos(albumId, it) }
     var dialog by remember { mutableStateOf<String?>(null) }
+    var menu by remember { mutableStateOf(false) }
     val title = album.data?.title ?: "Album"
     // Shared with you: you can add and upload photos, but the album itself is the owner's
     val owned = album.data?.ownerId.let { it == null || it == AuthStore.user?.id }
@@ -165,9 +170,27 @@ fun AlbumScreen(albumId: String, onBack: () -> Unit, onNavigate: (String) -> Uni
             BsIconButton(BsIcons.ShareNetwork, "Share", onClick = { dialog = "share" })
             if (owned) {
                 BsIconButton(BsIcons.FolderSimplePlus, "New album inside", onClick = { dialog = "sub" })
-                BsIconButton(BsIcons.PencilSimple, "Rename", onClick = { dialog = "rename" })
-                BsIconButton(BsIcons.ArrowBendUpRight, "Move album", onClick = { dialog = "move" })
-                BsIconButton(BsIcons.Trash, "Delete album", onClick = { dialog = "delete" }, tint = BsColors.Danger)
+                // Rename / move / delete sit behind "more" so the title keeps its room
+                Box {
+                    BsIconButton(BsIcons.DotsThreeVertical, "More", onClick = { menu = true })
+                    DropdownMenu(menu, onDismissRequest = { menu = false }, containerColor = BsColors.Surface) {
+                        listOf(
+                            Triple("rename", "Rename", BsIcons.PencilSimple),
+                            Triple("move", "Move into album", BsIcons.ArrowBendUpRight),
+                            Triple("delete", "Delete album", BsIcons.Trash),
+                        ).forEach { (id, label, icon) ->
+                            val tint = if (id == "delete") BsColors.Danger else BsColors.Foreground
+                            DropdownMenuItem(
+                                text = { Text(label, style = BsText.Sm, color = tint) },
+                                leadingIcon = { BsIcon(icon, size = 20.dp, tint = tint) },
+                                onClick = {
+                                    menu = false
+                                    dialog = id
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
         val subAlbums = children.data.orEmpty()

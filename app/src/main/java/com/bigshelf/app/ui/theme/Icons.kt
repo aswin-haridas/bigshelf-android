@@ -25,6 +25,7 @@ import com.adamglin.phosphoricons.regular.ArrowBendUpRight
 import com.adamglin.phosphoricons.regular.CalendarBlank
 import com.adamglin.phosphoricons.regular.Camera
 import com.adamglin.phosphoricons.regular.Crosshair
+import com.adamglin.phosphoricons.regular.DotsThreeVertical
 import com.adamglin.phosphoricons.regular.File
 import com.adamglin.phosphoricons.regular.FolderSimplePlus
 import com.adamglin.phosphoricons.regular.MapPin
@@ -92,6 +93,7 @@ object BsIcons {
     val CalendarBlank: ImageVector get() = PhosphorIcons.Regular.CalendarBlank
     val Camera: ImageVector get() = PhosphorIcons.Regular.Camera
     val Crosshair: ImageVector get() = PhosphorIcons.Regular.Crosshair
+    val DotsThreeVertical: ImageVector get() = PhosphorIcons.Regular.DotsThreeVertical
     val File: ImageVector get() = PhosphorIcons.Regular.File
     val FolderSimplePlus: ImageVector get() = PhosphorIcons.Regular.FolderSimplePlus
     val MagnifyingGlassFill: ImageVector get() = PhosphorIcons.Fill.FillMagnifyingGlass

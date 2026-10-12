@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Point
+import android.location.Location
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -140,7 +141,7 @@ private fun mapView(context: Context): MapView {
         isHorizontalMapRepetitionEnabled = false
         isVerticalMapRepetitionEnabled = false
         setScrollableAreaLimitLatitude(MapView.getTileSystem().maxLatitude, MapView.getTileSystem().minLatitude, 0)
-        // Dark app: invert the light OSM tiles, then mute them to sit on the neutral UI
+        // Dark app: invert the light OSM tiles, then drop their colour to sit on the neutral UI
         overlayManager.tilesOverlay.setColorFilter(
             ColorMatrixColorFilter(
                 ColorMatrix(
@@ -150,7 +151,7 @@ private fun mapView(context: Context): MapView {
                         0f, 0f, -1f, 0f, 255f,
                         0f, 0f, 0f, 1f, 0f,
                     ),
-                ).apply { postConcat(ColorMatrix().apply { setSaturation(0.3f) }) },
+                ).apply { postConcat(ColorMatrix().apply { setSaturation(0f) }) },
             ),
         )
     }
@@ -243,8 +244,17 @@ fun MapScreen(lat: Double?, lon: Double?, onBack: () -> Unit, onNavigate: (Strin
         // Half-open on the max side server-side, so nudge it past the last pin
         val bbox = listOf(m.minOf { it.latitude }, m.minOf { it.longitude }, m.maxOf { it.latitude } + 1e-6, m.maxOf { it.longitude } + 1e-6)
         scope.launch {
-            val name = PlaceNames.name(context, m.first().latitude, m.first().longitude) ?: "Map area"
-            onNavigate(Routes.filtered(name, PhotoFilter(bbox = bbox)))
+            val name = PlaceNames.name(context, m.first().latitude, m.first().longitude)
+            // A zoomed-out bubble can cover several towns
+            val spread = FloatArray(1).also {
+                Location.distanceBetween(bbox[0], bbox[1], bbox[2], bbox[3], it)
+            }[0] > 60_000f
+            val title = when {
+                name == null -> "Map area"
+                spread -> "$name and nearby"
+                else -> name
+            }
+            onNavigate(Routes.filtered(title, PhotoFilter(bbox = bbox)))
         }
     }
 
