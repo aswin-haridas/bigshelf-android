@@ -35,6 +35,8 @@ data class FaceBox(
     @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
     @SerialName("person_id") val personId: String? = null,
     @SerialName("person_name") val personName: String? = null,
+    // The backend's guess for an untagged face (closest person, or from the file name)
+    @SerialName("suggested_name") val suggestedName: String? = null,
     @SerialName("is_ignored") val isIgnored: Boolean = false,
 )
 
@@ -64,6 +66,10 @@ data class Photo(
     @SerialName("is_video") val isVideo: Boolean = false,
     // Framer score within a group (duplicate pair); the group's pick is marked best
     val quality: PhotoQuality? = null,
+    // Where it was taken (EXIF GPS) and camera details; null for older uploads
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val exif: CameraInfo? = null,
 ) {
     /** Same fallback as web `withIsAi`: server flag, else the ChatGPT filename rule. */
     val isAiImage get() = isAi || filename.lowercase().startsWith("chatgpt")
@@ -133,15 +139,102 @@ data class FaceList(val faces: List<FaceItem> = emptyList())
 @Serializable
 data class FacePhotos(val face: FaceItem, val items: List<Photo> = emptyList(), val total: Int = 0)
 
+/** Camera details the backend read from the upload's EXIF. */
+@Serializable
+data class CameraInfo(
+    val make: String? = null,
+    val model: String? = null,
+    val lens: String? = null,
+    @SerialName("f_number") val fNumber: Double? = null,
+    // Seconds
+    @SerialName("exposure_time") val exposureTime: Double? = null,
+    val iso: Int? = null,
+    // Millimetres
+    @SerialName("focal_length") val focalLength: Double? = null,
+)
+
 @Serializable
 data class AlbumListItem(
     val id: String,
     val title: String,
+    // Someone else's id when the album was shared with you
+    @SerialName("owner_id") val ownerId: String? = null,
+    val description: String? = null,
     @SerialName("photo_count") val photoCount: Int = 0,
+    // Sub-albums: the album this one sits in, and how many sit in it
+    @SerialName("parent_id") val parentId: String? = null,
+    @SerialName("child_count") val childCount: Int = 0,
+    @SerialName("cover_photo") val coverPhoto: Photo? = null,
 )
 
 @Serializable
-data class AlbumList(val items: List<AlbumListItem> = emptyList())
+data class AlbumList(val items: List<AlbumListItem> = emptyList(), val total: Int = 0)
+
+/**
+ * The smart filters on GET /photos (and album creation): capture-date range (ISO), a map
+ * area [minLat, minLon, maxLat, maxLon], or photos in no album that aren't hearted.
+ */
+@Serializable
+data class PhotoFilter(
+    @SerialName("taken_from") val takenFrom: String? = null,
+    @SerialName("taken_to") val takenTo: String? = null,
+    val bbox: List<Double>? = null,
+    val unorganized: Boolean = false,
+)
+
+// ---------- Search tab groupings (backend endpoints/explore.py) ----------
+
+@Serializable
+data class PhotoLocation(val id: String, val latitude: Double, val longitude: Double)
+
+@Serializable
+data class LocationList(val items: List<PhotoLocation> = emptyList())
+
+/** One ~11 km cell of geotagged photos; named on the device by the Geocoder. */
+@Serializable
+data class PlaceCell(
+    val latitude: Double,
+    val longitude: Double,
+    val count: Int = 0,
+    val bbox: List<Double> = emptyList(),
+    val cover: Photo? = null,
+)
+
+@Serializable
+data class PlaceList(val items: List<PlaceCell> = emptyList())
+
+@Serializable
+data class LibraryEvent(
+    val id: String,
+    // "event" | "trip"
+    val kind: String = "event",
+    // A fixed-date occasion it falls on (Christmas...)
+    val occasion: String? = null,
+    val start: String,
+    val end: String,
+    val count: Int = 0,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val cover: Photo? = null,
+) {
+    val isTrip get() = kind == "trip"
+}
+
+@Serializable
+data class EventList(val items: List<LibraryEvent> = emptyList(), val total: Int = 0)
+
+/** Shots taken within seconds that look alike; one is marked `quality.best`. */
+@Serializable
+data class Burst(val id: String, val items: List<Photo> = emptyList())
+
+@Serializable
+data class BurstList(val groups: List<Burst> = emptyList(), val total: Int = 0)
+
+@Serializable
+data class FaceTagResult(
+    @SerialName("person_name") val personName: String = "",
+    @SerialName("auto_tagged_count") val autoTaggedCount: Int = 0,
+)
 
 /** One download batch in Archive; id is the batch's shared archived_at. */
 @Serializable
@@ -295,3 +388,18 @@ data class MergeSuggestion(val keep: MergeSuggestionPerson, val merge: MergeSugg
 /** The current review screen; [merge] is asked before any face grid. */
 @Serializable
 data class FaceReview(val batch: FaceReviewBatch? = null, val merge: MergeSuggestion? = null, val total: Int = 0)
+
+/** A public link (/s/{token}) to an album or a selection of photos. */
+@Serializable
+data class ShareLink(
+    val id: String,
+    val token: String,
+    val title: String,
+    @SerialName("album_id") val albumId: String? = null,
+    @SerialName("photo_count") val photoCount: Int = 0,
+    @SerialName("expires_at") val expiresAt: String? = null,
+)
+
+/** Someone in a shared album; role is "owner" or "member". */
+@Serializable
+data class AlbumMember(val id: String, val username: String, val role: String)

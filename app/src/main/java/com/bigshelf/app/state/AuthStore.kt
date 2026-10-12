@@ -24,6 +24,8 @@ object AuthStore {
         error = null
         return try {
             api.login(identifier, password)
+            // Screens tell your albums from ones shared with you by this id
+            user = api.me()
             status = Status.Authenticated
             true
         } catch (e: Exception) {
@@ -63,6 +65,8 @@ object AuthStore {
             api.logout()
         } catch (_: Exception) {
         } finally {
+            // Not on session expiry: signing in again picks backup up where it stopped
+            BigShelfApp.backup.updateEnabled(false)
             onSessionEnded()
         }
     }

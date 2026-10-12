@@ -1,6 +1,14 @@
 package com.bigshelf.app.ui.photos
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.bigshelf.app.ui.components.BsIcon
+import com.bigshelf.app.ui.components.bsClickable
+import com.bigshelf.app.ui.theme.BsIcons
+import com.bigshelf.app.ui.theme.BsShapes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -90,6 +98,8 @@ fun ImagesGrid(
     isFetchingNextPage: Boolean = false,
     totalCount: Int? = null,
     groupByDate: Boolean = true,
+    // Full-width content above the photos (search matches, sub-albums), scrolling with them
+    header: (@Composable () -> Unit)? = null,
 ) {
     // Publish this grid's photos as the current view; cleared when the grid leaves
     DisposableEffect(photos) {
@@ -138,10 +148,11 @@ fun ImagesGrid(
             // Fixed first item: the grid anchors on it, so pages arriving above the footer
             // don't drag the view down to "Loading…"
             item(key = "top", span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.fillMaxWidth()) }
+            if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
             if (groupByDate && groups.isNotEmpty()) {
                 groups.forEach { group ->
                     item(key = "header-${group.key}", span = { GridItemSpan(maxLineSpan) }) {
-                        DateHeader(group.label, group.photos.size)
+                        DateHeader(group.label, group.photos.size, if (selectionActive) group.photos else null)
                     }
                     items(group.photos, key = { it.id }) { photo -> Tile(photo, selectionActive, open) }
                 }
@@ -171,7 +182,7 @@ private fun Tile(photo: Photo, selectionActive: Boolean, open: (Photo) -> Unit) 
 }
 
 @Composable
-private fun DateHeader(label: String, count: Int, modifier: Modifier = Modifier) {
+private fun DateHeader(label: String, count: Int, selectable: List<Photo>?, modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
@@ -184,8 +195,28 @@ private fun DateHeader(label: String, count: Int, modifier: Modifier = Modifier)
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // While selecting, a tap on the month's circle picks (or drops) the whole month
+        if (selectable != null) {
+            val all = selectable.all { SelectionStore.isSelected(it.id) }
+            Box(
+                Modifier
+                    .padding(end = 10.dp)
+                    .size(24.dp)
+                    .clip(BsShapes.Full)
+                    .background(if (all) BsColors.Primary else Color.Black.copy(alpha = 0.4f))
+                    .border(1.dp, BsColors.Muted.copy(alpha = 0.7f), BsShapes.Full)
+                    .bsClickable {
+                        if (all) selectable.forEach { if (SelectionStore.isSelected(it.id)) SelectionStore.toggle(it) }
+                        else SelectionStore.selectMany(selectable)
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (all) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground, contentDescription = "Deselect $label")
+            }
+        }
         Text(
             label.uppercase(Locale.US),
+            Modifier.weight(1f),
             style = BsText.Xs.copy(
                 fontWeight = BsWeight.Semibold,
                 fontFamily = MonoFamily,

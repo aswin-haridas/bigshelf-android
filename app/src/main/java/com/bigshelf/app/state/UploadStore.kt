@@ -30,7 +30,8 @@ object UploadStore {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val lanes = Semaphore(4)
 
-    fun start(uris: List<Uri>) {
+    /** With [albumId], each photo also lands in that album (yours or one shared with you). */
+    fun start(uris: List<Uri>, albumId: String? = null) {
         if (uris.isEmpty()) return
         val api = BigShelfApp.api
         scope.launch {
@@ -49,7 +50,7 @@ object UploadStore {
                 async {
                     lanes.withPermit {
                         try {
-                            api.upload(uri) { bytes ->
+                            api.upload(uri, albumId = albumId) { bytes ->
                                 scope.launch {
                                     sent[uri] = bytes
                                     report()

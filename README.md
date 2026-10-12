@@ -69,6 +69,18 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
 - People: the People, Detected Faces and Untagged Photos tabs, a person page with rename
   and download all, and face groups.
 - Favourites, Bin (restore, delete permanently, empty Bin), Archive folders, Settings.
+- Backup & storage (Library): automatic backup of every photo and video on the phone. It runs
+  as a WorkManager job every 15 minutes on Wi-Fi when the battery isn't low, with a progress
+  notification (with a Pause button), Pause / Resume, and notices when an upload fails or
+  finishes. Each file's SHA-256 goes along with the upload, so the API refuses ones already
+  in the library before any bytes are sent. The same page shows the storage used, plus item
+  counts for Library, Archive and Bin.
+- Sharing: Share in the selection bar makes a public link to the selected photos, and an album's
+  Share button makes one to the album, adds people by username or email (they can add and
+  upload their own photos to it) or lets a member leave. Library > Sharing lists albums
+  shared with you and your links, to share again or revoke. Links open on the web app at
+  `/s/<token>`, so they point at `bigshelf.apiUrl` and only work where the web app is served
+  from the same origin (as in production behind Caddy).
 - A selection bar that takes the bottom nav's place while photos are selected: add to album,
   untag, download, archive or unarchive, move to Bin.
 - Pipelines (run, progress, run detail with step logs - polled instead of the web's SSE),

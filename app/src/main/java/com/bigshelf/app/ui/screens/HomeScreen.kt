@@ -1,8 +1,5 @@
 package com.bigshelf.app.ui.screens
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Photo
-import com.bigshelf.app.state.UploadStore
 import com.bigshelf.app.state.rememberPagedPhotos
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsIconButton
@@ -25,6 +21,7 @@ import com.bigshelf.app.ui.components.BsSearchBar
 import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.photos.ImagesGrid
 import com.bigshelf.app.ui.photos.photoCount
+import com.bigshelf.app.ui.shell.rememberUploadPicker
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import kotlinx.coroutines.delay
@@ -60,16 +57,14 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit) {
         else -> if (feed.hasNextPage) null else photos.size
     }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
-        UploadStore.start(uris)
-    }
+    val upload = rememberUploadPicker()
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Photos", count = totalCount?.let(::photoCount)) {
             BsIconButton(
                 BsIcons.UploadSimple,
                 "Upload images",
-                onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
+                onClick = upload,
                 tint = BsColors.Foreground,
             )
         }

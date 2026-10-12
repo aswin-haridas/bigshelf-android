@@ -62,11 +62,15 @@ private fun countLabel(n: Int, noun: String) = "$n ${if (n == 1) noun else "${no
 
 /** Port of modules/favourites/favourites.tsx: hearted photos, newest capture first. */
 @Composable
-fun FavouritesScreen(onOpenPhoto: (String) -> Unit) {
+fun FavouritesScreen(onOpenPhoto: (String) -> Unit, onBack: () -> Unit) {
     val api = BigShelfApp.api
     val feed = rememberPagedPhotos("favourites", invalidatedBy = setOf("photos")) { api.photos(it, favorite = true) }
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Favourites", count = countLabel(feed.total ?: feed.photos.size, "photo"))
+        PageHeader(
+            "Favourites",
+            count = countLabel(feed.total ?: feed.photos.size, "photo"),
+            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
+        )
         ImagesGrid(
             photos = feed.photos,
             onOpen = { onOpenPhoto(it.id) },

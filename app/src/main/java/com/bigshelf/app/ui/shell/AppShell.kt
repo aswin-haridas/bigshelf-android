@@ -47,10 +47,13 @@ import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.screens.ArchiveFolderScreen
 import com.bigshelf.app.ui.screens.ArchiveScreen
+import com.bigshelf.app.ui.screens.BackupScreen
 import com.bigshelf.app.ui.screens.BinScreen
 import com.bigshelf.app.ui.screens.FavouritesScreen
 import com.bigshelf.app.ui.screens.HomeScreen
 import com.bigshelf.app.ui.screens.SettingsScreen
+import com.bigshelf.app.ui.screens.SharingScreen
+import com.bigshelf.app.ui.screens.explore.searchGraph
 import com.bigshelf.app.ui.screens.people.FacePhotosScreen
 import com.bigshelf.app.ui.screens.people.FacesScreen
 import com.bigshelf.app.ui.screens.people.PeopleScreen
@@ -81,15 +84,18 @@ private data class Tab(val label: String, val route: String, val icon: ImageVect
 
 private val TABS = listOf(
     Tab("Photos", Routes.HOME, BsIcons.Images, BsIcons.ImagesFill),
-    Tab("Favourites", Routes.FAVOURITES, BsIcons.Heart, BsIcons.HeartFill),
+    Tab("Search", Routes.SEARCH, BsIcons.MagnifyingGlass, BsIcons.MagnifyingGlassFill),
     Tab("People", Routes.PEOPLE, BsIcons.Users, BsIcons.UsersFill),
     Tab("Library", Routes.LIBRARY, BsIcons.SquaresFour, BsIcons.SquaresFourFill),
 )
 
-/** Which tab owns [path]: Library holds everything that isn't Photos, Favourites or People. */
+// Pages the Search tab owns: albums, places and the map, events, colours, bursts, smart filters
+private val SEARCH_PAGES = listOf("search", "albums", "places", "map", "events", "colors", "bursts", "filtered")
+
+/** Which tab owns [path]: Library holds everything that isn't Photos, Search or People. */
 private fun tabFor(path: String) = when {
     path.isEmpty() || path == Routes.HOME -> Routes.HOME
-    path == Routes.FAVOURITES -> Routes.FAVOURITES
+    SEARCH_PAGES.any { path == it || path.startsWith("$it/") || path.startsWith("$it?") } -> Routes.SEARCH
     path.startsWith("people") || path.startsWith("faces") -> Routes.PEOPLE
     else -> Routes.LIBRARY
 }
@@ -220,7 +226,8 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
     ) {
         composable(Routes.HOME) { HomeScreen(onOpenPhoto = openPhoto) }
         composable(Routes.LIBRARY) { LibraryScreen(onNavigate = { nav.navigate(it) }) }
-        composable(Routes.FAVOURITES) { FavouritesScreen(onOpenPhoto = openPhoto) }
+        composable(Routes.FAVOURITES) { FavouritesScreen(onOpenPhoto = openPhoto, onBack = onBack) }
+        searchGraph(nav, onBack = onBack, openPhoto = openPhoto)
         composable(Routes.PEOPLE) { PeopleScreen(onPerson = { nav.navigate(Routes.person(it)) }, onTab = peopleTab) }
         composable(Routes.FACES) { FacesScreen(onFace = { nav.navigate(Routes.face(it)) }, onTab = peopleTab) }
         composable(Routes.UNTAGGED) { UntaggedScreen(onOpenPhoto = openPhoto, onTab = peopleTab) }
@@ -248,6 +255,8 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
             )
         }
         composable(Routes.SETTINGS) { SettingsScreen(onBack = onBack) }
+        composable(Routes.BACKUP) { BackupScreen(onBack = onBack) }
+        composable(Routes.SHARING) { SharingScreen(onBack = onBack, onNavigate = { nav.navigate(it) }) }
         composable(Routes.PIPELINES) { PipelinesScreen(onBack = onBack, onRun = { nav.navigate(Routes.run(it)) }) }
         composable(Routes.RUN, arguments = listOf(navArgument("runId") { type = NavType.StringType })) {
             RunScreen(runId = it.arguments?.getString("runId").orEmpty(), onBack = onBack)
@@ -259,6 +268,7 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 photoId = it.arguments?.getString("photoId").orEmpty(),
                 onBack = { if (!nav.popBackStack()) onTopLevel(sectionFrom) },
                 onPerson = { nav.navigate(Routes.person(it)) },
+                onMap = { lat, lon -> nav.navigate(Routes.map(lat, lon)) },
             )
         }
         composable(Routes.SOON, arguments = listOf(navArgument("label") { type = NavType.StringType })) {

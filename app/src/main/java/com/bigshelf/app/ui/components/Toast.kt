@@ -40,18 +40,21 @@ import com.bigshelf.app.ui.theme.BsMotion
  */
 object toast {
     internal enum class Kind { Success, Error, Info, Message }
-    internal data class Item(val id: Long, val kind: Kind, val text: String)
+    internal data class Item(val id: Long, val kind: Kind, val text: String, val action: Pair<String, () -> Unit>? = null)
 
     internal val items = mutableStateListOf<Item>()
     private var nextId = 0L
 
-    private fun show(kind: Kind, text: String) {
-        items += Item(nextId++, kind, text)
+    private fun show(kind: Kind, text: String, action: Pair<String, () -> Unit>? = null) {
+        items += Item(nextId++, kind, text, action)
         // Sonner shows at most 3 at a time
         while (items.size > 3) items.removeAt(0)
     }
 
     fun success(text: String) = show(Kind.Success, text)
+
+    /** A success toast with a button, e.g. "Undo" after moving photos to the Bin. */
+    fun success(text: String, actionLabel: String, onAction: () -> Unit) = show(Kind.Success, text, actionLabel to onAction)
     fun error(text: String) = show(Kind.Error, text)
     fun info(text: String) = show(Kind.Info, text)
     fun message(text: String) = show(Kind.Message, text)
@@ -75,7 +78,7 @@ fun Toaster(modifier: Modifier = Modifier) {
         toast.items.forEach { item ->
             key(item.id) {
                 LaunchedEffect(Unit) {
-                    delay(4000) // sonner default duration
+                    delay(if (item.action != null) 6000 else 4000) // sonner default; longer to reach Undo
                     toast.dismiss(item.id)
                 }
                 val visible = remember { MutableTransitionState(false).apply { targetState = true } }
@@ -101,11 +104,28 @@ fun Toaster(modifier: Modifier = Modifier) {
                         if (icon != null) BsIcon(icon, size = 16.dp, tint = ToastText)
                         Text(
                             item.text,
+                            Modifier.weight(1f, fill = item.action != null),
                             color = ToastText,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
                             fontWeight = BsWeight.Medium,
                         )
+                        item.action?.let { (label, onAction) ->
+                            Text(
+                                label,
+                                Modifier
+                                    .clip(BsShapes.Md)
+                                    .bsClickable {
+                                        toast.dismiss(item.id)
+                                        onAction()
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                color = ToastText,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
+                                fontWeight = BsWeight.Semibold,
+                            )
+                        }
                     }
                 }
             }
