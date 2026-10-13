@@ -50,12 +50,13 @@ fun ImageCard(
     onClick: () -> Unit,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
+    // null: the caller sizes the tile (the tall tiles of the explore mosaic)
+    aspectRatio: Float? = 3f / 4f,
 ) {
     val processing = photo.isProcessing
     Box(
         modifier
-            .fillMaxWidth()
-            .aspectRatio(3f / 4f)
+            .then(if (aspectRatio != null) Modifier.fillMaxWidth().aspectRatio(aspectRatio) else Modifier)
             .background(BsColors.Surface.copy(alpha = 0.3f))
             .then(if (processing) Modifier.border(2.dp, BsColors.Info) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onToggle),

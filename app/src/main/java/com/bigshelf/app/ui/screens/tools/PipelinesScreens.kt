@@ -218,9 +218,9 @@ fun PipelinesScreen(onBack: () -> Unit, onRun: (String) -> Unit) {
         PageHeader("Pipelines", leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
         when {
             data == null && query.isLoading -> LoadingText()
-            data == null -> EmptyState("Couldn't load pipelines", description = "Check your connection and try again.")
+            data == null -> EmptyState("Couldn't load pipelines")
             else -> LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Face tagging runs per upload, so it's a progress-only card with no run button

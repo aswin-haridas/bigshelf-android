@@ -111,3 +111,48 @@ fun FaceTile(
         }
     }
 }
+
+/** Round face crop (Instagram profile picture), the Users glyph when there's no image. */
+@Composable
+fun Avatar(imageSrc: String?, name: String?, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .clip(BsShapes.Full)
+            .background(BsColors.Surface)
+            .border(1.dp, BsColors.Border, BsShapes.Full),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (imageSrc != null) {
+            AsyncImage(
+                model = BigShelfApp.api.mediaUrl(imageSrc),
+                contentDescription = name ?: "Face",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            BsIcon(BsIcons.Users, size = 24.dp, tint = BsColors.Muted)
+        }
+    }
+}
+
+/** People-grid entry: round avatar with the name and count centred underneath. */
+@Composable
+fun AvatarTile(imageSrc: String?, name: String?, subtitle: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier.fillMaxWidth().bsClickable(scale = 0.97f, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Avatar(imageSrc, name, Modifier.fillMaxWidth().aspectRatio(1f))
+        Text(
+            name ?: "Unnamed",
+            Modifier.padding(top = 8.dp),
+            style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
+            color = if (name != null) BsColors.Foreground else BsColors.Muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (subtitle != null) {
+            Text(subtitle, Modifier.padding(top = 2.dp), style = BsText.Xs2, color = BsColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}

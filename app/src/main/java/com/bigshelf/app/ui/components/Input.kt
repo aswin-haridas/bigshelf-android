@@ -40,7 +40,6 @@ import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
-import com.bigshelf.app.ui.theme.Neutral
 import androidx.compose.runtime.LaunchedEffect
 import com.bigshelf.app.ui.theme.BsMotion
 
@@ -154,8 +153,8 @@ fun BsField(
 }
 
 /**
- * Port of components/SearchBar.tsx: `h-8 bg-neutral-800 rounded-md pl-9 text-sm font-medium`
- * with a 16dp magnifying glass; turns neutral-700 while focused.
+ * Pill search field with a magnifying glass, lighter while focused, and a clear button
+ * once there's text.
  */
 @Composable
 fun BsSearchBar(
@@ -166,7 +165,7 @@ fun BsSearchBar(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg by animateColorAsState(if (focused) Neutral.N700 else Neutral.N800, BsMotion.fast(), label = "searchBg")
+    val bg by animateColorAsState(if (focused) BsColors.SurfaceHover else BsColors.Surface, BsMotion.fast(), label = "searchBg")
     val style = BsText.Sm
     BasicTextField(
         value = value,
@@ -181,15 +180,20 @@ fun BsSearchBar(
             Row(
                 Modifier
                     .height(48.dp)
-                    .clip(BsShapes.Xl)
+                    .clip(BsShapes.Full)
                     .background(bg)
-                    .padding(start = 16.dp, end = 16.dp),
+                    .padding(start = 16.dp, end = if (value.isEmpty()) 16.dp else 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BsIcon(BsIcons.MagnifyingGlass, Modifier.size(20.dp), tint = Neutral.N400)
+                BsIcon(BsIcons.MagnifyingGlass, Modifier.size(20.dp), tint = BsColors.Muted)
                 Box(Modifier.padding(start = 12.dp).weight(1f)) {
-                    if (value.isEmpty()) Text(placeholder, style = style, color = Neutral.N400, maxLines = 1)
+                    if (value.isEmpty()) Text(placeholder, style = style, color = BsColors.Muted, maxLines = 1)
                     inner()
+                }
+                if (value.isNotEmpty()) {
+                    Box(Modifier.size(40.dp).bsClickable { onValueChange("") }, contentAlignment = Alignment.Center) {
+                        BsIcon(BsIcons.XCircleFill, size = 20.dp, tint = BsColors.Muted, contentDescription = "Clear search")
+                    }
                 }
             }
         },

@@ -1,7 +1,6 @@
 package com.bigshelf.app.ui.shell
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,7 +49,7 @@ fun formatBytes(bytes: Long): String {
     return "$text ${units[i]}"
 }
 
-/** `rounded-xl border border-border bg-surface/30` group of rows, like the Settings cards. */
+/** Borderless surface card holding a group of rows. */
 @Composable
 private fun Group(title: String? = null, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -61,8 +60,7 @@ private fun Group(title: String? = null, content: @Composable () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .clip(BsShapes.Xl)
-                .background(BsColors.Surface.copy(alpha = 0.3f))
-                .border(1.dp, BsColors.Border, BsShapes.Xl),
+                .background(BsColors.Surface),
         ) { content() }
     }
 }

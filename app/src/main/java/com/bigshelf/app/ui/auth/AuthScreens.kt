@@ -32,7 +32,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -88,16 +87,15 @@ fun AuthLayout(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
-/** `AuthHeader`: `text-xl font-semibold tracking-tight` title, `text-xs text-muted` subtitle. */
+/** `AuthHeader`: `text-xl font-semibold tracking-tight` title, no subtitle. */
 @Composable
-private fun AuthHeader(title: String, subtitle: String) {
+private fun AuthHeader(title: String) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             title,
             style = BsText.Xl.copy(fontWeight = BsWeight.Semibold, letterSpacing = BsText.TrackingTight),
             color = BsColors.Foreground,
         )
-        Text(subtitle, Modifier.padding(top = 4.dp), style = BsText.Xs, color = BsColors.Muted, textAlign = TextAlign.Center)
     }
 }
 
@@ -148,7 +146,7 @@ fun LoginScreen(onRegister: () -> Unit) {
         else scope.launch { AuthStore.login(identifier.trim(), password) }
     }
 
-    AuthHeader("Sign In Account", "Enter your credentials to access your account.")
+    AuthHeader("Sign in")
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BsField(
             label = "Username or Email",
@@ -193,7 +191,7 @@ fun RegisterScreen(onLogin: () -> Unit) {
         }
     }
 
-    AuthHeader("Sign Up Account", "Enter your personal data to create your account.")
+    AuthHeader("Sign up")
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BsField("First Name", firstName, { firstName = it }, Modifier.weight(1f), placeholder = "eg. John")

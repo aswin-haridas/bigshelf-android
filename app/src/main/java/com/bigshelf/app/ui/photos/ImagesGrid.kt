@@ -12,6 +12,7 @@ import com.bigshelf.app.ui.theme.BsShapes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.state.SelectionStore
@@ -79,6 +81,21 @@ private fun columnsFor(widthDp: Float) = when {
     else -> 3
 }
 
+// Instagram Explore rhythm: a tall tile beside four squares, a row of three, the same block
+// mirrored, another row of three
+private val EXPLORE_PATTERN = intArrayOf(5, 3, 5, 3)
+
+private fun exploreBlocks(photos: List<Photo>): List<List<Photo>> {
+    val blocks = mutableListOf<List<Photo>>()
+    var i = 0
+    while (i < photos.size) {
+        val n = EXPLORE_PATTERN[blocks.size % EXPLORE_PATTERN.size]
+        blocks += photos.subList(i, minOf(i + n, photos.size))
+        i += n
+    }
+    return blocks
+}
+
 fun photoCount(n: Int) = "${NumberFormat.getIntegerInstance(Locale.US).format(n)} ${if (n == 1) "photo" else "photos"}"
 
 /**
@@ -98,6 +115,8 @@ fun ImagesGrid(
     isFetchingNextPage: Boolean = false,
     totalCount: Int? = null,
     groupByDate: Boolean = true,
+    // Square mosaic with tall tiles (Instagram Explore) instead of 3:4 tiles; never date-grouped
+    explore: Boolean = false,
     // Full-width content above the photos (search matches, sub-albums), scrolling with them
     header: (@Composable () -> Unit)? = null,
 ) {
@@ -106,7 +125,8 @@ fun ImagesGrid(
         SelectionStore.visible = photos
         onDispose { SelectionStore.visible = emptyList() }
     }
-    val groups = remember(photos, groupByDate) { if (groupByDate) groupByMonth(photos) else emptyList() }
+    val groups = remember(photos, groupByDate, explore) { if (groupByDate && !explore) groupByMonth(photos) else emptyList() }
+    val blocks = remember(photos, explore) { if (explore) exploreBlocks(photos) else emptyList() }
     val state = rememberLazyGridState()
     val loadMore by rememberUpdatedState(fetchNextPage)
     val canLoad by rememberUpdatedState(hasNextPage && !isFetchingNextPage)
@@ -136,8 +156,9 @@ fun ImagesGrid(
     }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
-        val cols = columnsFor(maxWidth.value)
+        val cols = if (explore) 3 else columnsFor(maxWidth.value)
         val gap = if (maxWidth.value >= 640) 4.dp else 2.dp
+        val tile = (maxWidth - gap * 2) / 3
         LazyVerticalGrid(
             columns = GridCells.Fixed(cols),
             state = state,
@@ -149,7 +170,14 @@ fun ImagesGrid(
             // don't drag the view down to "Loading…"
             item(key = "top", span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.fillMaxWidth()) }
             if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
-            if (groupByDate && groups.isNotEmpty()) {
+            if (explore) {
+                blocks.forEachIndexed { i, block ->
+                    item(key = "block-${block.first().id}", span = { GridItemSpan(maxLineSpan) }) {
+                        // Every other five-tile block puts its tall tile on the right
+                        ExploreBlock(block, tallLeft = i % 4 == 0, tile, gap, selectionActive, open)
+                    }
+                }
+            } else if (groupByDate && groups.isNotEmpty()) {
                 groups.forEach { group ->
                     item(key = "header-${group.key}", span = { GridItemSpan(maxLineSpan) }) {
                         DateHeader(group.label, group.photos.size, if (selectionActive) group.photos else null)
@@ -171,14 +199,57 @@ fun ImagesGrid(
 }
 
 @Composable
-private fun Tile(photo: Photo, selectionActive: Boolean, open: (Photo) -> Unit) {
+private fun Tile(
+    photo: Photo,
+    selectionActive: Boolean,
+    open: (Photo) -> Unit,
+    modifier: Modifier = Modifier,
+    aspectRatio: Float? = 3f / 4f,
+) {
     ImageCard(
         photo = photo,
         selected = SelectionStore.isSelected(photo.id),
         selectionActive = selectionActive,
         onClick = { open(photo) },
         onToggle = { SelectionStore.toggle(photo) },
+        modifier = modifier,
+        aspectRatio = aspectRatio,
     )
+}
+
+/** One explore block: a tall tile beside a 2x2 of squares, or plain rows of three squares. */
+@Composable
+private fun ExploreBlock(
+    photos: List<Photo>,
+    tallLeft: Boolean,
+    tile: Dp,
+    gap: Dp,
+    selectionActive: Boolean,
+    open: (Photo) -> Unit,
+) {
+    @Composable
+    fun Square(photo: Photo) = Tile(photo, selectionActive, open, Modifier.size(tile), aspectRatio = null)
+
+    if (photos.size < 5) {
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            photos.chunked(3).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) { row.forEach { Square(it) } }
+            }
+        }
+        return
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+        val tall = @Composable {
+            Tile(photos[0], selectionActive, open, Modifier.size(tile, tile * 2 + gap), aspectRatio = null)
+        }
+        if (tallLeft) tall()
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            photos.drop(1).chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) { row.forEach { Square(it) } }
+            }
+        }
+        if (!tallLeft) tall()
+    }
 }
 
 @Composable

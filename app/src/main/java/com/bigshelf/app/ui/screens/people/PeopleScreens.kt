@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,6 +29,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
+import com.bigshelf.app.data.Photo
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
@@ -44,7 +47,8 @@ import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.TabItem
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
-import com.bigshelf.app.ui.photos.FaceTile
+import com.bigshelf.app.ui.photos.Avatar
+import com.bigshelf.app.ui.photos.AvatarTile
 import com.bigshelf.app.ui.photos.ImagesGrid
 import com.bigshelf.app.ui.photos.personImageSrc
 import com.bigshelf.app.ui.photos.photoCountLabel
@@ -65,14 +69,14 @@ private val PEOPLE_TABS = listOf(
     TabItem(PeopleTab.Untagged, "Untagged"),
 )
 
-/** Square face grid, three across with 16dp gutters. */
+/** Round avatar grid, three across with 16dp gutters. */
 @Composable
 private fun FaceGrid(content: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         content = content,
     )
 }
@@ -109,11 +113,10 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
             query.isLoading -> LoadingText()
             people.isEmpty() -> EmptyState(
                 if (search.isNotEmpty()) "No people matching \"$search\"" else "No people yet",
-                description = "Tag faces in your photos and they will show up here.",
             )
             else -> FaceGrid {
                 items(people, key = { it.id }) { person ->
-                    FaceTile(personImageSrc(person), person.name, photoCountLabel(person.photoCount), onClick = { onPerson(person.id) })
+                    AvatarTile(personImageSrc(person), person.name, photoCountLabel(person.photoCount), onClick = { onPerson(person.id) })
                 }
             }
         }
@@ -129,10 +132,10 @@ fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
         PeopleHeader(PeopleTab.Faces, onTab) { FaceReviewBanner() }
         when {
             query.isLoading -> LoadingText()
-            faces.isEmpty() -> EmptyState("No detected faces", description = "Faces found in new photos will show up here.")
+            faces.isEmpty() -> EmptyState("No faces")
             else -> FaceGrid {
                 items(faces, key = { it.id }) { face ->
-                    FaceTile(
+                    AvatarTile(
                         imageSrc = face.faceThumbnail ?: "/api/v1/faces/${face.id}/thumbnail",
                         name = face.faceName,
                         subtitle = face.faceCount?.let(::photoCountLabel),
@@ -161,8 +164,8 @@ fun UntaggedScreen(onOpenPhoto: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
 }
 
 /**
- * Port of person-photos-view.tsx: back, Download all, tap-to-rename title, photo grid in
- * the server's similarity order (no month headers).
+ * A person laid out like an Instagram profile: avatar beside Photos / Videos / Years, the name,
+ * Rename and Download buttons, then their photos in the server's similarity order.
  */
 @Composable
 fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
@@ -200,42 +203,53 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
     Column(Modifier.fillMaxSize()) {
         PageHeader(
             data?.person?.name ?: "…",
-            count = data?.total?.let(::photoCountLabel),
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
-        ) {
-            BsIconButton(BsIcons.PencilSimple, "Rename", onClick = {
-                name = data?.person?.name.orEmpty()
-                editing = true
-            }, enabled = data != null)
-            BsIconButton(
-                BsIcons.DownloadSimple,
-                "Download all",
-                onClick = {
-                    val items = data?.items.orEmpty()
-                    downloading = true
-                    scope.launch {
-                        try {
-                            Downloads.save(context, items)
-                            toast.success("Downloading ${items.size} photos")
-                        } catch (_: Exception) {
-                            toast.error("Download failed")
-                        } finally {
-                            downloading = false
-                        }
-                    }
-                },
-                enabled = !data?.items.isNullOrEmpty(),
-                loading = downloading,
-            )
-        }
+        )
         when {
             query.isLoading -> LoadingText()
-            data == null || data.items.isEmpty() -> EmptyState("No photos found", description = "No photos found for this person.")
+            data == null -> EmptyState("No photos")
             else -> ImagesGrid(
                 photos = data.items,
                 onOpen = { onOpenPhoto(it.id) },
                 totalCount = data.total,
                 groupByDate = false,
+                header = {
+                    // This endpoint's person has no cover, so fall back to their face in the first photo
+                    val avatar = personImageSrc(data.person)
+                        ?: data.items.firstNotNullOfOrNull { p ->
+                            p.photoPerson?.let { it.thumbnailUrl ?: it.faceId?.let { id -> "/api/v1/faces/$id/thumbnail" } }
+                        }
+                        ?: data.items.firstOrNull()?.thumbnailUrl
+                    ProfileHeader(avatar, data.person.name, data.items, data.total) {
+                        BsButton(
+                            onClick = {
+                                name = data.person.name
+                                editing = true
+                            },
+                            modifier = Modifier.weight(1f),
+                            variant = ButtonVariant.Secondary,
+                        ) { Text("Rename") }
+                        BsButton(
+                            onClick = {
+                                downloading = true
+                                scope.launch {
+                                    try {
+                                        Downloads.save(context, data.items)
+                                        toast.success("Downloading ${data.items.size} photos")
+                                    } catch (_: Exception) {
+                                        toast.error("Download failed")
+                                    } finally {
+                                        downloading = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            variant = ButtonVariant.Secondary,
+                            enabled = data.items.isNotEmpty(),
+                            loading = downloading,
+                        ) { Text("Download all") }
+                    }
+                },
             )
         }
     }
@@ -268,13 +282,63 @@ fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -
     Column(Modifier.fillMaxSize()) {
         PageHeader(
             data?.face?.faceName ?: "Unnamed face",
-            count = data?.total?.let(::photoCountLabel),
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
         )
         when {
             query.isLoading -> LoadingText()
-            data == null || data.items.isEmpty() -> EmptyState("No photos found")
-            else -> ImagesGrid(photos = data.items, onOpen = { onOpenPhoto(it.id) }, totalCount = data.total, groupByDate = false)
+            data == null -> EmptyState("No photos found")
+            else -> ImagesGrid(
+                photos = data.items,
+                onOpen = { onOpenPhoto(it.id) },
+                totalCount = data.total,
+                groupByDate = false,
+                header = {
+                    ProfileHeader(
+                        data.face.faceThumbnail ?: "/api/v1/faces/${data.face.id}/thumbnail",
+                        data.face.faceName ?: "Unnamed face",
+                        data.items,
+                        data.total,
+                    )
+                },
+            )
         }
+    }
+}
+
+/**
+ * Instagram profile header: 88dp avatar beside Photos / Videos / Years, the name with the
+ * first year under it, then an optional row of equal-width buttons.
+ */
+@Composable
+private fun ProfileHeader(
+    imageSrc: String?,
+    name: String,
+    photos: List<Photo>,
+    total: Int,
+    actions: (@Composable RowScope.() -> Unit)? = null,
+) {
+    val years = remember(photos) { photos.mapNotNull { (it.takenAt ?: it.createdAt)?.take(4)?.toIntOrNull() }.toSet() }
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Avatar(imageSrc, name, Modifier.size(88.dp))
+            Row(Modifier.weight(1f).padding(start = 16.dp)) {
+                Stat(total, if (total == 1) "Photo" else "Photos")
+                Stat(photos.count { it.isVideo }, "Videos")
+                Stat(years.size, if (years.size == 1) "Year" else "Years")
+            }
+        }
+        Text(name, Modifier.padding(top = 12.dp), style = BsText.Sm.copy(fontWeight = BsWeight.Semibold))
+        years.minOrNull()?.let { Text("Since $it", style = BsText.Xs, color = BsColors.Muted) }
+        if (actions != null) {
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), content = actions)
+        }
+    }
+}
+
+@Composable
+private fun RowScope.Stat(value: Int, label: String) {
+    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("$value", style = BsText.Base.copy(fontWeight = BsWeight.Semibold))
+        Text(label, style = BsText.Xs, color = BsColors.Muted)
     }
 }

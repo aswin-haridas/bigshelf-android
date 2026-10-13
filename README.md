@@ -1,8 +1,8 @@
 # BigShelf for Android
 
 Native Android client for BigShelf, written in Kotlin with Jetpack Compose. It talks to the
-same FastAPI backend as the React app in `../frontend` and uses the same design system:
-the same tokens, components and Phosphor icons.
+same FastAPI backend as the React app in `../frontend`. Its components and Phosphor icons
+started as ports of the web ones, but the look is now its own: minimal, true black, set in Inter.
 
 ## Run it
 
@@ -17,10 +17,13 @@ the same tokens, components and Phosphor icons.
 
 Requires JDK 17+. minSdk 26, targetSdk 35.
 
-## Design system parity
+## Design system
 
-Every visual value comes from `frontend/src/index.css` and the shared web components.
-**Change a token on both sides.**
+The Android look deliberately differs from the web app: true-black background, near-monochrome
+greys with purple kept only as the accent, white primary buttons, borderless icon buttons and tabs,
+rounder corners, an icon-only bottom bar, and Inter (bundled in `res/font`) everywhere. The Photos
+tab is an Instagram Explore-style mosaic and each person opens as an Instagram-style profile.
+Token names still follow the web's, so the tables below show where each piece came from.
 
 | Web | Android |
 | :-- | :-- |

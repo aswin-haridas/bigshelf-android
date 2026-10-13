@@ -3,7 +3,6 @@ package com.bigshelf.app.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -32,17 +31,16 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
-import com.bigshelf.app.ui.theme.Neutral
 import com.bigshelf.app.ui.theme.BsMotion
 
 enum class ButtonVariant { Primary, Secondary, Ghost }
 
 /**
- * Port of components/Button.tsx: `px-3 py-1.5 text-sm font-medium rounded-md`.
- * - primary: bg-primary, pressed bg-primary-deep
- * - secondary: bg-neutral-800, pressed bg-neutral-600
- * - ghost: transparent, pressed bg-neutral-800
- * Loading swaps to a dark surface + muted text with a 14dp spinner, like the web.
+ * Minimal buttons, rounded and flat:
+ * - primary: white with black text, dimming while pressed
+ * - secondary: surface grey, lighter while pressed
+ * - ghost: transparent, surface grey while pressed
+ * Loading swaps to the surface + muted text with a 14dp spinner.
  */
 @Composable
 fun BsButton(
@@ -51,7 +49,7 @@ fun BsButton(
     variant: ButtonVariant = ButtonVariant.Primary,
     enabled: Boolean = true,
     loading: Boolean = false,
-    contentColor: Color = BsColors.Foreground,
+    contentColor: Color? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     textStyle: TextStyle = BsText.Sm,
     gap: Dp = 6.dp,
@@ -61,18 +59,17 @@ fun BsButton(
     val pressed by interaction.collectIsPressedAsState()
     val target = when {
         loading -> BsColors.Surface
-        variant == ButtonVariant.Primary -> if (pressed) BsColors.PrimaryDeep else BsColors.Primary
-        variant == ButtonVariant.Secondary -> if (pressed) Neutral.N600 else Neutral.N800
-        else -> if (pressed) Neutral.N800 else Color.Transparent
+        variant == ButtonVariant.Primary -> if (pressed) BsColors.MutedSoft else BsColors.Foreground
+        variant == ButtonVariant.Secondary -> if (pressed) BsColors.SurfaceHover else BsColors.Surface
+        else -> if (pressed) BsColors.Surface else Color.Transparent
     }
-    // `transition-all duration-300`
     val bg by animateColorAsState(target, BsMotion.fast(), label = "buttonBg")
     val clickable = enabled && !loading
 
     Row(
         modifier = modifier
             .pressScale(interaction, if (clickable) 0.97f else 1f)
-            .clip(BsShapes.Md)
+            .clip(BsShapes.Lg)
             .background(bg)
             .clickable(interaction, indication = null, enabled = clickable, onClick = onClick)
             .padding(contentPadding),
@@ -80,7 +77,12 @@ fun BsButton(
         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
     ) {
         CompositionLocalProvider(
-            LocalContentColor provides if (loading) BsColors.Muted else contentColor,
+            LocalContentColor provides when {
+                loading -> BsColors.Muted
+                contentColor != null -> contentColor
+                variant == ButtonVariant.Primary -> BsColors.Background
+                else -> BsColors.Foreground
+            },
             LocalTextStyle provides textStyle.copy(fontWeight = BsWeight.Medium),
         ) {
             if (loading) Spinner(size = 14.dp)
@@ -89,10 +91,7 @@ fun BsButton(
     }
 }
 
-/**
- * The square icon buttons from the photo / person headers:
- * `p-2 bg-surface border border-border rounded-lg text-muted`, foreground when [active].
- */
+/** Borderless 44dp icon button: a bare glyph, on a surface circle when [active]. */
 @Composable
 fun BsIconButton(
     icon: ImageVector,
@@ -107,13 +106,12 @@ fun BsIconButton(
     Box(
         modifier = modifier
             .bsClickable(enabled = enabled && !loading, onClick = onClick)
-            .clip(BsShapes.Lg)
-            .background(BsColors.Surface)
-            .border(1.dp, if (active) BsColors.BorderFocus else BsColors.Border, BsShapes.Lg)
+            .clip(BsShapes.Full)
+            .background(if (active) BsColors.Surface else Color.Transparent)
             .size(44.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val color = tint ?: if (active) BsColors.Foreground else BsColors.Muted
+        val color = tint ?: BsColors.Foreground
         if (loading) Spinner(size = 20.dp, tint = color)
         else BsIcon(icon, size = 20.dp, tint = color, contentDescription = contentDescription)
     }

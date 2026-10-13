@@ -164,7 +164,7 @@ fun EventsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         }
         when {
             items.isEmpty() && (loading || total == null) -> LoadingText(text = "Grouping your photos…")
-            items.isEmpty() -> EmptyState("No events yet", description = "Five or more photos taken close together make an event.")
+            items.isEmpty() -> EmptyState("No events yet")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(150.dp),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -218,14 +218,6 @@ fun FilteredPhotosScreen(title: String, filter: PhotoFilter, onBack: () -> Unit,
                 // Unorganized has no album rule: select and add them instead
                 if (!filter.unorganized) BsIconButton(BsIcons.FolderSimplePlus, "Save as album", onClick = { saving = true })
             }
-        }
-        if (filter.unorganized) {
-            Text(
-                "In no album and not a favourite. Select them to add to an album, archive or bin.",
-                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                style = BsText.Xs,
-                color = BsColors.Muted,
-            )
         }
         ImagesGrid(
             photos = feed.photos,
@@ -334,7 +326,7 @@ fun BurstsScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
         )
         when {
             groups.isEmpty() && (loading || total == null) -> LoadingText(text = "Scoring similar shots…")
-            groups.isEmpty() -> EmptyState("No bursts", description = "Photos taken seconds apart that look alike show up here.")
+            groups.isEmpty() -> EmptyState("No bursts")
             else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 itemsIndexed(groups, key = { _, g -> g.id }) { i, burst ->
                     if (i >= groups.size - 3 && groups.size < (total ?: 0)) LaunchedEffect(groups.size) { load(false) }

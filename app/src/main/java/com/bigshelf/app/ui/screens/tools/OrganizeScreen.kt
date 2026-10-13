@@ -162,7 +162,7 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
 
         when {
             query.data == null && query.isLoading -> LoadingText(text = "Sorting photos…")
-            items.isEmpty() -> EmptyState("Nothing here", description = "No photos in this bucket.")
+            items.isEmpty() -> EmptyState("Nothing here")
             else -> ImagesGrid(
                 photos = items,
                 onOpen = { onOpenPhoto(it.id) },

@@ -81,7 +81,7 @@ private fun Modifier.divider(show: Boolean) = drawBehind {
 
 /** Label + hint on the left, control on the right (`px-4 py-3`). */
 @Composable
-private fun SettingRow(label: String, hint: String, modifier: Modifier = Modifier, control: @Composable () -> Unit) {
+private fun SettingRow(label: String, hint: String?, modifier: Modifier = Modifier, control: @Composable () -> Unit) {
     Row(
         modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -89,14 +89,14 @@ private fun SettingRow(label: String, hint: String, modifier: Modifier = Modifie
     ) {
         Column(Modifier.weight(1f)) {
             Text(label, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
-            Text(hint, style = BsText.Xs, color = BsColors.Muted)
+            if (hint != null) Text(hint, style = BsText.Xs, color = BsColors.Muted)
         }
         control()
     }
 }
 
 @Composable
-private fun ToggleRow(label: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit, divider: Boolean = false) {
+private fun ToggleRow(label: String, hint: String?, checked: Boolean, onChange: (Boolean) -> Unit, divider: Boolean = false) {
     // The whole row toggles, like the web's wrapping <label>
     SettingRow(label, hint, Modifier.divider(divider).bsClickable(scale = 1f) { onChange(!checked) }) {
         BsSwitch(checked, onChange)
@@ -104,11 +104,8 @@ private fun ToggleRow(label: String, hint: String, checked: Boolean, onChange: (
 }
 
 @Composable
-private fun SectionTitle(title: String, description: String) {
-    Column {
-        Text(title, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
-        Text(description, style = BsText.Xs, color = BsColors.Muted)
-    }
+private fun SectionTitle(title: String) {
+    Text(title, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
 }
 
 /** Port of modules/settings/settings.tsx - the parts that apply to the Android app. */
@@ -143,10 +140,10 @@ fun SettingsScreen(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         SettingsCard {
-            ToggleRow("AI images in Home page", "Show ChatGPT images in the Home grid.", settings.showAi, settings::updateShowAi)
+            ToggleRow("AI images on Home", null, settings.showAi, settings::updateShowAi)
             ToggleRow(
                 "Archive on download",
-                "Move photos to Archive after downloading them.",
+                null,
                 settings.archiveOnDownload,
                 settings::updateArchiveOnDownload,
                 divider = true,
@@ -154,12 +151,12 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionTitle("System", "Live use of the machine running Bigshelf, updated every few seconds.")
+            SectionTitle("System")
             SettingsCard {
                 val current = stats
                 when {
                     statsError -> Text(
-                        "Unable to load system stats.",
+                        "Unavailable",
                         Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                         style = BsText.Xs,
                         color = BsColors.Muted,
@@ -181,7 +178,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 // Outside the stats conditional: maintenance works even when stats fail to load
-                SettingRow("Thumbnails", "Rebuild the grid thumbnails of all your photos.", Modifier.divider(true)) {
+                SettingRow("Thumbnails", null, Modifier.divider(true)) {
                     BsButton(
                         onClick = {
                             regenerating = true
@@ -237,10 +234,10 @@ fun BackupScreen(onBack: () -> Unit) {
     }
 
     val (status, statusHint) = when {
-        backup.paused -> "Paused" to (waiting?.let { "$it waiting" } ?: "Resume to keep backing up.")
-        total > 0 -> "Backing up ${progress!!.getInt(BackupWorker.DONE, 0) + 1} of $total" to "Keeps going after you leave the app."
-        waiting == 0 -> "Up to date" to "New photos upload within 15 minutes."
-        else -> (waiting?.let { "$it waiting" } ?: "On") to "Uploads run on Wi-Fi when the battery isn't low."
+        backup.paused -> "Paused" to waiting?.let { "$it waiting" }
+        total > 0 -> "Backing up ${progress!!.getInt(BackupWorker.DONE, 0) + 1} of $total" to null
+        waiting == 0 -> "Up to date" to null
+        else -> (waiting?.let { "$it waiting" } ?: "On") to "Wi-Fi only"
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -250,7 +247,7 @@ fun BackupScreen(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         SettingsCard {
-            ToggleRow("Back up this phone", "Upload its photos and videos to BigShelf automatically.", backup.enabled, { on ->
+            ToggleRow("Back up this phone", null, backup.enabled, { on ->
                 if (on) permissions.launch(Backup.requestedPermissions.toTypedArray()) else backup.updateEnabled(false)
             })
             if (backup.enabled) {
@@ -264,7 +261,7 @@ fun BackupScreen(onBack: () -> Unit) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionTitle("Storage", "Space your originals take on BigShelf. Archive and Bin count until they're deleted for good.")
+            SectionTitle("Storage")
             SettingsCard {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(

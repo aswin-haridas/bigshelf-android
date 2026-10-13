@@ -185,7 +185,7 @@ fun ArchiveScreen(onFolder: (String) -> Unit, onBack: () -> Unit) {
         }
         when {
             folders.isLoading -> LoadingText()
-            list.isEmpty() -> EmptyState("Archive is empty", description = "Downloaded photos land here, one folder per download.")
+            list.isEmpty() -> EmptyState("Archive is empty")
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),

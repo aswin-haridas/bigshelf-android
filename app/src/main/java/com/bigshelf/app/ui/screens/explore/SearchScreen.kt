@@ -80,7 +80,11 @@ private fun Explore(onNavigate: (String) -> Unit) {
     var creating by rememberSaveable { mutableStateOf(false) }
     val row = PaddingValues(horizontal = 16.dp)
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
         item(key = "albums") {
             SectionHeader("Albums", actions = listOf("See all" to { onNavigate(Routes.ALBUMS) }))
             LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -106,7 +110,7 @@ private fun Explore(onNavigate: (String) -> Unit) {
             )
             val list = places.data.orEmpty()
             if (list.isEmpty()) {
-                Hint(if (places.isLoading) "Finding places…" else "Photos with a location show up here and on the map.")
+                Hint(if (places.isLoading) "Finding places…" else "No places yet")
             } else {
                 LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(list.take(15), key = { "${it.name}-${it.latitude}" }) { place ->
@@ -125,7 +129,7 @@ private fun Explore(onNavigate: (String) -> Unit) {
             SectionHeader("Events & trips", actions = listOf("See all" to { onNavigate(Routes.EVENTS) }))
             val list = events.data?.items.orEmpty()
             if (list.isEmpty()) {
-                Hint(if (events.isLoading) "Grouping your photos…" else "Days with several photos become events here.")
+                Hint(if (events.isLoading) "Grouping your photos…" else "No events yet")
             } else {
                 LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(list, key = { it.id }) { event ->
@@ -147,7 +151,7 @@ private fun Explore(onNavigate: (String) -> Unit) {
             }
         }
         item(key = "tidy") {
-            SectionHeader("Tidy up", Modifier.padding(top = 8.dp))
+            SectionHeader("Tidy up")
             RowGroup(
                 Modifier.padding(horizontal = 16.dp),
                 listOf(

@@ -94,10 +94,7 @@ fun PlacesScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         }
         when {
             places.isLoading && places.data == null -> LoadingText(text = "Finding places…")
-            list.isEmpty() -> EmptyState(
-                "No places yet",
-                description = "Photos uploaded with their GPS location show up here. Older uploads had theirs removed.",
-            )
+            list.isEmpty() -> EmptyState("No places yet")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(150.dp),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -287,7 +284,7 @@ fun MapScreen(lat: Double?, lon: Double?, onBack: () -> Unit, onNavigate: (Strin
             }
             if (locations.data?.isEmpty() == true) {
                 Text(
-                    "No photos with a location yet. New uploads keep their GPS position.",
+                    "No located photos",
                     Modifier
                         .align(Alignment.Center)
                         .padding(24.dp)

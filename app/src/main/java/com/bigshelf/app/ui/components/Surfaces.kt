@@ -34,30 +34,26 @@ import com.bigshelf.app.ui.theme.BsMotion
 
 data class TabItem<T>(val id: T, val label: String)
 
-/**
- * Port of components/ui/Tabs.tsx - segmented control:
- * `h-8 bg-surface border border-border rounded-md p-0.5 gap-1`, active tab `bg-white/10 text-white`.
- */
+/** Segmented control: a borderless surface pill, the active tab a lighter pill inside it. */
 @Composable
 fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
             .height(44.dp)
-            .clip(BsShapes.Lg)
+            .clip(BsShapes.Full)
             .background(BsColors.Surface)
-            .border(1.dp, BsColors.Border, BsShapes.Lg)
-            .padding(3.dp),
+            .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         tabs.forEach { tab ->
             val selected = tab.id == active
-            val bg by animateColorAsState(if (selected) Color.White.copy(alpha = 0.1f) else Color.Transparent, BsMotion.fast(), label = "tabBg")
+            val bg by animateColorAsState(if (selected) BsColors.SurfaceHover else Color.Transparent, BsMotion.fast(), label = "tabBg")
             Box(
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .clip(BsShapes.Md)
+                    .clip(BsShapes.Full)
                     .background(bg)
                     .bsClickable(scale = 1f) { onChange(tab.id) }
                     .padding(horizontal = 4.dp),
@@ -65,7 +61,7 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
             ) {
                 Text(
                     tab.label,
-                    style = BsText.Sm.copy(fontWeight = BsWeight.Medium),
+                    style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
                     color = if (selected) BsColors.Foreground else BsColors.Muted,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -167,7 +163,7 @@ fun PageHeader(
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
-            if (count != null) Text(count, style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted)
+            if (count != null) Text(count, Modifier.padding(top = 2.dp), style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
     }

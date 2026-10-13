@@ -3,20 +3,20 @@ package com.bigshelf.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Design tokens, one-to-one with the `@theme` block in frontend/src/index.css.
- * Use these for every colour; status colours are success / warning / info / danger.
+ * Colour tokens: true-black, near-monochrome, with purple kept as the one accent (selection,
+ * switches, progress). Use these for every colour; status colours are success / warning / info / danger.
  */
 object BsColors {
-    val Background = Color(0xFF0B0C10)
-    val Surface = Color(0xFF16171B)
-    val SurfaceHover = Color(0xFF232429)
-    val Border = Color(0xFF26262B)
-    val BorderFocus = Color(0xFF52525B)
+    val Background = Color(0xFF000000)
+    val Surface = Color(0xFF121212)
+    val SurfaceHover = Color(0xFF1C1C1C)
+    val Border = Color(0xFF1F1F1F)
+    val BorderFocus = Color(0xFF3F3F3F)
 
     val Foreground = Color(0xFFFFFFFF)
-    val Muted = Color(0xFFA3A3A3)
+    val Muted = Color(0xFF8E8E8E)
     val MutedSoft = Color(0xFFD4D4D4)
-    val MutedFaint = Color(0xFF737373)
+    val MutedFaint = Color(0xFF5C5C5C)
 
     val Primary = Color(0xFF7C3AED)
     val PrimaryDeep = Color(0xFF3B0764)
@@ -30,17 +30,13 @@ object BsColors {
     val Info = Color(0xFF60A5FA)
 }
 
-/**
- * Tailwind neutrals that shared web components still use directly
- * (Button `secondary`, SearchBar, FloatingActionBar, sidebar active row, upload modal).
- * Only for porting those components exactly - new UI should use [BsColors].
- */
+/** Greys a few older components use directly, tuned to the black palette. New UI should use [BsColors]. */
 internal object Neutral {
     val N300 = Color(0xFFD4D4D4)
     val N400 = Color(0xFFA3A3A3)
-    val N600 = Color(0xFF525252)
-    val N700 = Color(0xFF404040)
-    val N800 = Color(0xFF262626)
-    val N900 = Color(0xFF171717)
+    val N600 = Color(0xFF3A3A3A)
+    val N700 = Color(0xFF2A2A2A)
+    val N800 = Color(0xFF1C1C1C)
+    val N900 = Color(0xFF121212)
     val Rose400 = Color(0xFFFB7185)
 }

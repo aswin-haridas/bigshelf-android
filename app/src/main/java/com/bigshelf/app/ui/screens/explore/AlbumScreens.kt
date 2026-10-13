@@ -121,7 +121,7 @@ fun AlbumsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         }
         when {
             albums.isLoading && albums.data == null -> LoadingText()
-            list.isEmpty() -> EmptyState("No albums yet", description = "Create one, or select photos and add them to an album.")
+            list.isEmpty() -> EmptyState("No albums yet")
             else -> AlbumGrid(list, onOpen = { onNavigate(Routes.album(it.id)) })
         }
     }

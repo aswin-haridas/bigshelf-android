@@ -81,7 +81,7 @@ fun CoverCard(
         }
         Text(
             title,
-            Modifier.padding(top = 6.dp),
+            Modifier.padding(top = 8.dp),
             style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

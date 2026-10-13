@@ -184,7 +184,6 @@ fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 EmptyState(
                     if (auto > 0) "$auto exact duplicate${if (auto > 1) "s" else ""} moved to Bin" else "No duplicates found",
                     Modifier.padding(horizontal = 24.dp),
-                    description = "Exact duplicates are moved to Bin automatically.",
                 )
             }
             else -> key(current.key) {
@@ -257,7 +256,7 @@ private fun PairReview(group: DuplicateGroup, relaxedTo: Double?, onKeep: (Photo
             Text("${(group.similarity * 100).toInt()}% match", style = BsText.Base.copy(fontWeight = BsWeight.Medium))
             // No pairs at the standard match %, so the backend lowered the bar to show one
             if (relaxedTo != null) Text("Relaxed to ${(relaxedTo * 100).toInt()}%", style = BsText.Xs, color = BsColors.Warning)
-            Text("Tap the photo to keep. The other goes to Bin.", style = BsText.Xs, color = BsColors.Muted)
+            Text("Tap the one to keep", style = BsText.Xs, color = BsColors.Muted)
             BsButton(onClick = { onKeep(null) }, Modifier.fillMaxWidth(), variant = ButtonVariant.Secondary) {
                 BsIcon(BsIcons.CheckBold, size = 18.dp)
                 Text("Keep both")

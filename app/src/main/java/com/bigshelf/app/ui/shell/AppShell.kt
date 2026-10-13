@@ -7,14 +7,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.PageHeader
-import com.bigshelf.app.ui.theme.Neutral
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -160,7 +157,7 @@ fun AppShell() {
     }
 }
 
-/** 64dp bar: 24dp icons (filled when active, on a neutral-800 pill) over `text-xs` labels. */
+/** Instagram-style 56dp bar: bare 24dp icons, filled and white when active, no labels. */
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit) {
     Row(
@@ -169,36 +166,19 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit) {
             .background(BsColors.Background)
             .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
             .navigationBarsPadding()
-            .height(64.dp),
+            .height(56.dp),
     ) {
         TABS.forEach { tab ->
             val selected = tab.route == active
-            val pill by animateColorAsState(if (selected) Neutral.N800 else Color.Transparent, BsMotion.fast(), label = "tabPill")
-            Column(
+            val tint by animateColorAsState(if (selected) BsColors.Foreground else BsColors.Muted, BsMotion.fast(), label = "tabTint")
+            Box(
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .bsClickable(scale = 0.94f) { onSelect(tab.route) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .bsClickable(scale = 0.9f) { onSelect(tab.route) },
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    Modifier.clip(BsShapes.Full).background(pill).padding(horizontal = 20.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    BsIcon(
-                        if (selected) tab.activeIcon else tab.icon,
-                        size = 24.dp,
-                        tint = if (selected) BsColors.Foreground else BsColors.Muted,
-                        contentDescription = tab.label,
-                    )
-                }
-                Text(
-                    tab.label,
-                    Modifier.padding(top = 4.dp),
-                    style = BsText.Xs2.copy(fontWeight = BsWeight.Medium),
-                    color = if (selected) BsColors.Foreground else BsColors.Muted,
-                )
+                BsIcon(if (selected) tab.activeIcon else tab.icon, size = 24.dp, tint = tint, contentDescription = tab.label)
             }
         }
     }
@@ -224,7 +204,7 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
         popEnterTransition = { fadeIn(BsMotion.spec()) },
         popExitTransition = { fadeOut(BsMotion.fast()) },
     ) {
-        composable(Routes.HOME) { HomeScreen(onOpenPhoto = openPhoto) }
+        composable(Routes.HOME) { HomeScreen(onOpenPhoto = openPhoto, onProfile = { nav.navigate(Routes.SETTINGS) }) }
         composable(Routes.LIBRARY) { LibraryScreen(onNavigate = { nav.navigate(it) }) }
         composable(Routes.FAVOURITES) { FavouritesScreen(onOpenPhoto = openPhoto, onBack = onBack) }
         searchGraph(nav, onBack = onBack, openPhoto = openPhoto)
@@ -278,7 +258,6 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 EmptyState(
                     title = "Web only",
                     modifier = Modifier.padding(horizontal = 24.dp),
-                    description = "$label isn't in the Android app yet. Open BigShelf on the web to use it.",
                 )
             }
         }

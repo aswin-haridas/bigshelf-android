@@ -110,7 +110,7 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             Section("Shared with you") {
                 val albums = shared.data.orEmpty()
                 if (albums.isEmpty()) {
-                    Hint(if (shared.isLoading) "Loading…" else "Albums people share with you show up here.")
+                    Hint(if (shared.isLoading) "Loading…" else "Nothing yet")
                 } else {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -131,10 +131,7 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             Section("Your links") {
                 val list = links.data.orEmpty()
                 if (list.isEmpty()) {
-                    Hint(
-                        if (links.isLoading) "Loading…"
-                        else "Share an album, or select photos and tap Share, to make a link anyone can open.",
-                    )
+                    Hint(if (links.isLoading) "Loading…" else "No links")
                 } else {
                     Column(
                         Modifier

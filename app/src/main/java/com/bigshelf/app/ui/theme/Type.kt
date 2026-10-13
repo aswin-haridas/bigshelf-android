@@ -1,25 +1,33 @@
 package com.bigshelf.app.ui.theme
 
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.bigshelf.app.R
+
+/** Inter, bundled (Latin subset; other scripts fall back to the system font). */
+val Sans = FontFamily(
+    Font(R.font.inter_400, FontWeight.Normal),
+    Font(R.font.inter_500, FontWeight.Medium),
+    Font(R.font.inter_600, FontWeight.SemiBold),
+)
 
 /**
- * Type scale named after index.css (`--text-*`), but sized to the Material 3 scale for
- * phones: nothing under 12sp, 14sp secondary text, 16sp body. Each token sits one step
- * above its web value, so the web's hierarchy holds at a readable mobile size.
+ * Type scale in Inter, sized for phones: nothing under 12sp, 14sp secondary text, 16sp body,
+ * 24sp page titles. Names follow the web's `--text-*` tokens.
  */
 object BsText {
-    val Xs2 = TextStyle(fontSize = 12.sp, lineHeight = 16.sp) // text-2xs  -> M3 labelMedium
-    val Xs = TextStyle(fontSize = 14.sp, lineHeight = 20.sp) // text-xs   -> M3 bodyMedium
-    val Sm = TextStyle(fontSize = 16.sp, lineHeight = 24.sp) // text-sm   -> M3 bodyLarge
-    val Base = TextStyle(fontSize = 16.sp, lineHeight = 24.sp) // text-base -> M3 bodyLarge
-    val Lg = TextStyle(fontSize = 22.sp, lineHeight = 28.sp) // text-lg (page titles) -> M3 titleLarge
-    val Xl = TextStyle(fontSize = 24.sp, lineHeight = 32.sp) // text-xl   -> M3 headlineSmall
-    val Xl2 = TextStyle(fontSize = 28.sp, lineHeight = 36.sp) // text-2xl  -> M3 headlineMedium
-    val Xl4 = TextStyle(fontSize = 36.sp, lineHeight = 44.sp) // text-4xl  -> M3 displaySmall
+    val Xs2 = TextStyle(fontFamily = Sans, fontSize = 12.sp, lineHeight = 16.sp) // text-2xs  -> M3 labelMedium
+    val Xs = TextStyle(fontFamily = Sans, fontSize = 14.sp, lineHeight = 20.sp) // text-xs   -> M3 bodyMedium
+    val Sm = TextStyle(fontFamily = Sans, fontSize = 16.sp, lineHeight = 24.sp) // text-sm   -> M3 bodyLarge
+    val Base = TextStyle(fontFamily = Sans, fontSize = 16.sp, lineHeight = 24.sp) // text-base -> M3 bodyLarge
+    val Lg = TextStyle(fontFamily = Sans, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.02).em) // text-lg (page titles) -> M3 titleLarge
+    val Xl = TextStyle(fontFamily = Sans, fontSize = 24.sp, lineHeight = 32.sp) // text-xl   -> M3 headlineSmall
+    val Xl2 = TextStyle(fontFamily = Sans, fontSize = 28.sp, lineHeight = 36.sp) // text-2xl  -> M3 headlineMedium
+    val Xl4 = TextStyle(fontFamily = Sans, fontSize = 36.sp, lineHeight = 44.sp) // text-4xl  -> M3 displaySmall
 
     /** `tracking-tight` */
     val TrackingTight = (-0.025).em
@@ -36,5 +44,5 @@ object BsWeight {
     val Semibold = FontWeight(600)
 }
 
-/** `font-mono`: counts, timestamps, scores, dimensions. */
-val MonoFamily: FontFamily = FontFamily.Monospace
+/** Counts, timestamps, scores, dimensions: Inter too, so numbers don't break the minimal look. */
+val MonoFamily: FontFamily = Sans
