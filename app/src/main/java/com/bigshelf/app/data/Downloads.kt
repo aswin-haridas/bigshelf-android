@@ -5,10 +5,13 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import com.bigshelf.app.BigShelfApp
+import com.bigshelf.app.state.PhotoEvents
+import com.bigshelf.app.ui.components.toast
 
 /**
  * Saves photos to Downloads/BigShelf with the system DownloadManager. The web zips
  * multi-photo downloads in the browser; on Android each file is its own download.
+ * With Archive on download on, the saved photos are then archived.
  */
 object Downloads {
     suspend fun save(context: Context, photos: Collection<Photo>) {
@@ -25,6 +28,18 @@ object Downloads {
             // Media served by the API itself (not presigned storage) needs the session
             if (url.startsWith(api.baseUrl)) api.accessToken?.let { request.addRequestHeader("Authorization", "Bearer $it") }
             manager.enqueue(request)
+        }
+        // Settings > Archive on download (web `archiveDownloaded`): applies to every download
+        // button, so downloaded photos leave the library wherever they were saved from
+        if (BigShelfApp.settings.archiveOnDownload && photos.isNotEmpty()) {
+            try {
+                api.flagArchived(photos.map { it.id }, true)
+                PhotoEvents.invalidateAll()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                toast.error("Photo downloaded, but failed to move to archive")
+            }
         }
     }
 }

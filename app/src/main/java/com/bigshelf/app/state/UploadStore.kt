@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bigshelf.app.BigShelfApp
+import com.bigshelf.app.data.ApiException
 import com.bigshelf.app.data.userMessage
 import com.bigshelf.app.ui.components.toast
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 /**
  * App-wide upload queue (web `useUploadStore` + `startUpload`). Drives the
@@ -40,7 +42,10 @@ object UploadStore {
             val sent = HashMap<Uri, Long>()
             var processed = 0
             var failed = 0
+            var duplicates = 0
             var lastError: String? = null
+            // Hashes sent in this batch, so a repeat within one pick is skipped too
+            val sentHashes = HashSet<String>()
             fun report() {
                 val raw = (sent.values.sum() / total * 100).toInt().coerceAtMost(99)
                 upload = Progress(uris.size, processed, raw)
@@ -50,11 +55,21 @@ object UploadStore {
                 async {
                     lanes.withPermit {
                         try {
-                            api.upload(uri, albumId = albumId) { bytes ->
+                            // SHA-256 lets the API refuse an exact copy already in the library (409)
+                            // before any bytes are sent (web `uploads/check`)
+                            val hash = withContext(Dispatchers.IO) { runCatching { BigShelfApp.backup.sha256(uri) }.getOrNull() }
+                            if (hash != null && !synchronized(sentHashes) { sentHashes.add(hash) }) throw ApiException(409, "Duplicate")
+                            api.upload(uri, contentHash = hash, albumId = albumId) { bytes ->
                                 scope.launch {
                                     sent[uri] = bytes
                                     report()
                                 }
+                            }
+                        } catch (e: ApiException) {
+                            if (e.code == 409) duplicates++
+                            else {
+                                failed++
+                                lastError = e.userMessage("Upload failed")
                             }
                         } catch (e: Exception) {
                             failed++
@@ -67,8 +82,13 @@ object UploadStore {
                 }
             }.awaitAll()
             upload = Progress(uris.size, processed, 100)
-            if (failed == 0) toast.success("${uris.size} file${if (uris.size == 1) "" else "s"} uploaded")
-            else toast.error(lastError ?: "$failed upload${if (failed == 1) "" else "s"} failed")
+            val uploaded = uris.size - failed - duplicates
+            when {
+                failed > 0 -> toast.error(lastError ?: "$failed upload${if (failed == 1) "" else "s"} failed")
+                uploaded > 0 && duplicates > 0 -> toast.success("Uploaded $uploaded file${if (uploaded == 1) "" else "s"}, skipped $duplicates duplicate${if (duplicates == 1) "" else "s"}")
+                duplicates > 0 -> toast.info("$duplicates file${if (duplicates == 1) " was" else "s were"} already in your library")
+                else -> toast.success("$uploaded file${if (uploaded == 1) "" else "s"} uploaded")
+            }
             PhotoEvents.invalidate("photos")
             delay(2500)
             upload = null

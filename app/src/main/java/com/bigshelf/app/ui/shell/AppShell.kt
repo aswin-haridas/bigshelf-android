@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.bigshelf.app.ui.components.BsIconButton
-import com.bigshelf.app.ui.components.PageHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,10 +35,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.bigshelf.app.state.EventStream
 import com.bigshelf.app.state.SelectionStore
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.bigshelf.app.ui.Routes
 import com.bigshelf.app.ui.components.BsIcon
-import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.screens.ArchiveFolderScreen
 import com.bigshelf.app.ui.screens.ArchiveScreen
@@ -58,7 +59,14 @@ import com.bigshelf.app.ui.screens.people.PeopleTab
 import com.bigshelf.app.ui.screens.people.PersonScreen
 import com.bigshelf.app.ui.screens.people.UntaggedScreen
 import com.bigshelf.app.ui.screens.photo.PhotoScreen
+import com.bigshelf.app.BigShelfApp
+import com.bigshelf.app.ui.screens.tools.COMPOSER_ENDPOINT
 import com.bigshelf.app.ui.screens.tools.DuplicatesScreen
+import com.bigshelf.app.ui.screens.tools.FramerScreen
+import com.bigshelf.app.ui.screens.tools.OUTFIT_SWAP_PROMPT
+import com.bigshelf.app.ui.screens.tools.TRIPLETS_ENDPOINT
+import com.bigshelf.app.ui.screens.tools.TRIPTYCH_ENDPOINT
+import com.bigshelf.app.ui.screens.tools.TriptychScreen
 import com.bigshelf.app.ui.screens.tools.OrganizeScreen
 import com.bigshelf.app.ui.screens.tools.PipelinesScreen
 import com.bigshelf.app.ui.screens.tools.RunScreen
@@ -103,6 +111,10 @@ private fun tabFor(path: String) = when {
  */
 @Composable
 fun AppShell() {
+    // Live server updates (processing finished, another device's edits) while in the foreground
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { EventStream.listen() } }
+
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val path = entry?.path().orEmpty()
@@ -249,17 +261,29 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 onBack = { if (!nav.popBackStack()) onTopLevel(sectionFrom) },
                 onPerson = { nav.navigate(Routes.person(it)) },
                 onMap = { lat, lon -> nav.navigate(Routes.map(lat, lon)) },
+                onOpenPhoto = { id -> nav.navigate(Routes.photo(id)) },
+                onFramer = { id -> nav.navigate(Routes.framer(id)) },
             )
         }
-        composable(Routes.SOON, arguments = listOf(navArgument("label") { type = NavType.StringType })) {
-            val label = it.arguments?.getString("label").orEmpty()
-            Column(Modifier.fillMaxSize()) {
-                PageHeader(label, leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
-                EmptyState(
-                    title = "Web only",
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                )
-            }
+        composable(Routes.TRIPTYCH) {
+            TriptychScreen("Triptych", "All similar photos of one outfit", TRIPTYCH_ENDPOINT, onBack = onBack, onOpenPhoto = openPhoto)
+        }
+        composable(Routes.TRIPLETS) {
+            // Downloading moves the photos to Archive (when on in Settings), same as Triptych
+            TriptychScreen(
+                "Triplets", "${BigShelfApp.settings.tripletCount} photos of the same person", TRIPLETS_ENDPOINT,
+                onBack = onBack, onOpenPhoto = openPhoto,
+            )
+        }
+        composable(Routes.COMPOSER) {
+            // A clear-face photo, then the same person in another outfit, with the prompt to swap it in
+            TriptychScreen(
+                "Composer", "A clear face, and an outfit of theirs to swap in", COMPOSER_ENDPOINT,
+                onBack = onBack, onOpenPhoto = openPhoto, prompt = OUTFIT_SWAP_PROMPT,
+            )
+        }
+        composable(Routes.FRAMER, arguments = listOf(navArgument("photo") { type = NavType.StringType; nullable = true })) {
+            FramerScreen(photoId = it.arguments?.getString("photo"), onBack = onBack)
         }
     }
 }

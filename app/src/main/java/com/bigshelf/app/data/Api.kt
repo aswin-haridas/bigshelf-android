@@ -26,10 +26,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -141,7 +143,15 @@ class Api(context: Context, val baseUrl: String) {
         path: String,
         params: Map<String, Any?> = emptyMap(),
         body: RequestBody? = null,
-    ): String = withContext(Dispatchers.IO) {
+    ): String = callWithHeaders(method, path, params, body).first
+
+    // Body text plus response headers (Triptych/Triplets name the set's person in X-Person-*)
+    private suspend fun callWithHeaders(
+        method: String,
+        path: String,
+        params: Map<String, Any?> = emptyMap(),
+        body: RequestBody? = null,
+    ): Pair<String, Headers> = withContext(Dispatchers.IO) {
         val httpUrl = url(path).toHttpUrl().newBuilder().apply {
             params.forEach { (k, v) -> if (v != null) addQueryParameter(k, v.toString()) }
         }.build()
@@ -150,8 +160,28 @@ class Api(context: Context, val baseUrl: String) {
         client.newCall(request).execute().use { res ->
             val text = res.body?.string().orEmpty()
             if (!res.isSuccessful) throw ApiException(res.code, errorDetail(text) ?: "Request failed")
-            text
+            text to res.headers
         }
+    }
+
+    // multipart/form-data with one `file` part read from [uri] (Framer, search by image)
+    // [filename]: for file:// URIs, which have no display name (the backend checks the extension)
+    private fun filePart(uri: Uri, filename: String? = null, mimeType: String? = null): MultipartBody {
+        val resolver = appContext.contentResolver
+        var name = filename ?: "upload"
+        if (filename == null) {
+            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) name = c.getString(0) ?: name
+            }
+        }
+        val type = (mimeType ?: resolver.getType(uri))?.toMediaTypeOrNull()
+        val body = object : RequestBody() {
+            override fun contentType() = type
+            override fun writeTo(sink: BufferedSink) {
+                (resolver.openInputStream(uri) ?: throw IOException("Can't read $uri")).source().use { sink.writeAll(it) }
+            }
+        }
+        return MultipartBody.Builder().setType(MultipartBody.FORM).addFormDataPart("file", name, body).build()
     }
 
     // FastAPI sends a string `detail` for HTTPException, an array of {msg} for 422s
@@ -303,7 +333,14 @@ class Api(context: Context, val baseUrl: String) {
 
     // ---------- People & faces ----------
 
-    suspend fun people() = get("/api/v1/people", PersonList.serializer())
+    /**
+     * Every person; [q] filters by name server-side, [faceId] ranks lookalikes of that face
+     * first, [photoId] ranks people seen in similar photos first (whole-photo tagging).
+     */
+    suspend fun people(q: String? = null, faceId: String? = null, photoId: String? = null) = get(
+        "/api/v1/people", PersonList.serializer(),
+        mapOf("q" to q?.ifBlank { null }, "face_id" to faceId, "photo_id" to photoId),
+    )
 
     suspend fun personPhotos(id: String) = get("/api/v1/people/$id/photos", PersonPhotos.serializer())
 
@@ -349,6 +386,128 @@ class Api(context: Context, val baseUrl: String) {
             if (personId != null) put("person_id", personId) else put("name", name)
         },
     )
+
+    /** Forget a background face: it leaves Faces and its person (if any). */
+    suspend fun ignoreFace(faceId: String) = sendUnit("POST", "/api/v1/faces/$faceId/ignore")
+
+    /** Match untagged faces to existing people. */
+    suspend fun clusterFaces() = send("POST", "/api/v1/faces/cluster", ClusterResult.serializer())
+
+    /** Move the detected group holding [sourceFaceId] into [targetFaceId]'s group. */
+    suspend fun mergeFaceGroup(sourceFaceId: String, targetFaceId: String) = send(
+        "POST", "/api/v1/faces/$sourceFaceId/merge-group", MergeGroupResult.serializer(),
+        buildJsonObject { put("target_face_id", targetFaceId) },
+    )
+
+    /**
+     * Tag face number [faceIndex] on a photo (an existing person by id, or a name);
+     * [WHOLE_PHOTO_FACE_INDEX] tags the photo itself when no face was detected.
+     */
+    suspend fun tagPhotoFace(photoId: String, faceIndex: Int, name: String? = null, personId: String? = null) = send(
+        "POST", "/api/v1/photos/$photoId/faces/$faceIndex/tag", PhotoFaceResult.serializer(),
+        buildJsonObject { if (personId != null) put("person_id", personId) else put("name", name) },
+    )
+
+    /** "untag" removes the person from that face, "ignore" forgets it. */
+    suspend fun photoFaceAction(photoId: String, faceIndex: Int, action: String) =
+        send("POST", "/api/v1/photos/$photoId/faces/$faceIndex/$action", PhotoFaceResult.serializer())
+
+    /** A name guessed from the photo's filename, matched against existing people. */
+    suspend fun suggestName(photoId: String) =
+        get("/api/v1/photos/$photoId/suggest-name", SuggestedName.serializer()).suggestedName
+
+    // ---------- Triptych, Triplets, Composer ----------
+
+    /**
+     * One set from [endpoint] (`/api/v1/triptych`, `/triplets`, `/composer`), with the person it
+     * shows from the X-Person-* headers. Each endpoint ignores the params it doesn't use.
+     */
+    suspend fun photoSet(
+        endpoint: String,
+        offset: Int,
+        includeAi: Boolean,
+        count: Int,
+        solo: Boolean,
+        personId: String?,
+        skipSmall: Boolean,
+    ): PhotoSet {
+        val (text, headers) = callWithHeaders(
+            "GET", endpoint,
+            mapOf(
+                "offset" to offset, "include_ai" to includeAi, "count" to count, "solo" to solo,
+                "person_id" to personId, "skip_small" to skipSmall,
+            ),
+        )
+        return PhotoSet(
+            photos = json.decodeFromString(ListSerializer(Photo.serializer()), text),
+            personId = headers["x-person-id"],
+            // Percent-encoded by the backend (header values are latin-1 only)
+            personName = headers["x-person-name"]?.let { java.net.URLDecoder.decode(it, "UTF-8") },
+        )
+    }
+
+    /** Never show this person in Triptych or Triplets again (undone from Settings). */
+    suspend fun skipPerson(personId: String) = sendUnit("POST", "/api/v1/triplets/skip/$personId")
+
+    suspend fun unskipPerson(personId: String) = sendUnit("DELETE", "/api/v1/triplets/skip/$personId")
+
+    // ---------- Framer ----------
+
+    /** Scores the video's frames and returns the best [topK] as base64 JPEGs. */
+    suspend fun extractFrames(video: Uri, topK: Int, filename: String? = null, mimeType: String? = null) = json.decodeFromString(
+        FramerResult.serializer(),
+        call("POST", "/api/v1/framer/extract", mapOf("top_k" to topK), filePart(video, filename, mimeType)),
+    )
+
+    /** Downloads a media URL (a library video for Framer) into [file]. */
+    suspend fun fetchToFile(path: String, file: java.io.File) = withContext(Dispatchers.IO) {
+        client.newCall(Request.Builder().url(url(path)).build()).execute().use { res ->
+            if (!res.isSuccessful) throw ApiException(res.code, "Download failed")
+            file.outputStream().use { out -> res.body!!.byteStream().copyTo(out) }
+        }
+    }
+
+    suspend fun saveFrames(frames: List<Frame>) = send(
+        "POST", "/api/v1/framer/save", FramesSaved.serializer(),
+        buildJsonObject {
+            put("frames", JsonArray(frames.map { f ->
+                buildJsonObject {
+                    put("image_data", f.imageData)
+                    put("timestamp_formatted", f.timestampFormatted)
+                    put("title", "Frame ${f.timestampFormatted}")
+                }
+            }))
+        },
+    )
+
+    // ---------- Editing ----------
+
+    /** Cuts the photo to [box] in place (the original is overwritten and reprocessed). */
+    suspend fun crop(photoId: String, box: CropBox) = sendUnit(
+        "POST", "/api/v1/photos/$photoId/crop",
+        buildJsonObject {
+            put("box", buildJsonObject {
+                put("x", box.x)
+                put("y", box.y)
+                put("width", box.width)
+                put("height", box.height)
+            })
+            put("save_as_new", false)
+        },
+    )
+
+    /** Splits a collage into its photos; the original moves to the Bin. */
+    suspend fun split(photoId: String) = send("POST", "/api/v1/splitter/$photoId/split", SplitResult.serializer())
+
+    // ---------- Similar & reverse image search ----------
+
+    suspend fun similar(photoId: String, limit: Int = 24) =
+        get("/api/v1/photos/$photoId/similar", PhotoPage.serializer(), mapOf("limit" to limit)).items
+
+    suspend fun searchByImage(image: Uri) = json.decodeFromString(
+        PhotoPage.serializer(),
+        call("POST", "/api/v1/photos/search-by-image", body = filePart(image)),
+    ).items
 
     // ---------- Albums ----------
 

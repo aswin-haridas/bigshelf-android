@@ -1,5 +1,21 @@
 package com.bigshelf.app.ui.screens.explore
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import com.bigshelf.app.ui.components.BsButton
+import com.bigshelf.app.ui.components.BsIcon
+import com.bigshelf.app.ui.components.BsIconButton
+import com.bigshelf.app.ui.components.ButtonVariant
+import com.bigshelf.app.ui.components.toast
+import com.bigshelf.app.ui.theme.BsShapes
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -53,15 +69,38 @@ fun SearchScreen(onNavigate: (String) -> Unit, onOpenPhoto: (String) -> Unit) {
         delay(300)
         q = search.trim()
     }
+    // Reverse image search: the picked photo's look-alikes replace the text results
+    var image by rememberSaveable { mutableStateOf<Uri?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            search = "" // image and text queries are exclusive
+            image = uri
+        }
+    }
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Search")
+        PageHeader("Search") {
+            BsIconButton(
+                BsIcons.Image,
+                "Search by image",
+                onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                active = image != null,
+            )
+        }
         BsSearchBar(
             search,
-            { search = it },
+            {
+                search = it
+                image = null // typing switches back to text search
+            },
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             placeholder = "People, places, things, colours…",
         )
-        if (q.isEmpty()) Explore(onNavigate) else Results(q, onNavigate, onOpenPhoto)
+        val searching = image
+        when {
+            searching != null -> ImageResults(searching, onClear = { image = null }, onOpenPhoto)
+            q.isEmpty() -> Explore(onNavigate)
+            else -> Results(q, onNavigate, onOpenPhoto)
+        }
     }
 }
 
@@ -216,6 +255,37 @@ private fun Results(q: String, onNavigate: (String) -> Unit, onOpenPhoto: (Strin
                         Chip(it.name, onClick = { onNavigate(Routes.filtered(it.name, PhotoFilter(bbox = it.bbox))) }, icon = BsIcons.MapPin)
                     }
                     colorHits.forEach { (id, label, swatch) -> Chip(label, onClick = { onNavigate(Routes.color(id)) }, swatch = swatch) }
+                }
+            }
+        },
+    )
+}
+
+/** Port of the web's image search: library photos that look like [image], best match first. */
+@Composable
+private fun ImageResults(image: Uri, onClear: () -> Unit, onOpenPhoto: (String) -> Unit) {
+    val showAi = BigShelfApp.settings.showAi
+    val matches = rememberQuery("search-image", image, invalidatedBy = setOf("photos")) { BigShelfApp.api.searchByImage(image) }
+    LaunchedEffect(matches.isError) { if (matches.isError) toast.error("Reverse image search failed") }
+    val results = matches.data.orEmpty().let { all -> if (showAi) all else all.filterNot { it.isAiImage } }
+    ImagesGrid(
+        photos = results,
+        onOpen = { onOpenPhoto(it.id) },
+        isFetchingNextPage = matches.isLoading,
+        totalCount = if (matches.isLoading) null else results.size,
+        // Ranked by similarity, so no date grouping
+        groupByDate = false,
+        header = {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AsyncImage(image, "Current image search", Modifier.size(40.dp).clip(BsShapes.Md), contentScale = ContentScale.Crop)
+                Text("Current search", Modifier.weight(1f), style = BsText.Xs, color = BsColors.Muted)
+                BsButton(onClick = onClear, variant = ButtonVariant.Ghost, textStyle = BsText.Xs) {
+                    BsIcon(BsIcons.X, size = 12.dp)
+                    Text("Clear")
                 }
             }
         },

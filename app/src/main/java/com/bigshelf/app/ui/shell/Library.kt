@@ -95,7 +95,7 @@ private fun LibraryRow(
 
 /**
  * Library tab: everything the web sidebar holds beyond the bottom-bar sections - upload,
- * Archive, Bin, the web-only tools, Settings, Log out and storage used.
+ * Archive, Bin, the tools, Settings, Log out and storage used.
  */
 @Composable
 fun LibraryScreen(onNavigate: (String) -> Unit) {
@@ -122,15 +122,15 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
                 LibraryRow("Archive", BsIcons.Archive, divider = true, onClick = { onNavigate(Routes.ARCHIVE) })
                 LibraryRow("Bin", BsIcons.Trash, divider = true, onClick = { onNavigate(Routes.BIN) })
             }
+            // Same tools, same order as the web sidebar
             Group("Tools") {
-                LibraryRow("Pipelines", BsIcons.FlowArrow, onClick = { onNavigate(Routes.PIPELINES) })
+                LibraryRow("Framer", BsIcons.FilmStrip, onClick = { onNavigate(Routes.framer()) })
+                LibraryRow("Triptych", BsIcons.SquareSplitVertical, divider = true, onClick = { onNavigate(Routes.TRIPTYCH) })
+                LibraryRow("Triplets", BsIcons.Users, divider = true, onClick = { onNavigate(Routes.TRIPLETS) })
+                LibraryRow("Composer", BsIcons.Sparkle, divider = true, onClick = { onNavigate(Routes.COMPOSER) })
                 LibraryRow("Duplicates", BsIcons.Copy, divider = true, onClick = { onNavigate(Routes.DUPLICATES) })
+                LibraryRow("Pipelines", BsIcons.FlowArrow, divider = true, onClick = { onNavigate(Routes.PIPELINES) })
                 LibraryRow("Organize", BsIcons.Funnel, divider = true, onClick = { onNavigate(Routes.ORGANIZE) })
-            }
-            Group("On the web") {
-                Routes.tools.forEachIndexed { i, label ->
-                    LibraryRow(label, null, divider = i > 0, trailing = "Web", onClick = { onNavigate(Routes.soon(label)) })
-                }
             }
             Group {
                 LibraryRow("Settings", BsIcons.Gear, onClick = { onNavigate(Routes.SETTINGS) })

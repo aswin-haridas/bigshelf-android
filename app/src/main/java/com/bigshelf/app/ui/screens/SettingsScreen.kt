@@ -43,6 +43,10 @@ import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsProgress
 import com.bigshelf.app.ui.components.BsSwitch
+import com.bigshelf.app.ui.components.BsTabs
+import com.bigshelf.app.ui.components.TabItem
+import com.bigshelf.app.state.PhotoEvents
+import com.bigshelf.app.ui.photos.photoCountLabel
 import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.bsClickable
@@ -108,7 +112,77 @@ private fun SectionTitle(title: String) {
     Text(title, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
 }
 
-/** Port of modules/settings/settings.tsx - the parts that apply to the Android app. */
+/** Section title with a one-line explanation under it. */
+@Composable
+private fun Section(title: String, hint: String) {
+    Column {
+        SectionTitle(title)
+        Text(hint, style = BsText.Xs, color = BsColors.Muted)
+    }
+}
+
+// Triplets set sizes, the web slider's range (3-6)
+private val SET_SIZES = (3..6).map { TabItem(it, "$it") }
+
+/** People hidden with Skip on Triptych / Triplets, each with an Unskip to bring them back. */
+@Composable
+private fun SkippedPeople() {
+    val api = BigShelfApp.api
+    val scope = rememberCoroutineScope()
+    val people = rememberQuery("people-all", invalidatedBy = setOf("people")) { api.people().items }
+    val skipped = people.data.orEmpty().filter { it.isSkipped }
+    var pending by remember { mutableStateOf<String?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Section("Skipped people", "Skipped people never appear in Triptych or Triplets.")
+        SettingsCard {
+            when {
+                people.isLoading -> Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                    Spinner(size = 16.dp, tint = BsColors.Muted)
+                }
+                people.isError && people.data == null -> Text(
+                    "Unable to load skipped people.",
+                    Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = BsText.Xs,
+                    color = BsColors.Muted,
+                )
+                skipped.isEmpty() -> Text(
+                    "No skipped people. Use Skip on the Triptych page to hide someone.",
+                    Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = BsText.Xs,
+                    color = BsColors.Muted,
+                )
+                else -> skipped.forEachIndexed { i, person ->
+                    SettingRow(person.name, photoCountLabel(person.photoCount), Modifier.divider(i > 0)) {
+                        BsButton(
+                            onClick = {
+                                pending = person.id
+                                scope.launch {
+                                    try {
+                                        api.unskipPerson(person.id)
+                                        PhotoEvents.invalidate("people")
+                                        toast.success("${person.name} will appear in Triptych and Triplets again")
+                                    } catch (_: Exception) {
+                                        toast.error("Couldn't unskip this person")
+                                    } finally {
+                                        pending = null
+                                    }
+                                }
+                            },
+                            variant = ButtonVariant.Secondary,
+                            enabled = pending == null,
+                        ) {
+                            if (pending == person.id) Spinner(size = 16.dp) else BsIcon(BsIcons.UserPlus, size = 16.dp)
+                            Text("Unskip")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Port of modules/settings/settings.tsx. */
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val api = BigShelfApp.api
@@ -140,15 +214,49 @@ fun SettingsScreen(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         SettingsCard {
-            ToggleRow("AI images on Home", null, settings.showAi, settings::updateShowAi)
+            ToggleRow("AI images on Home", "Show ChatGPT images in the Home grid.", settings.showAi, settings::updateShowAi)
             ToggleRow(
                 "Archive on download",
-                null,
+                "Move photos to Archive after downloading them.",
                 settings.archiveOnDownload,
                 settings::updateArchiveOnDownload,
                 divider = true,
             )
         }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Section("Triptych", "How Triptych groups photos of one outfit.")
+            SettingsCard {
+                ToggleRow("AI images", "Let Triptych use AI images, at most one per set.", settings.triptychAi, settings::updateTriptychAi)
+                ToggleRow(
+                    "Skip small sets", "Leave out sets of 3 or fewer photos.",
+                    settings.triptychSkipSmall, settings::updateTriptychSkipSmall, divider = true,
+                )
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Section("Triplets", "How Triplets picks each set of one person's photos.")
+            SettingsCard {
+                ToggleRow("AI images", "Let Triplets pick AI images.", settings.includeAi, settings::updateIncludeAi)
+                ToggleRow(
+                    "Solo photos only", "Skip group photos with other tagged people.",
+                    settings.tripletSolo, settings::updateTripletSolo, divider = true,
+                )
+                Column(
+                    Modifier.divider(true).padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column {
+                        Text("Photos per set", style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+                        Text("People with fewer photos than this are left out.", style = BsText.Xs, color = BsColors.Muted)
+                    }
+                    BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
+                }
+            }
+        }
+
+        SkippedPeople()
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionTitle("System")

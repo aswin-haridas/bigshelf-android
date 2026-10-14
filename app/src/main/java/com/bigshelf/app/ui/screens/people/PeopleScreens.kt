@@ -1,5 +1,12 @@
 package com.bigshelf.app.ui.screens.people
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.bigshelf.app.ui.theme.BsShapes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -123,25 +130,156 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     }
 }
 
-/** Detected Faces tab: face groups that aren't named yet. */
+/**
+ * Detected Faces tab (web faces-grid.tsx): face groups that aren't named yet. Cluster matches
+ * them to existing people; Select picks groups to merge (into the first picked) or forget.
+ */
 @Composable
 fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
-    val query = rememberQuery("faces", invalidatedBy = setOf("faces")) { BigShelfApp.api.faces() }
-    val faces = query.data.orEmpty().filterNot { it.isIgnored }
+    val api = BigShelfApp.api
+    val scope = rememberCoroutineScope()
+    val query = rememberQuery("faces", invalidatedBy = setOf("faces")) { api.faces() }
+    val faces = query.data.orEmpty().filter { !it.isIgnored && it.faceName == null }
+    var clustering by remember { mutableStateOf(false) }
+    var selecting by remember { mutableStateOf(false) }
+    // Ordered: the first pick is the group the rest are merged into
+    val selected = remember { mutableStateListOf<String>() }
+    var busy by remember { mutableStateOf<String?>(null) }
+
+    fun cluster() {
+        clustering = true
+        scope.launch {
+            try {
+                val matched = api.clusterFaces().autoAssignedToPeople
+                PhotoEvents.invalidate("faces", "people", "photos")
+                if (matched > 0) toast.success("Matched $matched faces to existing people")
+                else toast.info("No faces matched existing people")
+            } catch (_: Exception) {
+                toast.error("Failed to match faces")
+            } finally {
+                clustering = false
+            }
+        }
+    }
+
+    fun merge() {
+        val (target, sources) = selected.first() to selected.drop(1)
+        busy = "merge"
+        scope.launch {
+            // Keys the backend reports stale; refreshed even if a later merge fails
+            val stale = mutableSetOf("faces")
+            try {
+                sources.forEach { stale += api.mergeFaceGroup(it, target).invalidate }
+                toast.success("Merged ${sources.size + 1} groups")
+                selected.clear()
+            } catch (_: Exception) {
+                toast.error("Failed to merge groups")
+            } finally {
+                PhotoEvents.invalidate(*stale.toTypedArray())
+                busy = null
+            }
+        }
+    }
+
+    // Forget every selected group; failed ones stay selected so they can be retried
+    fun forget() {
+        busy = "forget"
+        scope.launch {
+            val failed = selected.filter { id -> runCatching { api.ignoreFace(id) }.isFailure }
+            val done = selected.size - failed.size
+            selected.clear()
+            selected.addAll(failed)
+            PhotoEvents.invalidate("faces", "people", "photos")
+            if (failed.isNotEmpty()) toast.error("Failed to forget ${failed.size} face(s)") else toast.success("$done face(s) forgotten")
+            busy = null
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
-        PeopleHeader(PeopleTab.Faces, onTab) { FaceReviewBanner() }
-        when {
-            query.isLoading -> LoadingText()
-            faces.isEmpty() -> EmptyState("No faces")
-            else -> FaceGrid {
-                items(faces, key = { it.id }) { face ->
-                    AvatarTile(
-                        imageSrc = face.faceThumbnail ?: "/api/v1/faces/${face.id}/thumbnail",
-                        name = face.faceName,
-                        subtitle = face.faceCount?.let(::photoCountLabel),
-                        onClick = { onFace(face.id) },
-                    )
+        PeopleHeader(PeopleTab.Faces, onTab) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BsButton(
+                    onClick = ::cluster,
+                    modifier = Modifier.weight(1f),
+                    variant = ButtonVariant.Secondary,
+                    enabled = !clustering && faces.isNotEmpty(),
+                    loading = clustering,
+                    textStyle = BsText.Xs,
+                ) { Text(if (clustering) "Clustering…" else "Cluster faces") }
+                BsButton(
+                    onClick = {
+                        selecting = !selecting
+                        selected.clear()
+                    },
+                    modifier = Modifier.weight(1f),
+                    variant = if (selecting) ButtonVariant.Primary else ButtonVariant.Secondary,
+                    enabled = faces.isNotEmpty(),
+                    textStyle = BsText.Xs,
+                ) { Text(if (selecting) "Done" else "Select") }
+            }
+            FaceReviewBanner()
+        }
+        Box(Modifier.weight(1f)) {
+            when {
+                query.isLoading -> LoadingText()
+                faces.isEmpty() -> EmptyState("No untagged faces", description = "Detected faces without a name will appear here.")
+                else -> FaceGrid {
+                    items(faces, key = { it.id }) { face ->
+                        val picked = face.id in selected
+                        Box {
+                            AvatarTile(
+                                imageSrc = faceImageSrc(face),
+                                name = null,
+                                // Each card is one detected group; show its size once merged/clustered
+                                subtitle = face.faceCount?.takeIf { it > 1 }?.let { "$it faces" },
+                                onClick = {
+                                    if (!selecting) onFace(face.id)
+                                    else if (!selected.remove(face.id)) selected.add(face.id)
+                                },
+                            )
+                            if (selecting) {
+                                Box(
+                                    Modifier
+                                        .padding(4.dp)
+                                        .size(24.dp)
+                                        .clip(BsShapes.Full)
+                                        .background(if (picked) BsColors.Primary else Color.Black.copy(alpha = 0.4f))
+                                        .border(1.dp, BsColors.Muted.copy(alpha = 0.7f), BsShapes.Full),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (picked) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)
+                                }
+                            }
+                        }
+                    }
                 }
+            }
+        }
+        if (selected.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().background(BsColors.Surface).padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("${selected.size} selected", Modifier.weight(1f), style = BsText.Xs, color = BsColors.Muted)
+                BsButton(
+                    onClick = ::merge,
+                    variant = ButtonVariant.Secondary,
+                    enabled = busy == null && selected.size >= 2,
+                    loading = busy == "merge",
+                    textStyle = BsText.Xs,
+                ) {
+                    BsIcon(BsIcons.GitMerge, size = 14.dp)
+                    Text("Merge")
+                }
+                BsButton(
+                    onClick = ::forget,
+                    variant = ButtonVariant.Secondary,
+                    contentColor = BsColors.Danger,
+                    enabled = busy == null,
+                    loading = busy == "forget",
+                    textStyle = BsText.Xs,
+                ) { Text("Forget") }
             }
         }
     }
@@ -165,7 +303,7 @@ fun UntaggedScreen(onOpenPhoto: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
 
 /**
  * A person laid out like an Instagram profile: avatar beside Photos / Videos / Years, the name,
- * Rename and Download buttons, then their photos in the server's similarity order.
+ * Rename, Download and Merge buttons, then their photos in the server's similarity order.
  */
 @Composable
 fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
@@ -178,6 +316,7 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
     var name by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
+    var merging by remember { mutableStateOf(false) }
 
     fun save() {
         val clean = name.trim()
@@ -248,10 +387,17 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
                             enabled = data.items.isNotEmpty(),
                             loading = downloading,
                         ) { Text("Download all") }
+                        BsButton(onClick = { merging = true }, modifier = Modifier.weight(1f), variant = ButtonVariant.Secondary) {
+                            Text("Merge")
+                        }
                     }
                 },
             )
         }
+    }
+
+    if (merging && data != null) {
+        MergePersonModal(data.person, onClose = { merging = false }, onMerged = onBack)
     }
 
     if (editing) {
@@ -274,16 +420,43 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
     }
 }
 
-/** Photos of one detected face group. */
+/**
+ * Photos of one detected face group (web face-photos-view.tsx), with Tag, Merge (into
+ * another group), Forget and Download all.
+ */
 @Composable
 fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
-    val query = rememberQuery("face", faceId, invalidatedBy = setOf("faces")) { BigShelfApp.api.facePhotos(faceId) }
+    val api = BigShelfApp.api
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val query = rememberQuery("face", faceId, invalidatedBy = setOf("faces")) { api.facePhotos(faceId) }
     val data = query.data
+    var modal by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf<String?>(null) }
+
+    fun forget() {
+        busy = "forget"
+        scope.launch {
+            try {
+                api.ignoreFace(faceId)
+                PhotoEvents.invalidate("faces", "people", "photos")
+                toast.success("Face forgotten")
+                onBack()
+            } catch (_: Exception) {
+                toast.error("Failed to forget face")
+            } finally {
+                busy = null
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         PageHeader(
-            data?.face?.faceName ?: "Unnamed face",
+            data?.face?.faceName ?: "Untagged face",
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
-        )
+        ) {
+            BsIconButton(BsIcons.Trash, "Forget face", onClick = ::forget, loading = busy == "forget", enabled = data != null, tint = BsColors.Danger)
+        }
         when {
             query.isLoading -> LoadingText()
             data == null -> EmptyState("No photos found")
@@ -293,14 +466,38 @@ fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -
                 totalCount = data.total,
                 groupByDate = false,
                 header = {
-                    ProfileHeader(
-                        data.face.faceThumbnail ?: "/api/v1/faces/${data.face.id}/thumbnail",
-                        data.face.faceName ?: "Unnamed face",
-                        data.items,
-                        data.total,
-                    )
+                    ProfileHeader(faceImageSrc(data.face), data.face.faceName ?: "Untagged face", data.items, data.total) {
+                        BsButton(onClick = { modal = "tag" }, modifier = Modifier.weight(1f)) { Text("Tag") }
+                        BsButton(onClick = { modal = "merge" }, modifier = Modifier.weight(1f), variant = ButtonVariant.Secondary) { Text("Merge") }
+                        BsButton(
+                            onClick = {
+                                busy = "download"
+                                scope.launch {
+                                    try {
+                                        Downloads.save(context, data.items)
+                                        toast.success("Downloading ${data.items.size} photos")
+                                    } catch (_: Exception) {
+                                        toast.error("Download failed")
+                                    } finally {
+                                        busy = null
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            variant = ButtonVariant.Secondary,
+                            enabled = data.items.isNotEmpty(),
+                            loading = busy == "download",
+                        ) { Text("Download") }
+                    }
                 },
             )
+        }
+    }
+
+    data?.face?.let { face ->
+        when (modal) {
+            "tag" -> TagFaceModal(face, onClose = { modal = null }, onDone = onBack)
+            "merge" -> MergeFaceGroupModal(face, onClose = { modal = null }, onMerged = onBack)
         }
     }
 }

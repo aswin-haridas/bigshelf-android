@@ -229,11 +229,6 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                         try {
                             Downloads.save(context, selected)
                             toast.success("Downloading ${plural(selected.size)}")
-                            // Settings > Archive on download: downloaded photos leave the library
-                            if (BigShelfApp.settings.archiveOnDownload) {
-                                api.flagArchived(selected.map { it.id }, true)
-                                PhotoEvents.invalidateAll()
-                            }
                             SelectionStore.clear()
                         } catch (_: Exception) {
                             toast.error("Failed to download")

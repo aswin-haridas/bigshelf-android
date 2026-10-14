@@ -60,6 +60,7 @@ private val BUCKETS = listOf(
     "non_34" to "Not 3:4",
     "low_res" to "Low resolution",
     "collage" to "Collages",
+    "screenshot" to "Screenshots",
     "failed" to "Failed",
     "videos" to "Videos",
 )

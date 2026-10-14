@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.photo
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -19,8 +20,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.input.ImeAction
+import com.bigshelf.app.data.CropBox
+import com.bigshelf.app.data.WHOLE_PHOTO_FACE_INDEX
+import com.bigshelf.app.ui.photos.ImageCard
+import com.bigshelf.app.ui.screens.people.PersonList
 import com.bigshelf.app.data.CameraInfo
-import com.bigshelf.app.data.FaceBox
 import com.bigshelf.app.data.PlaceNames
 import com.bigshelf.app.data.userMessage
 import com.bigshelf.app.state.rememberQuery
@@ -28,8 +40,6 @@ import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsInput
 import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.components.ButtonVariant
-import com.bigshelf.app.ui.photos.personImageSrc
-import com.bigshelf.app.ui.photos.photoCountLabel
 import com.bigshelf.app.ui.screens.explore.rememberPlaceName
 import com.bigshelf.app.ui.shell.formatBytes
 import com.bigshelf.app.ui.theme.MonoFamily
@@ -120,7 +130,14 @@ private fun formatDate(iso: String?): String? = iso?.let {
  * holds the pager still); at 1x, swiping down closes the viewer and swiping up opens Info.
  */
 @Composable
-fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit, onMap: (Double, Double) -> Unit) {
+fun PhotoScreen(
+    photoId: String,
+    onBack: () -> Unit,
+    onPerson: (String) -> Unit,
+    onMap: (Double, Double) -> Unit,
+    onOpenPhoto: (String) -> Unit,
+    onFramer: (String) -> Unit,
+) {
     // The grid's list if it contains this photo, else just this one
     val list = remember(photoId) {
         ViewerList.photos.takeIf { l -> l.any { it.id == photoId } } ?: listOf(Photo(id = photoId))
@@ -132,6 +149,8 @@ fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit,
     val details = remember { mutableStateMapOf<String, Photo>() }
     // A zoomed-in photo pans instead of paging
     var zoomed by remember { mutableStateOf(false) }
+    // Crop mode belongs to one photo; it takes over the screen until saved or cancelled
+    var croppingId by remember { mutableStateOf<String?>(null) }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(
@@ -139,7 +158,7 @@ fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit,
             Modifier.fillMaxSize(),
             key = { list[it].id },
             beyondViewportPageCount = 1,
-            userScrollEnabled = !zoomed,
+            userScrollEnabled = !zoomed && croppingId == null,
         ) { page ->
             val id = list[page].id
             PhotoPage(
@@ -155,14 +174,38 @@ fun PhotoScreen(photoId: String, onBack: () -> Unit, onPerson: (String) -> Unit,
         }
 
         val current = details[list[pager.currentPage].id]
-        AnimatedVisibility(chrome, Modifier.align(Alignment.TopCenter), enter = fadeIn(BsMotion.fast()), exit = fadeOut(BsMotion.fast())) {
+        val cropping = current != null && croppingId == current.id
+        AnimatedVisibility(chrome && !cropping, Modifier.align(Alignment.TopCenter), enter = fadeIn(BsMotion.fast()), exit = fadeOut(BsMotion.fast())) {
             TopBar(current, onBack)
         }
         if (current != null) {
-            AnimatedVisibility(chrome, Modifier.align(Alignment.BottomCenter), enter = fadeIn(BsMotion.fast()), exit = fadeOut(BsMotion.fast())) {
-                ActionBar(current, onInfo = { showInfo = true }, onChanged = { details[it.id] = it }, onDeleted = onBack)
+            AnimatedVisibility(chrome && !cropping, Modifier.align(Alignment.BottomCenter), enter = fadeIn(BsMotion.fast()), exit = fadeOut(BsMotion.fast())) {
+                ActionBar(
+                    current,
+                    onInfo = { showInfo = true },
+                    onChanged = { details[it.id] = it },
+                    onDeleted = onBack,
+                    onCrop = { croppingId = current.id },
+                    // The original is in the Bin now, so the first new photo takes its place
+                    onSplit = { id ->
+                        onBack()
+                        onOpenPhoto(id)
+                    },
+                    onFramer = { onFramer(current.id) },
+                )
             }
-            if (showInfo) InfoSheet(current, onPerson, onMap, onDismiss = { showInfo = false })
+            if (cropping) CropOverlay(current, onClose = { croppingId = null })
+            if (showInfo) {
+                InfoSheet(
+                    current, onPerson, onMap,
+                    onChanged = { details[it.id] = it },
+                    onOpenPhoto = { id ->
+                        showInfo = false
+                        onOpenPhoto(id)
+                    },
+                    onDismiss = { showInfo = false },
+                )
+            }
         }
     }
 }
@@ -423,12 +466,21 @@ private fun Action(
  * delete - over a clear-to-black scrim.
  */
 @Composable
-private fun ActionBar(image: Photo, onInfo: () -> Unit, onChanged: (Photo) -> Unit, onDeleted: () -> Unit) {
+private fun ActionBar(
+    image: Photo,
+    onInfo: () -> Unit,
+    onChanged: (Photo) -> Unit,
+    onDeleted: () -> Unit,
+    onCrop: () -> Unit,
+    onSplit: (String) -> Unit,
+    onFramer: () -> Unit,
+) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var busy by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var showMore by remember { mutableStateOf(false) }
     // Only the user's own mark can be undone; photos detected as AI stay AI
     val markedByUser = image.aiSource == USER_MARKED_AI
     val detectedAi = image.isAiImage && !markedByUser
@@ -509,8 +561,38 @@ private fun ActionBar(image: Photo, onInfo: () -> Unit, onChanged: (Photo) -> Un
                 modifier = cell,
                 loading = busy == "rotate",
             )
+            // Crop and split re-encode the image, so they're images-only like rotate
+            Action(BsIcons.DotsThreeVertical, "More", onClick = { showMore = true }, modifier = cell, loading = busy == "split")
+        } else {
+            // Videos: pick the best frames of this one in Framer
+            Action(BsIcons.FilmStrip, "Framer", onClick = onFramer, modifier = cell)
         }
         Action(BsIcons.Trash, "Delete", onClick = { confirmDelete = true }, modifier = cell, loading = busy == "delete", tint = BsColors.Danger)
+    }
+
+    if (showMore) {
+        BsModal(title = "Edit", onClose = { showMore = false }) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // The 3:4 window needs the dimensions to size itself
+                if (image.width != null && image.height != null) {
+                    MenuRow(BsIcons.Crop, "Crop to 3:4") {
+                        showMore = false
+                        onCrop()
+                    }
+                }
+                // Splits a collage into its photos; the original moves to the Bin
+                MenuRow(BsIcons.SquareSplitVertical, "Split") {
+                    showMore = false
+                    act("split", "Failed to split photo") {
+                        val created = api.split(image.id).createdPhotos
+                        PhotoEvents.invalidate("photos", "bin-photos")
+                        toast.success("Photo split initiated")
+                        // Show the first new photo now that the original is in the Bin
+                        created.firstOrNull()?.let { onSplit(it.id) } ?: onDeleted()
+                    }
+                }
+            }
+        }
     }
 
     if (confirmDelete) {
@@ -534,9 +616,16 @@ private fun ActionBar(image: Photo, onInfo: () -> Unit, onChanged: (Photo) -> Un
 /** Port of image-info-sidebar.tsx as a bottom sheet on the surface colour. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onMap: (Double, Double) -> Unit, onDismiss: () -> Unit) {
-    // An untagged face picked for naming
-    var naming by remember { mutableStateOf<FaceBox?>(null) }
+private fun InfoSheet(
+    image: Photo,
+    onPerson: (String) -> Unit,
+    onMap: (Double, Double) -> Unit,
+    onChanged: (Photo) -> Unit,
+    onOpenPhoto: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // Index of the face picked for tagging (WHOLE_PHOTO_FACE_INDEX: the photo itself)
+    var tagging by remember { mutableStateOf<Int?>(null) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = BsColors.Surface,
@@ -562,6 +651,9 @@ private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onMap: (Double, 
                         color = BsColors.MutedSoft,
                     )
                 }
+                if (image.width > 0 && image.height > 0) {
+                    InfoField("Aspect ratio") { Text(aspectRatio(image.width, image.height), style = BsText.Sm, color = BsColors.MutedSoft) }
+                }
             }
             InfoField("File") {
                 Text(image.filename, style = BsText.Sm, color = BsColors.MutedSoft)
@@ -580,35 +672,31 @@ private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onMap: (Double, 
             }
             // Faces only exist for images; a video would sit at "Detecting…" forever
             if (!image.isVideo) {
-                val faces = image.faces.orEmpty().filterNot { it.isIgnored }
+                val faces = image.faces.orEmpty().withIndex().filterNot { it.value.isIgnored }
+                // A person can be tagged on the photo itself when no face of them was found
+                // (back turned, face covered); offered once detection has run and found none
+                val canTagPhoto = image.faceCount != null && faces.isEmpty()
                 InfoField("Faces") {
                     Text(
                         if (image.faceCount == null) "Detecting…" else "${faces.size} detected",
                         style = BsText.Sm,
                         color = BsColors.MutedSoft,
                     )
-                    if (faces.isNotEmpty()) {
-                        // Tagged faces open the person page
+                    val tiles = faces.map { (i, face) ->
+                        Triple(i, face.thumbnailUrl ?: face.faceId?.let { "/api/v1/faces/$it/thumbnail" }, face.personName ?: face.suggestedName?.let { "$it?" } ?: "Add name")
+                    } + if (image.photoPerson != null || canTagPhoto) {
+                        // The whole photo stands in for the face
+                        listOf(Triple(WHOLE_PHOTO_FACE_INDEX, image.thumbnailUrl, image.photoPerson?.personName ?: "Tag person"))
+                    } else {
+                        emptyList()
+                    }
+                    if (tiles.isNotEmpty()) {
+                        // Any face opens the tag modal: name it, change or remove its tag, or forget it
                         Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            faces.chunked(4).forEach { row ->
+                            tiles.chunked(4).forEach { row ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    row.forEach { face ->
-                                        FaceTile(
-                                            imageSrc = face.thumbnailUrl,
-                                            name = face.personName ?: face.suggestedName?.let { "$it?" } ?: "Add name",
-                                            subtitle = null,
-                                            // Tagged faces open the person; untagged ones get a name
-                                            onClick = {
-                                                val person = face.personId
-                                                if (person != null) {
-                                                    onDismiss()
-                                                    onPerson(person)
-                                                } else if (face.faceId != null) {
-                                                    naming = face
-                                                }
-                                            },
-                                            modifier = Modifier.weight(1f),
-                                        )
+                                    row.forEach { (index, src, name) ->
+                                        FaceTile(imageSrc = src, name = name, subtitle = null, onClick = { tagging = index }, modifier = Modifier.weight(1f))
                                     }
                                     repeat(4 - row.size) { Box(Modifier.weight(1f)) }
                                 }
@@ -617,13 +705,31 @@ private fun InfoSheet(image: Photo, onPerson: (String) -> Unit, onMap: (Double, 
                     }
                 }
             }
-            image.photoPerson?.personName?.let { name ->
-                InfoField("Tagged") { Text("$name (no face detected)", style = BsText.Sm, color = BsColors.MutedSoft) }
-            }
+            SimilarPhotos(image.id, onOpenPhoto)
             Box(Modifier.height(8.dp))
         }
     }
-    naming?.let { NameFaceModal(it, onClose = { naming = null }) }
+    tagging?.let { index ->
+        FaceTagModal(
+            photo = image,
+            faceIndex = index,
+            onChanged = onChanged,
+            onPerson = { id ->
+                onDismiss()
+                onPerson(id)
+            },
+            onClose = { tagging = null },
+        )
+    }
+}
+
+private tailrec fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
+
+// Reduced ratio like "3:4"; odd sizes (e.g. 1080×1349) don't reduce cleanly, so show a decimal instead
+private fun aspectRatio(width: Int, height: Int): String {
+    val d = gcd(width, height)
+    val (w, h) = width / d to height / d
+    return if (w <= 32 && h <= 32) "$w:$h" else String.format(Locale.US, "%.2f:1", width.toDouble() / height)
 }
 
 // "1/120 s" under a second, "2 s" above
@@ -670,75 +776,256 @@ private fun LocationField(lat: Double, lon: Double, onMap: () -> Unit) {
     }
 }
 
+// Strips numbers and emoji from an AI-suggested name, then tidies the spaces they leave
+private fun cleanName(name: String) =
+    name.replace(Regex("[\\p{N}\\p{So}\\p{Sk}\\p{Cs}\\u200D\\uFE0F]"), "").replace(Regex("\\s+"), " ").trim()
+
 /**
- * Name an untagged face: an existing person (filtered as you type) or a new name. The backend
- * also tags other faces that match it closely, so naming one face groups its lookalikes.
+ * Port of face-tag-modal.tsx: tag face [faceIndex] of [photo] (or the photo itself, for
+ * [WHOLE_PHOTO_FACE_INDEX]) as an existing person or a new name, change or remove its tag,
+ * or forget a background face. People are filtered as you type and ranked by how much they
+ * look like this face; the backend also tags close lookalikes elsewhere.
  */
 @Composable
-private fun NameFaceModal(face: FaceBox, onClose: () -> Unit) {
+private fun FaceTagModal(photo: Photo, faceIndex: Int, onChanged: (Photo) -> Unit, onPerson: (String) -> Unit, onClose: () -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
-    val people = rememberQuery("people-all", invalidatedBy = setOf("people")) { api.people().items }
-    var name by remember { mutableStateOf(face.suggestedName.orEmpty()) }
+    val wholePhoto = faceIndex == WHOLE_PHOTO_FACE_INDEX
+    val face = if (wholePhoto) photo.photoPerson else photo.faces?.getOrNull(faceIndex)
+    val currentName = face?.personName
+    var query by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
 
-    fun tag(personId: String?, label: String) {
-        val faceId = face.faceId ?: return
+    // The face's own guess first; else ask the backend for one from the filename
+    var suggested by remember { mutableStateOf(face?.suggestedName?.trim()?.ifEmpty { null }) }
+    LaunchedEffect(photo.id) {
+        if (suggested == null && currentName == null) suggested = runCatching { api.suggestName(photo.id) }.getOrNull()
+    }
+    val suggestedName = suggested?.let(::cleanName)?.ifEmpty { null }
+
+    // Debounced server-side search; a whole-photo tag ranks people by look-alike photos instead
+    var people by remember { mutableStateOf<List<com.bigshelf.app.data.Person>?>(null) }
+    LaunchedEffect(query) {
+        delay(250)
+        people = runCatching {
+            api.people(query.trim(), faceId = face?.faceId, photoId = if (wholePhoto) photo.id else null).items
+        }.getOrNull() ?: people
+    }
+
+    // Each action closes at once and toasts when the server answers
+    fun run(failure: String, block: suspend () -> String) {
         if (saving) return
         saving = true
         scope.launch {
             try {
-                val result = api.tagFace(faceId, name = label, personId = personId)
+                val message = block()
                 PhotoEvents.invalidate("photo", "people", "faces", "photos")
-                toast.success(
-                    "Tagged as ${result.personName.ifEmpty { label }}" +
-                        if (result.autoTaggedCount > 0) " (+${result.autoTaggedCount} similar)" else "",
-                )
+                toast.success(message)
                 onClose()
             } catch (e: Exception) {
-                toast.error(e.userMessage("Failed to tag face"))
+                toast.error(e.userMessage(failure))
             } finally {
                 saving = false
             }
         }
     }
 
-    val clean = name.trim()
-    val matches = people.data.orEmpty()
-        .filter { !it.isSkipped && (clean.isEmpty() || it.name.contains(clean, ignoreCase = true)) }
-        .take(12)
+    fun tag(personId: String?, label: String) = run("Failed to save face tag") {
+        val result = api.tagPhotoFace(photo.id, faceIndex, name = label, personId = personId)
+        onChanged(result.photo)
+        "Tagged as $label" + if (result.autoTaggedCount > 0) " & linked ${result.autoTaggedCount} matching photos" else ""
+    }
+
+    val clean = query.trim()
     BsModal(
-        title = "Who is this?",
+        title = when {
+            currentName != null -> "Edit: $currentName"
+            wholePhoto -> "Tag person"
+            else -> "Tag face"
+        },
         onClose = onClose,
         footer = {
-            BsButton(onClick = { tag(null, clean) }, enabled = clean.isNotEmpty() && !saving, loading = saving, textStyle = BsText.Xs) {
-                Text(if (clean.isEmpty()) "Add name" else "Tag as \"$clean\"")
+            // No face to forget for a whole-photo tag
+            if (!wholePhoto) {
+                BsButton(
+                    onClick = { run("Failed to forget face") { onChanged(api.photoFaceAction(photo.id, faceIndex, "ignore").photo); "Face forgotten" } },
+                    variant = ButtonVariant.Ghost,
+                    enabled = !saving,
+                    contentColor = BsColors.Danger,
+                    textStyle = BsText.Xs,
+                ) { Text("Forget face") }
+            }
+            if (currentName != null) {
+                BsButton(
+                    onClick = { run("Failed to remove tag") { onChanged(api.photoFaceAction(photo.id, faceIndex, "untag").photo); "Tag removed" } },
+                    variant = ButtonVariant.Secondary,
+                    enabled = !saving,
+                    textStyle = BsText.Xs,
+                ) { Text("Remove tag") }
+            }
+            face?.personId?.let { id ->
+                BsButton(onClick = { onClose(); onPerson(id) }, variant = ButtonVariant.Secondary, textStyle = BsText.Xs) { Text("View") }
             }
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                FaceTile(imageSrc = face.thumbnailUrl, name = null, subtitle = null, onClick = {}, modifier = Modifier.size(64.dp))
-                BsInput(value = name, onValueChange = { name = it }, placeholder = "Name", autoFocus = true, modifier = Modifier.weight(1f))
+                val src = if (wholePhoto) photo.thumbnailUrl else face?.thumbnailUrl ?: face?.faceId?.let { "/api/v1/faces/$it/thumbnail" }
+                FaceTile(imageSrc = src, name = null, subtitle = null, onClick = {}, modifier = Modifier.size(64.dp))
+                BsInput(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = suggestedName ?: "Name or search…",
+                    autoFocus = true,
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        // An exact name match tags that person; anything else is a new name
+                        val match = people.orEmpty().firstOrNull { it.name.equals(clean, ignoreCase = true) }
+                        if (match != null) tag(match.id, match.name) else if (clean.isNotEmpty()) tag(null, clean)
+                    }),
+                )
             }
-            Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                matches.forEach { person ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(BsShapes.Md)
-                            .bsClickable(enabled = !saving, scale = 0.98f) { tag(person.id, person.name) }
-                            .background(BsColors.Surface)
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        FaceTile(imageSrc = personImageSrc(person), name = null, subtitle = null, onClick = { tag(person.id, person.name) }, modifier = Modifier.size(36.dp))
-                        Text(person.name, Modifier.weight(1f), style = BsText.Sm, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(photoCountLabel(person.photoCount), style = BsText.Xs, color = BsColors.Muted)
+            // The suggested name, one tap to use (web: Tab accepts the placeholder)
+            if (clean.isEmpty() && suggestedName != null) {
+                BsButton(onClick = { tag(null, suggestedName) }, variant = ButtonVariant.Secondary, enabled = !saving, textStyle = BsText.Xs) {
+                    Text("Tag as \"$suggestedName\"")
+                }
+            } else if (clean.isNotEmpty()) {
+                BsButton(onClick = { tag(null, clean) }, enabled = !saving, loading = saving, textStyle = BsText.Xs) {
+                    Text("Tag as \"$clean\"")
+                }
+            }
+            PersonList(
+                people = people.orEmpty().filter { it.name != currentName },
+                enabled = !saving,
+                empty = if (people == null) "Searching…" else "No people found",
+                onPick = { tag(it.id, it.name) },
+            )
+        }
+    }
+}
+
+/** Menu entry in the viewer's Edit sheet: icon and label. */
+@Composable
+private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(BsShapes.Md).bsClickable(scale = 0.98f, onClick = onClick).padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        BsIcon(icon, size = 20.dp, tint = BsColors.Muted)
+        Text(label, style = BsText.Sm)
+    }
+}
+
+/** Port of similar-images.tsx: visually similar photos, three across, in the Info sheet. */
+@Composable
+private fun SimilarPhotos(photoId: String, onOpenPhoto: (String) -> Unit) {
+    val similar = rememberQuery("similar", photoId, invalidatedBy = setOf("photos")) {
+        BigShelfApp.api.similar(photoId).filter { it.id != photoId }
+    }
+    val photos = similar.data.orEmpty()
+    InfoField("Similar photos") {
+        when {
+            similar.isLoading -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Spinner(size = 16.dp, tint = BsColors.Muted)
+                Text("Finding similar photos…", style = BsText.Xs, color = BsColors.Muted)
+            }
+            photos.isEmpty() -> Text("No similar photos found", style = BsText.Xs, color = BsColors.Muted)
+            else -> Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                photos.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        row.forEach { photo ->
+                            ImageCard(
+                                photo = photo,
+                                selected = false,
+                                selectionActive = false,
+                                onClick = {
+                                    ViewerList.photos = photos
+                                    onOpenPhoto(photo.id)
+                                },
+                                onToggle = {},
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(3 - row.size) { Box(Modifier.weight(1f)) }
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Port of crop-overlay.tsx: the 3:4 window the crop keeps, over the photo with everything
+ * outside dimmed. It spans the full width or height, so dragging slides it along the other
+ * axis. Saving overwrites the original; the viewer reloads it under its new URL.
+ */
+@Composable
+private fun CropOverlay(image: Photo, onClose: () -> Unit) {
+    val w = image.width ?: return
+    val h = image.height ?: return
+    val scope = rememberCoroutineScope()
+    var pos by remember(image.id) { mutableFloatStateOf(0.5f) }
+    var saving by remember { mutableStateOf(false) }
+    val box = CropBox.portrait(w, h, pos)
+    val sideways = box.width < w // wider than 3:4: the window slides left/right
+    val slack = if (sideways) w - box.width else h - box.height // image px the window can travel
+    // Back leaves crop mode, not the viewer
+    BackHandler(onBack = onClose)
+
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        AsyncImage(BigShelfApp.api.mediaUrl(image.url ?: image.thumbnailUrl), image.filename, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(image.id, slack) {
+                    detectDragGestures { change, drag ->
+                        change.consume()
+                        if (slack <= 0) return@detectDragGestures
+                        // Screen px moved -> image px -> fraction of the travel
+                        val scale = minOf(size.width / w.toFloat(), size.height / h.toFloat())
+                        val moved = if (sideways) drag.x else drag.y
+                        pos = (pos + moved / scale / slack).coerceIn(0f, 1f)
+                    }
+                }
+                .drawBehind {
+                    // Where the Fit-scaled photo sits, then the kept window inside it
+                    val scale = minOf(size.width / w, size.height / h)
+                    val left = (size.width - w * scale) / 2 + box.x * scale
+                    val top = (size.height - h * scale) / 2 + box.y * scale
+                    val keep = Rect(left, top, left + box.width * scale, top + box.height * scale)
+                    val dim = Color.Black.copy(alpha = 0.7f)
+                    drawRect(dim, Offset.Zero, Size(size.width, keep.top))
+                    drawRect(dim, Offset(0f, keep.bottom), Size(size.width, size.height - keep.bottom))
+                    drawRect(dim, Offset(0f, keep.top), Size(keep.left, keep.height))
+                    drawRect(dim, Offset(keep.right, keep.top), Size(size.width - keep.right, keep.height))
+                    drawRect(BsColors.Foreground, keep.topLeft, keep.size, style = Stroke(2.dp.toPx()))
+                },
+        )
+        Row(
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            BsButton(onClick = onClose, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Cancel") }
+            BsButton(
+                onClick = {
+                    saving = true
+                    scope.launch {
+                        try {
+                            BigShelfApp.api.crop(image.id, box)
+                            PhotoEvents.invalidate("photo", "photos")
+                            toast.success("Cropped to 3:4")
+                            onClose()
+                        } catch (_: Exception) {
+                            toast.error("Failed to crop photo")
+                            saving = false
+                        }
+                    }
+                },
+                loading = saving,
+            ) { Text("Save crop") }
         }
     }
 }

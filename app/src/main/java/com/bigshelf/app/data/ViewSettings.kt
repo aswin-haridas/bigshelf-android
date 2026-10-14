@@ -29,4 +29,49 @@ class ViewSettings(context: Context) {
         archiveOnDownload = value
         prefs.edit().putBoolean("archiveOnDownload", value).apply()
     }
+
+    // Let Triptych use AI images (at most one per set). On by default.
+    var triptychAi by mutableStateOf(prefs.getBoolean("triptychAi", true))
+        private set
+
+    fun updateTriptychAi(value: Boolean) {
+        triptychAi = value
+        prefs.edit().putBoolean("triptychAi", value).apply()
+    }
+
+    // Leave out Triptych sets of 3 or fewer photos. Off by default.
+    var triptychSkipSmall by mutableStateOf(prefs.getBoolean("triptychSkipSmall", false))
+        private set
+
+    fun updateTriptychSkipSmall(value: Boolean) {
+        triptychSkipSmall = value
+        prefs.edit().putBoolean("triptychSkipSmall", value).apply()
+    }
+
+    // Let Triplets (and Composer) pick AI images too
+    var includeAi by mutableStateOf(prefs.getBoolean("includeAi", false))
+        private set
+
+    fun updateIncludeAi(value: Boolean) {
+        includeAi = value
+        prefs.edit().putBoolean("includeAi", value).apply()
+    }
+
+    // Photos per Triplets set (3-6)
+    var tripletCount by mutableStateOf(prefs.getInt("tripletCount", 3))
+        private set
+
+    fun updateTripletCount(value: Int) {
+        tripletCount = value
+        prefs.edit().putInt("tripletCount", value).apply()
+    }
+
+    // Triplets only uses photos with no other tagged person in them
+    var tripletSolo by mutableStateOf(prefs.getBoolean("tripletSolo", false))
+        private set
+
+    fun updateTripletSolo(value: Boolean) {
+        tripletSolo = value
+        prefs.edit().putBoolean("tripletSolo", value).apply()
+    }
 }

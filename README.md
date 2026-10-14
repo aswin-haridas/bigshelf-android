@@ -73,17 +73,30 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   keep best with Undo) and Unorganized (in no album, not a favourite). Typing matches
   people, albums, places and colours by name, plus photos by content, file name and tagged
   person. Places, events and map areas can be saved as albums that fill themselves, and a
-  new album can be filled from a date range and/or a place.
+  new album can be filled from a date range and/or a place. The image button searches by a
+  picked photo instead (reverse image search).
 - Photo viewer: swipe between photos (the bars stay put, a tap hides them), pinch or
   double-tap to zoom, swipe down to close and up for Info, plus favourite, mark as AI, rotate,
-  download and delete. Info shows the file, camera and exposure, where it was taken (with a
-  link to the map) and the faces; tapping an untagged face names it.
+  download and delete; More holds crop to 3:4 (drag the window) and split, and videos open in
+  Framer. Info shows the file, camera and exposure, where it was taken (with a link to the
+  map), the faces and similar photos. Tapping a face tags it, changes or removes its tag, or
+  forgets it; a photo with no detected face can be tagged as a whole.
 - Location: uploads ask for media location access, since Android strips GPS from picked
   photos without it. The backend reads GPS and camera details at upload; photos uploaded
   before that have none, because the stored originals were re-encoded without metadata.
-- People: the People, Detected Faces and Untagged Photos tabs, a person page with rename
-  and download all, and face groups.
-- Favourites (in Library), Bin (restore, delete permanently, empty Bin), Archive folders, Settings.
+- People: the People, Detected Faces and Untagged Photos tabs, a person page with rename,
+  download all and merge, and face groups with tag, merge and forget. Detected Faces can
+  cluster faces into existing people, and Select picks groups to merge or forget together.
+- Favourites (in Library), Bin (restore, delete permanently, empty Bin), Archive folders, Settings
+  (AI images, archive on download from any download button, Triptych and Triplets options,
+  skipped people).
+- Framer: pick a video (or open one from the viewer), extract its best frames, select and
+  save them to the library, or Quick extract to do both. Long-press a frame for its score
+  breakdown and a rule-of-thirds grid.
+- Triptych, Triplets and Composer: one set at a time with Download and Next, a person filter,
+  Skip person, and Composer's copyable outfit-swap prompt.
+- Live updates: screens refresh from the backend's server-sent events while the app is open,
+  like the web. Manual uploads skip files already in the library.
 - Backup & storage (Library): automatic backup of every photo and video on the phone. It runs
   as a WorkManager job every 15 minutes on Wi-Fi when the battery isn't low, with a progress
   notification (with a Pause button), Pause / Resume, and notices when an upload fails or
@@ -100,13 +113,9 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   (by full album path), untag, download, archive or unarchive, move to Bin; inside an album,
   move, copy or remove. Archive, Bin and Remove offer Undo, and while selecting, a month
   header's circle selects the whole month.
-- Pipelines (run, progress, run detail with step logs - polled instead of the web's SSE),
+- Pipelines (run, progress, run detail with step logs - polled),
   Duplicates (one pair at a time, keep / keep both / pick the best, undo) and Organize
   (review buckets, select / download all, reprocess failed).
-
-Framer, Triptych, Triplets and Composer are listed in Library but show an "open BigShelf
-on the web" placeholder for now. The web features they depend on
-(face tagging modal, crop, split, merge, reverse image search) aren't ported yet either.
 
 ## Layout
 

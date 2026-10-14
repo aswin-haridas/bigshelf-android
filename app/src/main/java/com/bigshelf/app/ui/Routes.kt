@@ -23,7 +23,11 @@ object Routes {
     const val DUPLICATES = "duplicates"
     const val ORGANIZE = "organize"
     const val PHOTO = "photos/{photoId}"
-    const val SOON = "soon/{label}"
+    const val TRIPTYCH = "triptych"
+    const val TRIPLETS = "triplets"
+    const val COMPOSER = "composer"
+    // ?photo=<id>: open a library video (from the photo viewer)
+    const val FRAMER = "framer?photo={photo}"
 
     // Search tab: albums, places and the map, events, colours, bursts, unorganized
     const val SEARCH = "search"
@@ -42,7 +46,7 @@ object Routes {
     fun photo(id: String) = "photos/$id"
     fun archiveFolder(id: String) = "archive/folder?id=${Uri.encode(id)}"
     fun run(id: String) = "pipelines/runs/$id"
-    fun soon(label: String) = "soon/${Uri.encode(label)}"
+    fun framer(photoId: String? = null) = if (photoId == null) "framer" else "framer?photo=$photoId"
     fun album(id: String) = "albums/$id"
     fun color(name: String) = "colors/$name"
     fun map(lat: Double? = null, lon: Double? = null) = if (lat == null || lon == null) "map" else "map?lat=$lat&lon=$lon"
@@ -53,7 +57,4 @@ object Routes {
         filter.bbox?.let { append("&bbox=${it.joinToString(",")}") }
         if (filter.unorganized) append("&unorganized=true")
     }
-
-    /** Tools still web-only, listed in Library (same labels as the web sidebar). */
-    val tools = listOf("Framer", "Triptych", "Triplets", "Composer")
 }

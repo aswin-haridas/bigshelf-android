@@ -131,7 +131,12 @@ data class FaceItem(
     @SerialName("face_thumbnail") val faceThumbnail: String? = null,
     @SerialName("face_count") val faceCount: Int? = null,
     @SerialName("is_ignored") val isIgnored: Boolean = false,
-)
+    // Detected group this face belongs to; null when it stands alone
+    @SerialName("cluster_id") val clusterId: String? = null,
+) {
+    /** One card per group in the Faces grid and the merge picker. */
+    val groupKey get() = clusterId ?: id
+}
 
 @Serializable
 data class FaceList(val faces: List<FaceItem> = emptyList())
@@ -403,3 +408,83 @@ data class ShareLink(
 /** Someone in a shared album; role is "owner" or "member". */
 @Serializable
 data class AlbumMember(val id: String, val username: String, val role: String)
+
+// ---------- Face actions ----------
+
+/** faceIndex that tags the photo itself, when the person's face wasn't detected. */
+const val WHOLE_PHOTO_FACE_INDEX = -1
+
+@Serializable
+data class PhotoFaceResult(
+    val photo: Photo,
+    @SerialName("auto_tagged_count") val autoTaggedCount: Int = 0,
+)
+
+@Serializable
+data class SuggestedName(@SerialName("suggested_name") val suggestedName: String? = null)
+
+@Serializable
+data class ClusterResult(@SerialName("auto_assigned_to_people") val autoAssignedToPeople: Int = 0)
+
+/** [invalidate]: the query keys the backend says went stale with this merge. */
+@Serializable
+data class MergeGroupResult(
+    @SerialName("merged_count") val mergedCount: Int = 0,
+    val invalidate: List<String> = emptyList(),
+)
+
+// ---------- Triptych / Triplets / Composer ----------
+
+/** One set of photos, and the single person it shows (when it does) so they can be skipped. */
+data class PhotoSet(val photos: List<Photo>, val personId: String?, val personName: String?)
+
+// ---------- Framer ----------
+
+@Serializable
+data class FrameBreakdown(
+    val sharpness: Double = 0.0,
+    val framing: Double = 0.0,
+    val portrait: Double = 0.0,
+    val lighting: Double = 0.0,
+)
+
+/** One extracted frame; [imageData] is a `data:image/jpeg;base64,...` URL. */
+@Serializable
+data class Frame(
+    @SerialName("frame_index") val frameIndex: Int,
+    @SerialName("timestamp_formatted") val timestampFormatted: String = "",
+    val score: Double = 0.0,
+    val breakdown: FrameBreakdown = FrameBreakdown(),
+    val highlights: List<String> = emptyList(),
+    @SerialName("image_data") val imageData: String,
+)
+
+@Serializable
+data class FramerResult(
+    @SerialName("duration_seconds") val durationSeconds: Double = 0.0,
+    @SerialName("analyzed_count") val analyzedCount: Int = 0,
+    val frames: List<Frame> = emptyList(),
+)
+
+@Serializable
+data class FramesSaved(@SerialName("saved_count") val savedCount: Int = 0)
+
+// ---------- Editing ----------
+
+/** A crop window in image pixels. */
+data class CropBox(val x: Int, val y: Int, val width: Int, val height: Int) {
+    companion object {
+        /**
+         * Web `crop3x4Box`: the largest 3:4 (portrait) box in a [width] x [height] image. Wider
+         * than 3:4 trims the sides, taller trims top and bottom; [pos] (0..1) slides it along.
+         */
+        fun portrait(width: Int, height: Int, pos: Float = 0.5f): CropBox {
+            val w = minOf(width, height * 3 / 4)
+            val h = minOf(height, width * 4 / 3)
+            return CropBox(Math.round((width - w) * pos), Math.round((height - h) * pos), w, h)
+        }
+    }
+}
+
+@Serializable
+data class SplitResult(@SerialName("created_photos") val createdPhotos: List<Photo> = emptyList())
