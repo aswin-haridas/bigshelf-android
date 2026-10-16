@@ -4,11 +4,17 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -145,53 +151,81 @@ fun AppShell() {
     val inViewer = path.startsWith("photos/")
     // Landscape-locked Duplicates needs every bit of height, so it drops the bottom bar too
     val fullScreen = inViewer || path == Routes.DUPLICATES
-    // Something sits in the bottom slot unless the viewer has the screen to itself
-    val docked = selecting || !fullScreen
+    // The floating nav overlays the page; the selection bar still docks below it
+    val floating = !selecting && !fullScreen
+    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Column(Modifier.fillMaxSize().background(BsColors.Background)) {
         Box(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .then(if (docked) Modifier else Modifier.navigationBarsPadding()),
+                .then(if (selecting || floating) Modifier else Modifier.navigationBarsPadding()),
         ) {
-            AppNavHost(nav, onTopLevel = ::go, onBack = ::back, sectionFrom = from.value)
+            CompositionLocalProvider(LocalBottomBarInset provides if (floating) navInset + 84.dp else 0.dp) {
+                AppNavHost(nav, onTopLevel = ::go, onBack = ::back, sectionFrom = from.value)
+            }
             UploadProgressModal(Modifier.align(Alignment.BottomCenter))
+            if (floating) BottomBar(active = tabFor(path), onSelect = ::go, modifier = Modifier.align(Alignment.BottomCenter))
         }
-        when {
-            // One bar for the whole app: selection actions replace the nav while anything is picked
-            selecting -> SelectionActionBar(
-                path = if (inViewer) from.value else path,
-                onPersonGone = { go(Routes.PEOPLE) },
-            )
-            !fullScreen -> BottomBar(active = tabFor(path), onSelect = ::go)
-        }
+        // One bar for the whole app: selection actions replace the nav while anything is picked
+        if (selecting) SelectionActionBar(
+            path = if (inViewer) from.value else path,
+            onPersonGone = { go(Routes.PEOPLE) },
+        )
     }
 }
 
-/** Instagram-style 56dp bar: bare 24dp icons, filled and white when active, no labels. */
+/** Height the floating bar covers at the bottom of the page; scrolling content pads by it. */
+val LocalBottomBarInset = staticCompositionLocalOf { 0.dp }
+
+/** Floating pill (Photos, People, Library) beside a round Search button, over the content. */
 @Composable
-private fun BottomBar(active: String, onSelect: (String) -> Unit) {
+private fun BottomBar(active: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    val search = TABS.first { it.route == Routes.SEARCH }
     Row(
-        Modifier
-            .fillMaxWidth()
-            .background(BsColors.Background)
-            .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
-            .navigationBarsPadding()
-            .height(56.dp),
+        modifier.navigationBarsPadding().padding(bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        TABS.forEach { tab ->
-            val selected = tab.route == active
-            val tint by animateColorAsState(if (selected) BsColors.Foreground else BsColors.Muted, BsMotion.fast(), label = "tabTint")
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .bsClickable(scale = 0.9f) { onSelect(tab.route) },
-                contentAlignment = Alignment.Center,
-            ) {
-                BsIcon(if (selected) tab.activeIcon else tab.icon, size = 24.dp, tint = tint, contentDescription = tab.label)
+        Row(
+            Modifier
+                .shadow(8.dp, BsShapes.Full)
+                .background(BsColors.SurfaceHover, BsShapes.Full)
+                .padding(6.dp)
+                .animateContentSize(BsMotion.spec()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            TABS.filter { it != search }.forEach { tab ->
+                val selected = tab.route == active
+                val tint by animateColorAsState(if (selected) BsColors.Foreground else BsColors.Muted, BsMotion.fast(), label = "tabTint")
+                Row(
+                    Modifier
+                        .height(48.dp)
+                        .background(if (selected) BsColors.BorderFocus else Color.Transparent, BsShapes.Full)
+                        .bsClickable(scale = 0.9f) { onSelect(tab.route) }
+                        .padding(horizontal = if (selected) 18.dp else 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    BsIcon(if (selected) tab.activeIcon else tab.icon, size = 24.dp, tint = tint, contentDescription = tab.label)
+                    if (selected) Text(tab.label, style = BsText.Sm, fontWeight = BsWeight.Medium, color = tint)
+                }
             }
+        }
+        val selected = active == Routes.SEARCH
+        Box(
+            Modifier
+                .size(60.dp)
+                .shadow(8.dp, BsShapes.Full)
+                .background(if (selected) BsColors.BorderFocus else BsColors.SurfaceHover, BsShapes.Full)
+                .bsClickable(scale = 0.9f) { onSelect(search.route) },
+            contentAlignment = Alignment.Center,
+        ) {
+            BsIcon(
+                if (selected) search.activeIcon else search.icon, size = 24.dp,
+                tint = if (selected) BsColors.Foreground else BsColors.MutedSoft, contentDescription = search.label,
+            )
         }
     }
 }

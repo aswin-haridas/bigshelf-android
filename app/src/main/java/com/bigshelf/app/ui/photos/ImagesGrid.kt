@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.layout.PaddingValues
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Text
@@ -163,6 +165,7 @@ fun ImagesGrid(
             columns = GridCells.Fixed(cols),
             state = state,
             modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = LocalBottomBarInset.current),
             horizontalArrangement = Arrangement.spacedBy(gap),
             verticalArrangement = Arrangement.spacedBy(gap),
         ) {
