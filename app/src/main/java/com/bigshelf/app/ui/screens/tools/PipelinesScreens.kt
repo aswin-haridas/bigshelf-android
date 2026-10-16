@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.tools
 
 import androidx.compose.foundation.Canvas
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -220,7 +221,7 @@ fun PipelinesScreen(onBack: () -> Unit, onRun: (String) -> Unit) {
             data == null && query.isLoading -> LoadingText()
             data == null -> EmptyState("Couldn't load pipelines")
             else -> LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Face tagging runs per upload, so it's a progress-only card with no run button
@@ -446,7 +447,7 @@ fun RunScreen(runId: String, onBack: () -> Unit) {
         LazyColumn(
             Modifier
                 .weight(1f)
-                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp + LocalBottomBarInset.current)
                 .fillMaxWidth()
                 .clip(BsShapes.Lg)
                 .background(Color.Black.copy(alpha = 0.4f))

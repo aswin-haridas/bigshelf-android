@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens
 
 import androidx.compose.foundation.background
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -188,7 +189,7 @@ fun ArchiveScreen(onFolder: (String) -> Unit, onBack: () -> Unit) {
             list.isEmpty() -> EmptyState("Archive is empty")
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {

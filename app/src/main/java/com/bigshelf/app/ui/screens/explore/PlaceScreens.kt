@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.explore
 
 import android.content.Context
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Point
@@ -97,7 +98,7 @@ fun PlacesScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             list.isEmpty() -> EmptyState("No places yet")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(150.dp),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {

@@ -107,7 +107,7 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("Library", count = storage.data?.let { "${formatBytes(it.usedBytes)} used" })
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Group {

@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.people
 
 import androidx.compose.foundation.background
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.mutableStateListOf
@@ -81,7 +82,7 @@ private val PEOPLE_TABS = listOf(
 private fun FaceGrid(content: androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         content = content,

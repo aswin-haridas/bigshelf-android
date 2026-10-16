@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.explore
 
 import androidx.compose.foundation.background
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -167,7 +168,7 @@ fun EventsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             items.isEmpty() -> EmptyState("No events yet")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(150.dp),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -327,7 +328,7 @@ fun BurstsScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
         when {
             groups.isEmpty() && (loading || total == null) -> LoadingText(text = "Scoring similar shots…")
             groups.isEmpty() -> EmptyState("No bursts")
-            else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp + LocalBottomBarInset.current), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 itemsIndexed(groups, key = { _, g -> g.id }) { i, burst ->
                     if (i >= groups.size - 3 && groups.size < (total ?: 0)) LaunchedEffect(groups.size) { load(false) }
                     BurstRow(burst, busy == burst.id, onKeepBest = { keepBest(burst) }, onOpen = { id ->

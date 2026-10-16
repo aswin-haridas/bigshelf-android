@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -210,7 +211,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
     PageHeader("Settings", leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         SettingsCard {
@@ -351,7 +352,7 @@ fun BackupScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
     PageHeader("Backup & storage", leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         SettingsCard {

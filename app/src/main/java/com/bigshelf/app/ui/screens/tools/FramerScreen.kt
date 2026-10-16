@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.tools
 
 import android.content.ContentValues
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -260,7 +261,7 @@ fun FramerScreen(photoId: String?, onBack: () -> Unit) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = 16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp + LocalBottomBarInset.current),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {

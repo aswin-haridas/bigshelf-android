@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens
 
 import android.content.Context
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -104,7 +105,7 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("Sharing", leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+            Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp + LocalBottomBarInset.current),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Section("Shared with you") {

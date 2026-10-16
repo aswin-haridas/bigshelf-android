@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.tools
 
 import android.content.ClipData
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -256,7 +256,7 @@ fun TriptychScreen(
 
         if (photos.isNotEmpty()) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).navigationBarsPadding(),
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).padding(bottom = LocalBottomBarInset.current),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Shown when the set names its person (Triptych sets of untagged photos don't)

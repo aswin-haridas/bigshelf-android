@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.explore
 
 import androidx.compose.foundation.background
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -132,7 +133,7 @@ fun AlbumsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
 private fun AlbumGrid(albums: List<AlbumListItem>, onOpen: (AlbumListItem) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

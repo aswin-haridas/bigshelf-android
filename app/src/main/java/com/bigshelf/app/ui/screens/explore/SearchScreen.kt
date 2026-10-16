@@ -1,6 +1,7 @@
 package com.bigshelf.app.ui.screens.explore
 
 import android.net.Uri
+import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -121,7 +122,7 @@ private fun Explore(onNavigate: (String) -> Unit) {
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item(key = "albums") {
