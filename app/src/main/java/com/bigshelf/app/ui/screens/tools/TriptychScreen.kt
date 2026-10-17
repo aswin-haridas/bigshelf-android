@@ -95,7 +95,8 @@ fun TriptychScreen(
     // Each view has its own AI toggle; set size and solo only apply to Triplets
     val includeAi = if (endpoint == TRIPTYCH_ENDPOINT) settings.triptychAi else settings.includeAi
     val skipSmall = endpoint == TRIPTYCH_ENDPOINT && settings.triptychSkipSmall
-    val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall)
+    val faces = endpoint == TRIPTYCH_ENDPOINT && settings.triptychFaces
+    val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces)
 
     // Sets by offset for the current options: the visible one plus the prefetched next one
     val cache = remember(options) { mutableStateMapOf<Int, PhotoSet>() }
@@ -107,7 +108,7 @@ fun TriptychScreen(
     var shown by remember { mutableStateOf<PhotoSet?>(null) }
 
     suspend fun fetch(at: Int) = api.photoSet(
-        endpoint, at, includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall,
+        endpoint, at, includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces,
     )
 
     fun moveTo(next: Int) {

@@ -360,6 +360,13 @@ data class ClearedResponse(@SerialName("cleared_count") val clearedCount: Int = 
 @Serializable
 data class Bucket(val count: Int = 0, val items: List<Photo> = emptyList())
 
+/** Organize's Clean up: photos scored under the cut-off; [nextBefore] is null once the library runs out. */
+@Serializable
+data class UglyPage(
+    val items: List<Photo> = emptyList(),
+    @SerialName("next_before") val nextBefore: String? = null,
+)
+
 // ---------- Face review (web useFaceConfirmations) ----------
 
 @Serializable

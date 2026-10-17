@@ -430,12 +430,13 @@ class Api(context: Context, val baseUrl: String) {
         solo: Boolean,
         personId: String?,
         skipSmall: Boolean,
+        matchFaces: Boolean,
     ): PhotoSet {
         val (text, headers) = callWithHeaders(
             "GET", endpoint,
             mapOf(
                 "offset" to offset, "include_ai" to includeAi, "count" to count, "solo" to solo,
-                "person_id" to personId, "skip_small" to skipSmall,
+                "person_id" to personId, "skip_small" to skipSmall, "match_faces" to matchFaces,
             ),
         )
         return PhotoSet(
@@ -592,6 +593,10 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun organize(limit: Int) =
         get("/api/v1/photos/organize", MapSerializer(String.serializer(), Bucket.serializer()), mapOf("limit" to limit))
+
+    /** The next page's low framer scores (worst first), photos older than [before]. */
+    suspend fun uglyPhotos(before: String?) =
+        get("/api/v1/photos/organize/ugly", UglyPage.serializer(), mapOf("before" to before))
 
     // ---------- Sharing ----------
 

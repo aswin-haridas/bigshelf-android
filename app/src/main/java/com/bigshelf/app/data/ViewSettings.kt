@@ -48,6 +48,15 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("triptychSkipSmall", value).apply()
     }
 
+    // Never put two different tagged people in one Triptych set. Off by default.
+    var triptychFaces by mutableStateOf(prefs.getBoolean("triptychFaces", false))
+        private set
+
+    fun updateTriptychFaces(value: Boolean) {
+        triptychFaces = value
+        prefs.edit().putBoolean("triptychFaces", value).apply()
+    }
+
     // Let Triplets (and Composer) pick AI images too
     var includeAi by mutableStateOf(prefs.getBoolean("includeAi", false))
         private set

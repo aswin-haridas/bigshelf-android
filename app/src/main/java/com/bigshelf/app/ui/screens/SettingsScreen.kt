@@ -233,6 +233,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                     "Skip small sets", "Leave out sets of 3 or fewer photos.",
                     settings.triptychSkipSmall, settings::updateTriptychSkipSmall, divider = true,
                 )
+                ToggleRow(
+                    "Split by face", "Never put two different tagged people in one set.",
+                    settings.triptychFaces, settings::updateTriptychFaces, divider = true,
+                )
             }
         }
 
