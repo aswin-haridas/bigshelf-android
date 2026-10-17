@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -297,15 +298,19 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 onFramer = { id -> nav.navigate(Routes.framer(id)) },
             )
         }
-        composable(Routes.TRIPTYCH) {
-            TriptychScreen("Triptych", "All similar photos of one outfit", TRIPTYCH_ENDPOINT, onBack = onBack, onOpenPhoto = openPhoto)
-        }
         composable(Routes.TRIPLETS) {
-            // Downloading moves the photos to Archive (when on in Settings), same as Triptych
-            TriptychScreen(
-                "Triplets", "${BigShelfApp.settings.tripletCount} photos of the same person", TRIPLETS_ENDPOINT,
-                onBack = onBack, onOpenPhoto = openPhoto,
-            )
+            // Match outfit (default) uses the triptych grouping; off, random photos of one person.
+            // Downloading moves the photos to Archive (when on in Settings)
+            val settings = BigShelfApp.settings
+            // Keyed so switching modes starts that endpoint's state fresh
+            key(settings.tripletOutfit) {
+                TriptychScreen(
+                    "Triplets",
+                    if (settings.tripletOutfit) "All similar photos of one outfit" else "${settings.tripletCount} photos of the same person",
+                    if (settings.tripletOutfit) TRIPTYCH_ENDPOINT else TRIPLETS_ENDPOINT,
+                    onBack = onBack, onOpenPhoto = openPhoto,
+                )
+            }
         }
         composable(Routes.COMPOSER) {
             // A clear-face photo, then the same person in another outfit, with the prompt to swap it in

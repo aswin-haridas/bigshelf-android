@@ -125,7 +125,7 @@ private fun Section(title: String, hint: String) {
 // Triplets set sizes, the web slider's range (3-6)
 private val SET_SIZES = (3..6).map { TabItem(it, "$it") }
 
-/** People hidden with Skip on Triptych / Triplets, each with an Unskip to bring them back. */
+/** People hidden with Skip on Triplets, each with an Unskip to bring them back. */
 @Composable
 private fun SkippedPeople() {
     val api = BigShelfApp.api
@@ -135,7 +135,7 @@ private fun SkippedPeople() {
     var pending by remember { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Section("Skipped people", "Skipped people never appear in Triptych or Triplets.")
+        Section("Skipped people", "Skipped people never appear in Triplets.")
         SettingsCard {
             when {
                 people.isLoading -> Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
@@ -148,7 +148,7 @@ private fun SkippedPeople() {
                     color = BsColors.Muted,
                 )
                 skipped.isEmpty() -> Text(
-                    "No skipped people. Use Skip on the Triptych page to hide someone.",
+                    "No skipped people. Use Skip on the Triplets page to hide someone.",
                     Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     style = BsText.Xs,
                     color = BsColors.Muted,
@@ -162,7 +162,7 @@ private fun SkippedPeople() {
                                     try {
                                         api.unskipPerson(person.id)
                                         PhotoEvents.invalidate("people")
-                                        toast.success("${person.name} will appear in Triptych and Triplets again")
+                                        toast.success("${person.name} will appear in Triplets again")
                                     } catch (_: Exception) {
                                         toast.error("Couldn't unskip this person")
                                     } finally {
@@ -226,37 +226,38 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Triptych", "How Triptych groups photos of one outfit.")
-            SettingsCard {
-                ToggleRow("AI images", "Let Triptych use AI images, at most one per set.", settings.triptychAi, settings::updateTriptychAi)
-                ToggleRow(
-                    "Skip small sets", "Leave out sets of 3 or fewer photos.",
-                    settings.triptychSkipSmall, settings::updateTriptychSkipSmall, divider = true,
-                )
-                ToggleRow(
-                    "Split by face", "Never put two different tagged people in one set.",
-                    settings.triptychFaces, settings::updateTriptychFaces, divider = true,
-                )
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Section("Triplets", "How Triplets picks each set of one person's photos.")
             SettingsCard {
-                ToggleRow("AI images", "Let Triplets pick AI images.", settings.includeAi, settings::updateIncludeAi)
+                ToggleRow("AI images", "Let Triplets pick AI images, at most one per outfit set.", settings.includeAi, settings::updateIncludeAi)
                 ToggleRow(
-                    "Solo photos only", "Skip group photos with other tagged people.",
-                    settings.tripletSolo, settings::updateTripletSolo, divider = true,
+                    "Match outfit", "Group every photo of one outfit and scene. Off picks random photos.",
+                    settings.tripletOutfit, settings::updateTripletOutfit, divider = true,
                 )
-                Column(
-                    Modifier.divider(true).padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Column {
-                        Text("Photos per set", style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
-                        Text("People with fewer photos than this are left out.", style = BsText.Xs, color = BsColors.Muted)
+                // Outfit sets and random sets each have their own options
+                if (settings.tripletOutfit) {
+                    ToggleRow(
+                        "Skip small sets", "Leave out sets of 3 or fewer photos.",
+                        settings.triptychSkipSmall, settings::updateTriptychSkipSmall, divider = true,
+                    )
+                    ToggleRow(
+                        "Split by face", "Never put two different tagged people in one set.",
+                        settings.triptychFaces, settings::updateTriptychFaces, divider = true,
+                    )
+                } else {
+                    ToggleRow(
+                        "Solo photos only", "Skip group photos with other tagged people.",
+                        settings.tripletSolo, settings::updateTripletSolo, divider = true,
+                    )
+                    Column(
+                        Modifier.divider(true).padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column {
+                            Text("Photos per set", style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+                            Text("People with fewer photos than this are left out.", style = BsText.Xs, color = BsColors.Muted)
+                        }
+                        BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
                     }
-                    BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
                 }
             }
         }

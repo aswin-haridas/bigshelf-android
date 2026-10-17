@@ -94,6 +94,7 @@ import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.ViewerList
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.ConfirmModal
+import com.bigshelf.app.ui.components.Skeleton
 import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
@@ -402,7 +403,8 @@ private fun PhotoPage(
                         }
                     }
                 }
-                else -> Text(if (notFound) "Image not found" else "Loading…", color = BsColors.Muted)
+                notFound -> Text("Image not found", color = BsColors.Muted)
+                else -> Skeleton(Modifier.fillMaxSize())
             }
         }
     }

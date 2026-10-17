@@ -30,16 +30,17 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("archiveOnDownload", value).apply()
     }
 
-    // Let Triptych use AI images (at most one per set). On by default.
-    var triptychAi by mutableStateOf(prefs.getBoolean("triptychAi", true))
+    // Triplets groups every photo of one outfit and scene (the old Triptych). On by default;
+    // off gives random sets of one person.
+    var tripletOutfit by mutableStateOf(prefs.getBoolean("tripletOutfit", true))
         private set
 
-    fun updateTriptychAi(value: Boolean) {
-        triptychAi = value
-        prefs.edit().putBoolean("triptychAi", value).apply()
+    fun updateTripletOutfit(value: Boolean) {
+        tripletOutfit = value
+        prefs.edit().putBoolean("tripletOutfit", value).apply()
     }
 
-    // Leave out Triptych sets of 3 or fewer photos. Off by default.
+    // Outfit sets: leave out sets of 3 or fewer photos. Off by default.
     var triptychSkipSmall by mutableStateOf(prefs.getBoolean("triptychSkipSmall", false))
         private set
 
@@ -48,7 +49,7 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("triptychSkipSmall", value).apply()
     }
 
-    // Never put two different tagged people in one Triptych set. Off by default.
+    // Outfit sets: never put two different tagged people in one set. Off by default.
     var triptychFaces by mutableStateOf(prefs.getBoolean("triptychFaces", false))
         private set
 
@@ -57,7 +58,7 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("triptychFaces", value).apply()
     }
 
-    // Let Triplets (and Composer) pick AI images too
+    // Let Triplets (at most one per outfit set) and Composer pick AI images too
     var includeAi by mutableStateOf(prefs.getBoolean("includeAi", false))
         private set
 
@@ -66,7 +67,7 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("includeAi", value).apply()
     }
 
-    // Photos per Triplets set (3-6)
+    // Photos per random Triplets set (3-6); outfit sets are sized by the outfit
     var tripletCount by mutableStateOf(prefs.getInt("tripletCount", 3))
         private set
 

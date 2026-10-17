@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +30,7 @@ import coil3.compose.AsyncImage
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.ui.components.BsIcon
+import com.bigshelf.app.ui.components.Skeleton
 import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.theme.BsColors
@@ -63,12 +68,17 @@ fun ImageCard(
     ) {
         val src = photo.thumbnailUrl ?: photo.imageSrc
         if (src != null) {
+            // Skeleton pulses until the thumbnail lands (or fails)
+            var loaded by remember(src) { mutableStateOf(false) }
+            if (!loaded) Skeleton(Modifier.fillMaxSize())
             // Grid tiles use the 720x960 (3:4) thumbnail, like the web
             AsyncImage(
                 model = BigShelfApp.api.mediaUrl(src),
                 contentDescription = photo.title ?: photo.filename,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
+                onSuccess = { loaded = true },
+                onError = { loaded = true },
             )
         }
         if (photo.isAiImage) {

@@ -22,7 +22,6 @@ object Routes {
     const val DUPLICATES = "duplicates"
     const val ORGANIZE = "organize"
     const val PHOTO = "photos/{photoId}"
-    const val TRIPTYCH = "triptych"
     const val TRIPLETS = "triplets"
     const val COMPOSER = "composer"
     // ?photo=<id>: open a library video (from the photo viewer)

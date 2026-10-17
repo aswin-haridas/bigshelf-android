@@ -71,8 +71,8 @@ private val lastOffset = mutableMapOf<String, Int>()
 private val lastPerson = mutableMapOf<String, String?>()
 
 /**
- * Port of modules/triptych: one set of photos at a time with Download and Next. Triptych
- * shows every photo of one outfit; Triplets [count] photos of one person; Composer a clear
+ * Port of modules/triptych: one set of photos at a time with Download and Next. Triplets
+ * shows every photo of one outfit (or, with Match outfit off, [count] photos of one person); Composer a clear
  * face plus another outfit, with the image-model [prompt] to copy. Sets showing one person
  * can skip that person for good; a person filter limits sets to one person.
  */
@@ -92,8 +92,8 @@ fun TriptychScreen(
 
     var offset by remember { mutableStateOf(lastOffset[endpoint] ?: 0) }
     var onlyPerson by remember { mutableStateOf(lastPerson[endpoint]) }
-    // Each view has its own AI toggle; set size and solo only apply to Triplets
-    val includeAi = if (endpoint == TRIPTYCH_ENDPOINT) settings.triptychAi else settings.includeAi
+    // Set size and solo only apply to random Triplets; skip-small and faces to outfit sets
+    val includeAi = settings.includeAi
     val skipSmall = endpoint == TRIPTYCH_ENDPOINT && settings.triptychSkipSmall
     val faces = endpoint == TRIPTYCH_ENDPOINT && settings.triptychFaces
     val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces)
@@ -195,7 +195,7 @@ fun TriptychScreen(
             try {
                 api.skipPerson(personId)
                 PhotoEvents.invalidate("people")
-                toast.success("${set.personName ?: "This person"} won't appear in Triptych or Triplets again")
+                toast.success("${set.personName ?: "This person"} won't appear in Triplets again")
                 // Filtered to them: they have no sets left, so go back to everyone
                 if (onlyPerson == personId) setPerson(null) else refetchShifted()
             } catch (_: Exception) {
@@ -260,7 +260,7 @@ fun TriptychScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).padding(bottom = LocalBottomBarInset.current),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // Shown when the set names its person (Triptych sets of untagged photos don't)
+                // Shown when the set names its person (outfit sets of untagged photos don't)
                 if (set?.personId != null) {
                     BsButton(
                         onClick = ::skipPerson,

@@ -124,7 +124,6 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
             // Same tools, same order as the web sidebar
             Group("Tools") {
                 LibraryRow("Framer", BsIcons.FilmStrip, onClick = { onNavigate(Routes.framer()) })
-                LibraryRow("Triptych", BsIcons.SquareSplitVertical, divider = true, onClick = { onNavigate(Routes.TRIPTYCH) })
                 LibraryRow("Triplets", BsIcons.Users, divider = true, onClick = { onNavigate(Routes.TRIPLETS) })
                 LibraryRow("Composer", BsIcons.Sparkle, divider = true, onClick = { onNavigate(Routes.COMPOSER) })
                 LibraryRow("Duplicates", BsIcons.Copy, divider = true, onClick = { onNavigate(Routes.DUPLICATES) })
