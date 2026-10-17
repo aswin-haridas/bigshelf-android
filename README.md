@@ -65,7 +65,7 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   cookie, like the web.
 - Home timeline with month headers, infinite scroll, text search and the "show AI images"
   setting. Uploads go through the same presigned flow as the web, with the progress box.
-- Bottom navigation (Photos, Search, People, Library); Library holds upload, Favourites,
+- Bottom navigation (Photos, Search, People, Library); Library holds upload,
   Archive, Bin, the tools, Settings and Log out.
 - Search tab: albums with sub-albums, places (named by the phone's Geocoder) and a map of
   where photos were taken (OpenStreetMap via osmdroid, no API key), events and trips grouped
@@ -87,7 +87,7 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
 - People: the People, Detected Faces and Untagged Photos tabs, a person page with rename,
   download all and merge, and face groups with tag, merge and forget. Detected Faces can
   cluster faces into existing people, and Select picks groups to merge or forget together.
-- Favourites (in Library), Bin (restore, delete permanently, empty Bin), Archive folders, Settings
+- Bin (restore, delete permanently, empty Bin), Archive folders, Settings
   (AI images, archive on download from any download button, Triptych and Triplets options,
   skipped people).
 - Framer: pick a video (or open one from the viewer), extract its best frames, select and

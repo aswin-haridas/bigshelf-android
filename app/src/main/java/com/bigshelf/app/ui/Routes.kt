@@ -6,7 +6,6 @@ import android.net.Uri
 object Routes {
     const val HOME = "home"
     const val LIBRARY = "library"
-    const val FAVOURITES = "favourites"
     const val PEOPLE = "people"
     const val FACES = "faces"
     const val UNTAGGED = "people/untagged"

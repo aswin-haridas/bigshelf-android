@@ -53,7 +53,6 @@ import com.bigshelf.app.ui.screens.ArchiveFolderScreen
 import com.bigshelf.app.ui.screens.ArchiveScreen
 import com.bigshelf.app.ui.screens.BackupScreen
 import com.bigshelf.app.ui.screens.BinScreen
-import com.bigshelf.app.ui.screens.FavouritesScreen
 import com.bigshelf.app.ui.screens.HomeScreen
 import com.bigshelf.app.ui.screens.SettingsScreen
 import com.bigshelf.app.ui.screens.SharingScreen
@@ -252,7 +251,6 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
     ) {
         composable(Routes.HOME) { HomeScreen(onOpenPhoto = openPhoto, onProfile = { nav.navigate(Routes.SETTINGS) }) }
         composable(Routes.LIBRARY) { LibraryScreen(onNavigate = { nav.navigate(it) }) }
-        composable(Routes.FAVOURITES) { FavouritesScreen(onOpenPhoto = openPhoto, onBack = onBack) }
         searchGraph(nav, onBack = onBack, openPhoto = openPhoto)
         composable(Routes.PEOPLE) { PeopleScreen(onPerson = { nav.navigate(Routes.person(it)) }, onTab = peopleTab) }
         composable(Routes.FACES) { FacesScreen(onFace = { nav.navigate(Routes.face(it)) }, onTab = peopleTab) }

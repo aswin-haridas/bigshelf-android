@@ -116,8 +116,7 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
                 })
             }
             Group {
-                LibraryRow("Favourites", BsIcons.Heart, onClick = { onNavigate(Routes.FAVOURITES) })
-                LibraryRow("Backup & storage", BsIcons.CloudArrowUp, divider = true, onClick = { onNavigate(Routes.BACKUP) })
+                LibraryRow("Backup & storage", BsIcons.CloudArrowUp, onClick = { onNavigate(Routes.BACKUP) })
                 LibraryRow("Sharing", BsIcons.ShareNetwork, divider = true, onClick = { onNavigate(Routes.SHARING) })
                 LibraryRow("Archive", BsIcons.Archive, divider = true, onClick = { onNavigate(Routes.ARCHIVE) })
                 LibraryRow("Bin", BsIcons.Trash, divider = true, onClick = { onNavigate(Routes.BIN) })
