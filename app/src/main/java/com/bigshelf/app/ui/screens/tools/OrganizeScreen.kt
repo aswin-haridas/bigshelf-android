@@ -1,12 +1,12 @@
 package com.bigshelf.app.ui.screens.tools
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,10 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,17 +47,15 @@ import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
 import com.bigshelf.app.ui.components.PageHeader
-import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.photos.ImagesGrid
+import com.bigshelf.app.ui.screens.explore.CoverCard
 import com.bigshelf.app.ui.photos.photoCount
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
-import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.MonoFamily
-import com.bigshelf.app.ui.theme.Neutral
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -84,7 +79,7 @@ private val BUCKETS = listOf(
 )
 
 /**
- * Port of modules/organize: photos sorted into review buckets, picked from a row of chips.
+ * Port of modules/organize: photos sorted into review buckets, shown as cards; a card opens its photos.
  * Select all, Download all, and on Failed, Reprocess all.
  */
 @Composable
@@ -93,23 +88,29 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val query = rememberQuery("organize", invalidatedBy = setOf("organize")) { api.organize(BUCKET_LIMIT) }
-    var tab by rememberSaveable { mutableStateOf(BUCKETS.first().first) }
+    // null: the bucket cards; picking one opens its photos
+    var tab by rememberSaveable { mutableStateOf<String?>(null) }
+    val closeBucket = {
+        SelectionStore.clear() // fresh slate per bucket
+        tab = null
+    }
+    BackHandler(tab != null, closeBucket)
     var downloading by remember { mutableStateOf(false) }
     var reprocessing by remember { mutableStateOf(false) }
     // "Clean up" review of low-scoring photos, across the whole library (not the tab)
     var cleaningUp by remember { mutableStateOf(false) }
 
-    val bucket = query.data?.get(tab)
+    val bucket = tab?.let { query.data?.get(it) }
     val items = bucket?.items.orEmpty()
     val allSelected = items.isNotEmpty() && items.all { SelectionStore.isSelected(it.id) }
 
     Column(Modifier.fillMaxSize()) {
         PageHeader(
-            "Organize",
+            BUCKETS.firstOrNull { it.first == tab }?.second ?: "Organize",
             count = bucket?.let { photoCount(it.count) },
-            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
+            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = if (tab != null) closeBucket else onBack, tint = BsColors.Foreground) },
         ) {
-            BsIconButton(BsIcons.Sparkle, "Clean up", onClick = { cleaningUp = true })
+            if (tab == null) BsIconButton(BsIcons.Sparkle, "Clean up", onClick = { cleaningUp = true })
             if (items.isNotEmpty()) {
                 if (tab == "failed") {
                     // Pushes each photo to the front of the pipeline queue
@@ -150,40 +151,21 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             }
         }
 
-        LazyRow(
-            Modifier.padding(bottom = 12.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(BUCKETS, key = { it.first }) { (id, label) ->
-                val selected = id == tab
-                Row(
-                    Modifier
-                        .height(40.dp)
-                        .clip(BsShapes.Full)
-                        .background(if (selected) Neutral.N800 else BsColors.Surface)
-                        .border(1.dp, if (selected) BsColors.BorderFocus else BsColors.Border, BsShapes.Full)
-                        .bsClickable(scale = 0.96f) {
-                            // Fresh slate per bucket
-                            if (id != tab) SelectionStore.clear()
-                            tab = id
-                        }
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(label, style = BsText.Xs.copy(fontWeight = BsWeight.Medium), color = if (selected) BsColors.Foreground else BsColors.Muted)
-                    Text(
-                        "${query.data?.get(id)?.count ?: 0}",
-                        style = BsText.Xs2.copy(fontFamily = MonoFamily),
-                        color = if (selected) BsColors.MutedSoft else BsColors.MutedFaint,
-                    )
-                }
-            }
-        }
-
+        val open = tab
         when {
             query.data == null && query.isLoading -> LoadingText(text = "Sorting photos…")
+            open == null -> LazyVerticalGrid(
+                GridCells.Fixed(2),
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                gridItems(BUCKETS, key = { it.first }) { (id, label) ->
+                    val b = query.data?.get(id)
+                    CoverCard(label, photoCount(b?.count ?: 0), b?.items?.firstOrNull(), onClick = { tab = id }, icon = BsIcons.Funnel)
+                }
+            }
             items.isEmpty() -> EmptyState("Nothing here")
             else -> ImagesGrid(
                 photos = items,
