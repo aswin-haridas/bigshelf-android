@@ -89,6 +89,7 @@ import coil3.compose.AsyncImage
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Downloads
 import com.bigshelf.app.data.Photo
+import com.bigshelf.app.data.AI_MODEL_SOURCE
 import com.bigshelf.app.data.USER_MARKED_AI
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.ViewerList
@@ -483,9 +484,12 @@ private fun ActionBar(
     var busy by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
-    // Only the user's own mark can be undone; photos detected as AI stay AI
+    // Only the user's own mark and the AI detector's guess can be undone; photos detected
+    // as AI (metadata, filename, size) stay AI
     val markedByUser = image.aiSource == USER_MARKED_AI
-    val detectedAi = image.isAiImage && !markedByUser
+    val guessedByModel = image.aiSource == AI_MODEL_SOURCE
+    val detectedAi = image.isAiImage && !markedByUser && !guessedByModel
+    val unmarkable = markedByUser || guessedByModel
 
     fun act(name: String, failure: String, block: suspend () -> Unit) {
         if (busy != null) return
@@ -539,12 +543,12 @@ private fun ActionBar(
             // Filled when the photo counts as AI; disabled when that was detected, not marked
             Action(
                 if (image.isAiImage) BsIcons.FlowerTulipFill else BsIcons.FlowerTulip,
-                if (detectedAi) "AI" else if (markedByUser) "Unmark AI" else "Mark AI",
+                if (detectedAi) "AI" else if (unmarkable) "Unmark AI" else "Mark AI",
                 onClick = {
                     act("ai", "Failed to update AI mark") {
-                        onChanged(api.markAi(image.id, !markedByUser))
+                        onChanged(api.markAi(image.id, !unmarkable))
                         PhotoEvents.invalidate("photos")
-                        toast.success(if (markedByUser) "Removed AI mark" else "Marked as AI")
+                        toast.success(if (unmarkable) "Removed AI mark" else "Marked as AI")
                     }
                 },
                 modifier = cell,
@@ -643,6 +647,12 @@ private fun InfoSheet(
             InfoField("Name") { Text(image.title ?: image.filename, style = BsText.Sm.copy(fontWeight = BsWeight.Medium)) }
             formatDate(image.takenAt ?: image.createdAt)?.let { date ->
                 InfoField(if (image.takenAt != null) "Taken" else "Uploaded") { Text(date, style = BsText.Sm, color = BsColors.MutedSoft) }
+            }
+            image.heat?.let { heat ->
+                InfoField("Heat") { Text(String.format(Locale.US, "%.1f / 10", heat), style = BsText.Sm, color = BsColors.MutedSoft) }
+            }
+            image.aiScore?.let { score ->
+                InfoField("AI likelihood") { Text("${Math.round(score * 100)}%", style = BsText.Sm, color = BsColors.MutedSoft) }
             }
             if (image.width != null && image.height != null) {
                 val megapixels = image.width * image.height / 1_000_000.0

@@ -68,6 +68,8 @@ import com.bigshelf.app.ui.screens.photo.PhotoScreen
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.ui.screens.tools.COMPOSER_ENDPOINT
 import com.bigshelf.app.ui.screens.tools.DuplicatesScreen
+import com.bigshelf.app.ui.screens.tools.GradingScreen
+import com.bigshelf.app.ui.screens.tools.STANCE_ENDPOINT
 import com.bigshelf.app.ui.screens.tools.FramerScreen
 import com.bigshelf.app.ui.screens.tools.OUTFIT_SWAP_PROMPT
 import com.bigshelf.app.ui.screens.tools.TRIPLETS_ENDPOINT
@@ -287,7 +289,7 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
             RunScreen(runId = it.arguments?.getString("runId").orEmpty(), onBack = onBack)
         }
         composable(Routes.DUPLICATES) { DuplicatesScreen(onBack = onBack, onOpenPhoto = openPhoto) }
-        composable(Routes.ORGANIZE) { OrganizeScreen(onBack = onBack, onOpenPhoto = openPhoto) }
+        composable(Routes.ORGANIZE) { OrganizeScreen(onBack = onBack, onOpenPhoto = openPhoto, onDuplicates = { nav.navigate(Routes.DUPLICATES) }) }
         composable(Routes.PHOTO, arguments = listOf(navArgument("photoId") { type = NavType.StringType })) {
             PhotoScreen(
                 photoId = it.arguments?.getString("photoId").orEmpty(),
@@ -312,6 +314,11 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 )
             }
         }
+        composable(Routes.STANCE) {
+            // 2 or more photos of one tagged person in the same pose; downloading archives them too
+            TriptychScreen("Stance", "One person in the same pose", STANCE_ENDPOINT, onBack = onBack, onOpenPhoto = openPhoto)
+        }
+        composable(Routes.GRADING) { GradingScreen(onBack = onBack, onOpenPhoto = openPhoto) }
         composable(Routes.COMPOSER) {
             // A clear-face photo, then the same person in another outfit, with the prompt to swap it in
             TriptychScreen(

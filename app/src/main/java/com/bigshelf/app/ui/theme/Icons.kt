@@ -85,6 +85,9 @@ import com.adamglin.phosphoricons.regular.PencilSimple
 import com.adamglin.phosphoricons.regular.SignOut
 import com.adamglin.phosphoricons.regular.Spinner
 import com.adamglin.phosphoricons.regular.SquaresFour
+import com.adamglin.phosphoricons.regular.Fire
+import com.adamglin.phosphoricons.regular.PersonSimple
+import com.adamglin.phosphoricons.regular.Shuffle
 import com.adamglin.phosphoricons.regular.Stack
 import com.adamglin.phosphoricons.regular.Tag
 import com.adamglin.phosphoricons.regular.Trash
@@ -144,6 +147,9 @@ object BsIcons {
     val SelectionAll: ImageVector get() = PhosphorIcons.Regular.SelectionAll
     val Star: ImageVector get() = PhosphorIcons.Regular.Star
     val Broom: ImageVector get() = PhosphorIcons.Regular.Broom
+    val Fire: ImageVector get() = PhosphorIcons.Regular.Fire
+    val PersonSimple: ImageVector get() = PhosphorIcons.Regular.PersonSimple
+    val Shuffle: ImageVector get() = PhosphorIcons.Regular.Shuffle
     val XCircleFill: ImageVector get() = PhosphorIcons.Fill.FillXCircle
     val StarFill: ImageVector get() = PhosphorIcons.Fill.FillStar
     val ArrowClockwise: ImageVector get() = PhosphorIcons.Regular.ArrowClockwise

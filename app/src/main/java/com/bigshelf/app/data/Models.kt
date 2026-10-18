@@ -61,6 +61,10 @@ data class Photo(
     @SerialName("photo_person") val photoPerson: FaceBox? = null,
     val isAi: Boolean = false,
     @SerialName("ai_source") val aiSource: String? = null,
+    // Detail-only: 0-1 chance the AI detector gives that it is AI; null until it has run
+    @SerialName("ai_score") val aiScore: Double? = null,
+    // Heat out of 10 from the Grading taste model (detail only); null until trained
+    val heat: Double? = null,
     @SerialName("is_archived") val isArchived: Boolean = false,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
     @SerialName("is_video") val isVideo: Boolean = false,
@@ -90,6 +94,18 @@ data class Photo(
 
 /** Mirrors backend USER_MARKED_AI: the only ai_source the user can clear. */
 const val USER_MARKED_AI = "Marked by user"
+/** Mirrors backend AI_MODEL_SOURCE: flagged by the AI detector pipeline, also clearable. */
+const val AI_MODEL_SOURCE = "Detected by model"
+
+/** Two random photos to ask "which is hotter?" (Grading). */
+@Serializable
+data class GradingPair(val id: String, val items: List<Photo>)
+
+@Serializable
+data class GradingResponse(val rated: Int = 0, val pairs: List<GradingPair> = emptyList())
+
+@Serializable
+data class CompareResponse(val id: String)
 
 @Serializable
 data class PhotoPage(

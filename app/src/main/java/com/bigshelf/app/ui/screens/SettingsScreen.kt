@@ -262,6 +262,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Section("Stance", "How Stance picks each set of one person in the same pose.")
+            SettingsCard {
+                ToggleRow("Match outfit", "Only group photos where the clothes match too.", settings.stanceOutfit, settings::updateStanceOutfit)
+            }
+        }
+
         SkippedPeople()
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 
 const val TRIPTYCH_ENDPOINT = "/api/v1/triptych"
 const val TRIPLETS_ENDPOINT = "/api/v1/triplets"
+const val STANCE_ENDPOINT = "/api/v1/stance"
 const val COMPOSER_ENDPOINT = "/api/v1/composer"
 
 // Upload both photos in order (the face photo first, then the outfit) with this prompt.
@@ -96,7 +97,8 @@ fun TriptychScreen(
     val includeAi = settings.includeAi
     val skipSmall = endpoint == TRIPTYCH_ENDPOINT && settings.triptychSkipSmall
     val faces = endpoint == TRIPTYCH_ENDPOINT && settings.triptychFaces
-    val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces)
+    val outfit = endpoint == STANCE_ENDPOINT && settings.stanceOutfit
+    val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit)
 
     // Sets by offset for the current options: the visible one plus the prefetched next one
     val cache = remember(options) { mutableStateMapOf<Int, PhotoSet>() }
@@ -108,7 +110,7 @@ fun TriptychScreen(
     var shown by remember { mutableStateOf<PhotoSet?>(null) }
 
     suspend fun fetch(at: Int) = api.photoSet(
-        endpoint, at, includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces,
+        endpoint, at, includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit,
     )
 
     fun moveTo(next: Int) {

@@ -58,6 +58,15 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("triptychFaces", value).apply()
     }
 
+    // Stance sets also share one outfit. On by default.
+    var stanceOutfit by mutableStateOf(prefs.getBoolean("stanceOutfit", true))
+        private set
+
+    fun updateStanceOutfit(value: Boolean) {
+        stanceOutfit = value
+        prefs.edit().putBoolean("stanceOutfit", value).apply()
+    }
+
     // Let Triplets (at most one per outfit set) and Composer pick AI images too
     var includeAi by mutableStateOf(prefs.getBoolean("includeAi", false))
         private set

@@ -431,12 +431,14 @@ class Api(context: Context, val baseUrl: String) {
         personId: String?,
         skipSmall: Boolean,
         matchFaces: Boolean,
+        sameOutfit: Boolean,
     ): PhotoSet {
         val (text, headers) = callWithHeaders(
             "GET", endpoint,
             mapOf(
                 "offset" to offset, "include_ai" to includeAi, "count" to count, "solo" to solo,
                 "person_id" to personId, "skip_small" to skipSmall, "match_faces" to matchFaces,
+                "same_outfit" to sameOutfit,
             ),
         )
         return PhotoSet(
@@ -597,6 +599,23 @@ class Api(context: Context, val baseUrl: String) {
     /** The next page's low framer scores (worst first), photos older than [before]. */
     suspend fun uglyPhotos(before: String?) =
         get("/api/v1/photos/organize/ugly", UglyPage.serializer(), mapOf("before" to before))
+
+    // ---------- Grading ----------
+
+    suspend fun gradingPairs(limit: Int) = get("/api/v1/grading", GradingResponse.serializer(), mapOf("limit" to limit))
+
+    /** [winnerId] is hotter than [loserId]; returns the stored answer's id for Undo. */
+    suspend fun compare(winnerId: String, loserId: String) = send(
+        "POST", "/api/v1/grading/compare", CompareResponse.serializer(),
+        buildJsonObject {
+            put("winner_id", winnerId)
+            put("loser_id", loserId)
+        },
+    ).id
+
+    suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/grading/compare/$id")
+
+    suspend fun resetGrading() = send("DELETE", "/api/v1/grading", ClearedResponse.serializer())
 
     // ---------- Sharing ----------
 

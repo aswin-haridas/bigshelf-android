@@ -23,7 +23,9 @@ object Routes {
     const val ORGANIZE = "organize"
     const val PHOTO = "photos/{photoId}"
     const val TRIPLETS = "triplets"
+    const val STANCE = "stance"
     const val COMPOSER = "composer"
+    const val GRADING = "grading"
     // ?photo=<id>: open a library video (from the photo viewer)
     const val FRAMER = "framer?photo={photo}"
 

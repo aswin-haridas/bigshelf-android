@@ -83,7 +83,7 @@ private val BUCKETS = listOf(
  * Select all, Download all, and on Failed, Reprocess all.
  */
 @Composable
-fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
+fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicates: () -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -97,8 +97,6 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     BackHandler(tab != null, closeBucket)
     var downloading by remember { mutableStateOf(false) }
     var reprocessing by remember { mutableStateOf(false) }
-    // "Clean up" review of low-scoring photos, across the whole library (not the tab)
-    var cleaningUp by remember { mutableStateOf(false) }
 
     val bucket = tab?.let { query.data?.get(it) }
     val items = bucket?.items.orEmpty()
@@ -110,7 +108,6 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             count = bucket?.let { photoCount(it.count) },
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = if (tab != null) closeBucket else onBack, tint = BsColors.Foreground) },
         ) {
-            if (tab == null) BsIconButton(BsIcons.Sparkle, "Clean up", onClick = { cleaningUp = true })
             if (items.isNotEmpty()) {
                 if (tab == "failed") {
                     // Pushes each photo to the front of the pipeline queue
@@ -165,6 +162,8 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                     val b = query.data?.get(id)
                     CoverCard(label, photoCount(b?.count ?: 0), b?.items?.firstOrNull(), onClick = { tab = id }, icon = BsIcons.Funnel)
                 }
+                // Duplicates lives here too, as one more card next to the buckets
+                item(key = "duplicates") { CoverCard("Duplicates", null, null, onClick = onDuplicates, icon = BsIcons.Copy) }
             }
             items.isEmpty() -> EmptyState("Nothing here")
             else -> ImagesGrid(
@@ -175,7 +174,6 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             )
         }
     }
-    if (cleaningUp) CleanUpModal(onClose = { cleaningUp = false }, onOpenPhoto = onOpenPhoto)
 }
 
 /**
@@ -183,7 +181,7 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
  * framed) a page at a time. Every photo starts marked for the Bin; tap to keep, long-press to open.
  */
 @Composable
-private fun CleanUpModal(onClose: () -> Unit, onOpenPhoto: (String) -> Unit) {
+fun CleanUpModal(onClose: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     // ponytail: cursor lives only while the modal is open, so photos kept earlier come back next time
