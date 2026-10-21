@@ -86,6 +86,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Downloads
 import com.bigshelf.app.data.Photo
@@ -378,7 +380,9 @@ private fun PhotoPage(
                     }
                     if (!shown.isVideo && shown.url != null) {
                         AsyncImage(
-                            api.mediaUrl(shown.url),
+                            // No crossfade: the thumbnail is dropped on success, so a fade-in from
+                            // transparent would flash the black background for its 300ms
+                            ImageRequest.Builder(context).data(api.mediaUrl(shown.url)).crossfade(false).build(),
                             shown.title ?: shown.filename,
                             Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit,
