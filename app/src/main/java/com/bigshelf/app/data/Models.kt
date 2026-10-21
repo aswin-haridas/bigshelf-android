@@ -68,8 +68,10 @@ data class Photo(
     @SerialName("is_archived") val isArchived: Boolean = false,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
     @SerialName("is_video") val isVideo: Boolean = false,
-    // Framer score within a group (duplicate pair); the group's pick is marked best
+    // Framer score within a group (duplicate pair, burst); the group's pick is marked best
     val quality: PhotoQuality? = null,
+    // Auto tags, most likely first (detail only): scene labels and portrait / group / smiling
+    val tags: List<String>? = null,
     // Where it was taken (EXIF GPS) and camera details; null for older uploads
     val latitude: Double? = null,
     val longitude: Double? = null,
@@ -250,6 +252,13 @@ data class Burst(val id: String, val items: List<Photo> = emptyList())
 
 @Serializable
 data class BurstList(val groups: List<Burst> = emptyList(), val total: Int = 0)
+
+/** One auto tag ("Things"): how many photos carry it and the newest as cover. */
+@Serializable
+data class TagSummary(val tag: String, val count: Int = 0, val cover: Photo? = null)
+
+@Serializable
+data class TagList(val items: List<TagSummary> = emptyList())
 
 @Serializable
 data class FaceTagResult(

@@ -114,6 +114,7 @@ private fun Explore(onNavigate: (String) -> Unit) {
     val places = rememberQuery("places", invalidatedBy = setOf("photos")) { PlaceNames.places(context) }
     val events = rememberQuery("events-preview", invalidatedBy = setOf("photos")) { api.events(limit = 12) }
     val bursts = rememberQuery("bursts-count", invalidatedBy = setOf("photos")) { api.bursts(limit = 1).total }
+    val things = rememberQuery("tags", invalidatedBy = setOf("photos")) { api.tags() }
     val unorganized = rememberQuery("unorganized-count", invalidatedBy = setOf("photos", "albums")) {
         api.photos(1, size = 1, filter = PhotoFilter(unorganized = true)).total
     }
@@ -174,6 +175,23 @@ private fun Explore(onNavigate: (String) -> Unit) {
                 LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(list, key = { it.id }) { event ->
                         EventCard(event, onNavigate, Modifier.width(CARD))
+                    }
+                }
+            }
+        }
+        // Auto tags: scene labels (MobileCLIP) and people tags, busiest first
+        if (!things.data.isNullOrEmpty()) {
+            item(key = "things") {
+                SectionHeader("Things")
+                LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(things.data.orEmpty(), key = { it.tag }) { thing ->
+                        CoverCard(
+                            thing.tag.replaceFirstChar { it.uppercase() },
+                            photoCount(thing.count),
+                            thing.cover,
+                            onClick = { onNavigate(Routes.tag(thing.tag)) },
+                            Modifier.width(CARD),
+                        )
                     }
                 }
             }

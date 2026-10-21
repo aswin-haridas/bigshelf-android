@@ -264,9 +264,31 @@ fun ColorScreen(color: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit
     }
 }
 
+/** Photos carrying one auto tag ("Things"), newest first. */
+@Composable
+fun TagScreen(tag: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
+    val api = BigShelfApp.api
+    val feed = rememberPagedPhotos("tag", tag, invalidatedBy = setOf("photos")) { api.photosByTag(tag, it) }
+    Column(Modifier.fillMaxSize()) {
+        PageHeader(
+            tag.replaceFirstChar { it.uppercase() },
+            count = feed.total?.let(::photoCount),
+            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
+        )
+        ImagesGrid(
+            photos = feed.photos,
+            onOpen = { onOpenPhoto(it.id) },
+            fetchNextPage = feed::fetchNextPage,
+            hasNextPage = feed.hasNextPage,
+            isFetchingNextPage = feed.isFetching,
+            totalCount = feed.total,
+        )
+    }
+}
+
 /**
  * Bursts and runs of similar shots, newest first, with the best one marked (sharpness,
- * faces, framing - the Duplicates scorer). "Keep best" bins the rest, with Undo.
+ * faces, framing, eyes open and facing the camera - the Duplicates scorer). "Keep best" bins the rest, with Undo.
  */
 @Composable
 fun BurstsScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {

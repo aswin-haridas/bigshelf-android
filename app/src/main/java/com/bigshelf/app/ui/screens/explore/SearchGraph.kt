@@ -35,6 +35,9 @@ fun NavGraphBuilder.searchGraph(nav: NavHostController, onBack: () -> Unit, open
     composable(Routes.COLOR, arguments = listOf(navArgument("color") { type = NavType.StringType })) {
         ColorScreen(it.arguments?.getString("color").orEmpty(), onBack = onBack, onOpenPhoto = openPhoto)
     }
+    composable(Routes.TAG, arguments = listOf(navArgument("tag") { type = NavType.StringType })) {
+        TagScreen(it.arguments?.getString("tag").orEmpty(), onBack = onBack, onOpenPhoto = openPhoto)
+    }
     composable(Routes.BURSTS) { BurstsScreen(onBack = onBack, onOpenPhoto = openPhoto) }
     composable(
         Routes.FILTERED,

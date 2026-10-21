@@ -38,6 +38,7 @@ object Routes {
     const val EVENTS = "events"
     const val COLOR = "colors/{color}"
     const val BURSTS = "bursts"
+    const val TAG = "tags/{tag}"
     // Photos matching a smart filter (a place, a map cluster, an event, unorganized)
     const val FILTERED = "filtered?title={title}&from={from}&to={to}&bbox={bbox}&unorganized={unorganized}"
 
@@ -49,6 +50,7 @@ object Routes {
     fun framer(photoId: String? = null) = if (photoId == null) "framer" else "framer?photo=$photoId"
     fun album(id: String) = "albums/$id"
     fun color(name: String) = "colors/$name"
+    fun tag(name: String) = "tags/${Uri.encode(name)}"
     fun map(lat: Double? = null, lon: Double? = null) = if (lat == null || lon == null) "map" else "map?lat=$lat&lon=$lon"
     fun filtered(title: String, filter: com.bigshelf.app.data.PhotoFilter) = buildString {
         append("filtered?title=${Uri.encode(title)}")

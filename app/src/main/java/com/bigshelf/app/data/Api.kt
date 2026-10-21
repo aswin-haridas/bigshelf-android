@@ -270,6 +270,11 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun bursts(offset: Int = 0, limit: Int = 10) =
         get("/api/v1/photos/bursts", BurstList.serializer(), mapOf("offset" to offset, "limit" to limit))
 
+    suspend fun tags() = get("/api/v1/photos/tags", TagList.serializer()).items
+
+    suspend fun photosByTag(tag: String, page: Int) =
+        get("/api/v1/photos/tags/${Uri.encode(tag)}", PhotoPage.serializer(), mapOf("page" to page, "size" to PAGE_SIZE))
+
     suspend fun photosByColor(color: String, page: Int) =
         get("/api/v1/photos/by-color", PhotoPage.serializer(), mapOf("color" to color, "page" to page, "size" to PAGE_SIZE))
 

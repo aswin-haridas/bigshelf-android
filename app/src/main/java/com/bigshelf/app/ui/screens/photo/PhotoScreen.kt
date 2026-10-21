@@ -680,6 +680,11 @@ private fun InfoSheet(
                 )
             }
             image.exif?.let { camera -> CameraField(camera) }
+            image.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+                InfoField("Tags") {
+                    Text(tags.joinToString(" · ") { it.replaceFirstChar(Char::uppercase) }, style = BsText.Sm, color = BsColors.MutedSoft)
+                }
+            }
             if (image.latitude != null && image.longitude != null) {
                 LocationField(image.latitude, image.longitude, onMap = {
                     onDismiss()
