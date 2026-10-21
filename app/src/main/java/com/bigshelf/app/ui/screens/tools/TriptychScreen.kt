@@ -33,6 +33,7 @@ import coil3.request.ImageRequest
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Downloads
 import com.bigshelf.app.data.PhotoSet
+import com.bigshelf.app.data.ViewSettings
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.SelectionStore
 import com.bigshelf.app.state.ViewerList
@@ -55,6 +56,27 @@ import kotlinx.coroutines.launch
 const val TRIPTYCH_ENDPOINT = "/api/v1/triptych"
 const val TRIPLETS_ENDPOINT = "/api/v1/triplets"
 const val STANCE_ENDPOINT = "/api/v1/stance"
+
+/**
+ * The Settings options [endpoint] takes, as its query params (the web's endpointParams). Only
+ * the ones it reads, so an option for another view never resets this one's sets.
+ */
+private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
+    val common = mapOf<String, Any?>("include_ai" to s.includeAi)
+    return when (endpoint) {
+        TRIPLETS_ENDPOINT -> common + mapOf(
+            "count" to s.tripletCount, "solo" to s.tripletSolo, "similar_faces" to s.tripletMatchFaces,
+            "variety" to s.tripletVariety, "clear_lead" to s.tripletClearLead, "order" to s.tripletOrder,
+        )
+        TRIPTYCH_ENDPOINT -> common + mapOf(
+            // 0 = no limit
+            "min_size" to s.triptychMinSize, "max_size" to s.triptychMaxSize.takeIf { it > 0 },
+            "match_faces" to s.triptychFaces, "order" to s.tripletOrder,
+        )
+        STANCE_ENDPOINT -> common + ("same_outfit" to s.stanceOutfit)
+        else -> common
+    }
+}
 const val COMPOSER_ENDPOINT = "/api/v1/composer"
 
 // Upload both photos in order (the face photo first, then the outfit) with this prompt.
@@ -95,13 +117,8 @@ fun TriptychScreen(
 
     var offset by remember { mutableStateOf(lastOffset[endpoint] ?: 0) }
     var onlyPerson by remember { mutableStateOf(lastPerson[endpoint]) }
-    // Set size and solo only apply to random Triplets; skip-small and faces to outfit sets
-    val includeAi = settings.includeAi
-    val skipSmall = endpoint == TRIPTYCH_ENDPOINT && settings.triptychSkipSmall
-    val faces = endpoint == TRIPTYCH_ENDPOINT && settings.triptychFaces
-    val outfit = endpoint == STANCE_ENDPOINT && settings.stanceOutfit
-    val similar = endpoint == TRIPLETS_ENDPOINT && settings.tripletMatchFaces
-    val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit, similar)
+    // The endpoint's query params from Settings, plus the person filter; a change starts fresh sets
+    val options = setOptions(endpoint, settings) + ("person_id" to onlyPerson)
 
     // Sets by offset for the current options: the visible one plus the prefetched next one
     val cache = remember(options) { mutableStateMapOf<Int, PhotoSet>() }
@@ -112,9 +129,7 @@ fun TriptychScreen(
     // Keep the last set on screen while the next one loads (keepPreviousData)
     var shown by remember { mutableStateOf<PhotoSet?>(null) }
 
-    suspend fun fetch(at: Int) = api.photoSet(
-        endpoint, at, includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit, similar,
-    )
+    suspend fun fetch(at: Int) = api.photoSet(endpoint, at, options)
 
     fun moveTo(next: Int) {
         offset = next

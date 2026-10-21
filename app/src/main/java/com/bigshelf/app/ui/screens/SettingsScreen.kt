@@ -122,8 +122,8 @@ private fun Section(title: String, hint: String) {
     }
 }
 
-// Triplets set sizes, the web slider's range (3-6)
-private val SET_SIZES = (3..6).map { TabItem(it, "$it") }
+// Triplets set sizes, the web slider's range (2-9)
+private val SET_SIZES = (2..9).map { TabItem(it, "$it") }
 
 /** People hidden with Skip on Triplets, each with an Unskip to bring them back. */
 @Composable
@@ -184,6 +184,27 @@ private fun SkippedPeople() {
 }
 
 /** Port of modules/settings/settings.tsx. */
+// Outfit sets' "Largest set" choices; 0 = no limit
+private val MAX_SIZES = listOf(TabItem(0, "Any")) + listOf(3, 4, 5, 6, 8, 10, 12).map { TabItem(it, "$it") }
+private val ORDERS = listOf(
+    TabItem("newest", "Newest"), TabItem("oldest", "Oldest"), TabItem("best", "Best"), TabItem("random", "Shuffle"),
+)
+
+/** Label + hint over a full-width segmented control (sizes, order), a divider above it. */
+@Composable
+private fun TabsRow(label: String, hint: String, content: @Composable () -> Unit) {
+    Column(
+        Modifier.divider(true).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column {
+            Text(label, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+            Text(hint, style = BsText.Xs, color = BsColors.Muted)
+        }
+        content()
+    }
+}
+
 /** The Triplets options card, shared by Settings and the gear on the Triplets page. */
 @Composable
 fun TripletSettingsCard() {
@@ -197,13 +218,15 @@ fun TripletSettingsCard() {
         // Outfit sets and random sets each have their own options
         if (settings.tripletOutfit) {
             ToggleRow(
-                "Skip small sets", "Leave out sets of 3 or fewer photos.",
-                settings.triptychSkipSmall, settings::updateTriptychSkipSmall, divider = true,
-            )
-            ToggleRow(
                 "Split by face", "Never put two different tagged people in one set.",
                 settings.triptychFaces, settings::updateTriptychFaces, divider = true,
             )
+            TabsRow("Smallest set", "Leave out sets with fewer photos than this.") {
+                BsTabs(SET_SIZES, settings.triptychMinSize, settings::updateTriptychMinSize)
+            }
+            TabsRow("Largest set", "Show only the best-framed photos of a bigger set.") {
+                BsTabs(MAX_SIZES, settings.triptychMaxSize, settings::updateTriptychMaxSize)
+            }
         } else {
             ToggleRow(
                 "Solo photos only", "Skip group photos with other tagged people.",
@@ -213,16 +236,24 @@ fun TripletSettingsCard() {
                 "Match faces", "Fill each set with photos where the face looks most like the first one.",
                 settings.tripletMatchFaces, settings::updateTripletMatchFaces, divider = true,
             )
-            Column(
-                Modifier.divider(true).padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column {
-                    Text("Photos per set", style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
-                    Text("People with fewer photos than this are left out.", style = BsText.Xs, color = BsColors.Muted)
-                }
+            ToggleRow(
+                "Different scenes", "Spread each set across places and shoots. Off allows one scene's photos together.",
+                settings.tripletVariety, settings::updateTripletVariety, divider = true,
+            )
+            ToggleRow(
+                "Clear face first", "Lead with a big, sharp, typical face. Off lays the whole set out in order.",
+                settings.tripletClearLead, settings::updateTripletClearLead, divider = true,
+            )
+            TabsRow("Photos per set", "People with fewer photos than this are left out.") {
                 BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
             }
+        }
+        TabsRow(
+            "Order",
+            if (settings.tripletOutfit || !settings.tripletClearLead) "How the photos of a set are laid out."
+            else "How the photos after the clear face are laid out.",
+        ) {
+            BsTabs(ORDERS, settings.tripletOrder, settings::updateTripletOrder)
         }
     }
 }

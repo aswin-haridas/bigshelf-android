@@ -40,13 +40,25 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("tripletOutfit", value).apply()
     }
 
-    // Outfit sets: leave out sets of 3 or fewer photos. Off by default.
-    var triptychSkipSmall by mutableStateOf(prefs.getBoolean("triptychSkipSmall", false))
+    // Outfit sets: leave out sets smaller than this (2-9); 2 shows every set. Replaces the old
+    // "Skip small sets" toggle, so a phone that had it on starts at 4.
+    var triptychMinSize by mutableStateOf(
+        prefs.getInt("triptychMinSize", if (prefs.getBoolean("triptychSkipSmall", false)) 4 else 2),
+    )
         private set
 
-    fun updateTriptychSkipSmall(value: Boolean) {
-        triptychSkipSmall = value
-        prefs.edit().putBoolean("triptychSkipSmall", value).apply()
+    fun updateTriptychMinSize(value: Int) {
+        triptychMinSize = value
+        prefs.edit().putInt("triptychMinSize", value).apply()
+    }
+
+    // Outfit sets: show at most this many photos of a set, its best-framed ones. 0 = no limit.
+    var triptychMaxSize by mutableStateOf(prefs.getInt("triptychMaxSize", 0))
+        private set
+
+    fun updateTriptychMaxSize(value: Int) {
+        triptychMaxSize = value
+        prefs.edit().putInt("triptychMaxSize", value).apply()
     }
 
     // Outfit sets: never put two different tagged people in one set. Off by default.
@@ -76,7 +88,7 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("includeAi", value).apply()
     }
 
-    // Photos per random Triplets set (3-6); outfit sets are sized by the outfit
+    // Photos per random Triplets set (2-9); outfit sets are sized by the outfit
     var tripletCount by mutableStateOf(prefs.getInt("tripletCount", 3))
         private set
 
@@ -101,5 +113,32 @@ class ViewSettings(context: Context) {
     fun updateTripletMatchFaces(value: Boolean) {
         tripletMatchFaces = value
         prefs.edit().putBoolean("tripletMatchFaces", value).apply()
+    }
+
+    // Random Triplets spread each set across scenes. On by default; off allows one scene's photos together.
+    var tripletVariety by mutableStateOf(prefs.getBoolean("tripletVariety", true))
+        private set
+
+    fun updateTripletVariety(value: Boolean) {
+        tripletVariety = value
+        prefs.edit().putBoolean("tripletVariety", value).apply()
+    }
+
+    // Random Triplets lead with a clear face (big, sharp, typical). On by default; off orders the whole set.
+    var tripletClearLead by mutableStateOf(prefs.getBoolean("tripletClearLead", true))
+        private set
+
+    fun updateTripletClearLead(value: Boolean) {
+        tripletClearLead = value
+        prefs.edit().putBoolean("tripletClearLead", value).apply()
+    }
+
+    // Order of a set's photos (newest / oldest / best / random), random and outfit sets alike
+    var tripletOrder by mutableStateOf(prefs.getString("tripletOrder", "newest") ?: "newest")
+        private set
+
+    fun updateTripletOrder(value: String) {
+        tripletOrder = value
+        prefs.edit().putString("tripletOrder", value).apply()
     }
 }

@@ -422,27 +422,9 @@ class Api(context: Context, val baseUrl: String) {
      * One set from [endpoint] (`/api/v1/triptych`, `/triplets`, `/composer`), with the person it
      * shows from the X-Person-* headers. Each endpoint ignores the params it doesn't use.
      */
-    suspend fun photoSet(
-        endpoint: String,
-        offset: Int,
-        includeAi: Boolean,
-        count: Int,
-        solo: Boolean,
-        personId: String?,
-        skipSmall: Boolean,
-        matchFaces: Boolean,
-        sameOutfit: Boolean,
-        // Random Triplets only; not `match_faces`, which is the outfit sets' "Split by face"
-        similarFaces: Boolean,
-    ): PhotoSet {
-        val (text, headers) = callWithHeaders(
-            "GET", endpoint,
-            mapOf(
-                "offset" to offset, "include_ai" to includeAi, "count" to count, "solo" to solo,
-                "person_id" to personId, "skip_small" to skipSmall, "match_faces" to matchFaces,
-                "same_outfit" to sameOutfit, "similar_faces" to similarFaces,
-            ),
-        )
+    suspend fun photoSet(endpoint: String, offset: Int, options: Map<String, Any?>): PhotoSet {
+        // [options] are the endpoint's own query params (setOptions in TriptychScreen)
+        val (text, headers) = callWithHeaders("GET", endpoint, options + ("offset" to offset))
         return PhotoSet(
             photos = json.decodeFromString(ListSerializer(Photo.serializer()), text),
             personId = headers["x-person-id"],
