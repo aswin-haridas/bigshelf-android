@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -55,7 +56,9 @@ import com.bigshelf.app.ui.screens.ArchiveScreen
 import com.bigshelf.app.ui.screens.BackupScreen
 import com.bigshelf.app.ui.screens.BinScreen
 import com.bigshelf.app.ui.screens.HomeScreen
+import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.screens.SettingsScreen
+import com.bigshelf.app.ui.screens.TripletSettingsCard
 import com.bigshelf.app.ui.screens.SharingScreen
 import com.bigshelf.app.ui.screens.explore.searchGraph
 import com.bigshelf.app.ui.screens.people.FacePhotosScreen
@@ -304,6 +307,8 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
             // Match outfit (default) uses the triptych grouping; off, random photos of one person.
             // Downloading moves the photos to Archive (when on in Settings)
             val settings = BigShelfApp.settings
+            // Outside the key below, so flipping Match outfit in it doesn't close the modal
+            var editingSettings by remember { mutableStateOf(false) }
             // Keyed so switching modes starts that endpoint's state fresh
             key(settings.tripletOutfit) {
                 TriptychScreen(
@@ -311,7 +316,14 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                     if (settings.tripletOutfit) "All similar photos of one outfit" else "${settings.tripletCount} photos of the same person",
                     if (settings.tripletOutfit) TRIPTYCH_ENDPOINT else TRIPLETS_ENDPOINT,
                     onBack = onBack, onOpenPhoto = openPhoto,
+                    onSettings = { editingSettings = true },
                 )
+            }
+            // The same options as the Triplets section of Settings
+            if (editingSettings) {
+                BsModal(title = "Triplets settings", onClose = { editingSettings = false }) {
+                    TripletSettingsCard()
+                }
             }
         }
         composable(Routes.STANCE) {

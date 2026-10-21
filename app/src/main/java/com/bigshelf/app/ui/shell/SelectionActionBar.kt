@@ -57,6 +57,9 @@ import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.Neutral
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import com.bigshelf.app.ui.screens.sendLink
 import com.bigshelf.app.data.userMessage
@@ -205,6 +208,12 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                         runBulk("untag", { "Untagged ${plural(it)}" }, "Failed to untag photos") {
                             if (api.untagPhotos(personId, it).personDeleted) onPersonGone()
                         }
+                    }
+                }
+                // No bulk endpoint: one PATCH per photo, in parallel (the web does the same)
+                Action("mark-ai", BsIcons.FlowerTulip, "Mark AI") {
+                    runBulk("mark-ai", { "${plural(it)} marked as AI" }, "Failed to mark photos as AI") { ids ->
+                        coroutineScope { ids.map { async { api.markAi(it, true) } }.awaitAll() }
                     }
                 }
                 Action("share", BsIcons.ShareNetwork, "Share") {

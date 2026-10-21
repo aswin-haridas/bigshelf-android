@@ -184,6 +184,49 @@ private fun SkippedPeople() {
 }
 
 /** Port of modules/settings/settings.tsx. */
+/** The Triplets options card, shared by Settings and the gear on the Triplets page. */
+@Composable
+fun TripletSettingsCard() {
+    val settings = BigShelfApp.settings
+    SettingsCard {
+        ToggleRow("AI images", "Let Triplets pick AI images, at most one per outfit set.", settings.includeAi, settings::updateIncludeAi)
+        ToggleRow(
+            "Match outfit", "Group every photo of one outfit and scene. Off picks random photos.",
+            settings.tripletOutfit, settings::updateTripletOutfit, divider = true,
+        )
+        // Outfit sets and random sets each have their own options
+        if (settings.tripletOutfit) {
+            ToggleRow(
+                "Skip small sets", "Leave out sets of 3 or fewer photos.",
+                settings.triptychSkipSmall, settings::updateTriptychSkipSmall, divider = true,
+            )
+            ToggleRow(
+                "Split by face", "Never put two different tagged people in one set.",
+                settings.triptychFaces, settings::updateTriptychFaces, divider = true,
+            )
+        } else {
+            ToggleRow(
+                "Solo photos only", "Skip group photos with other tagged people.",
+                settings.tripletSolo, settings::updateTripletSolo, divider = true,
+            )
+            ToggleRow(
+                "Match faces", "Fill each set with photos where the face looks most like the first one.",
+                settings.tripletMatchFaces, settings::updateTripletMatchFaces, divider = true,
+            )
+            Column(
+                Modifier.divider(true).padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column {
+                    Text("Photos per set", style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+                    Text("People with fewer photos than this are left out.", style = BsText.Xs, color = BsColors.Muted)
+                }
+                BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val api = BigShelfApp.api
@@ -227,39 +270,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Section("Triplets", "How Triplets picks each set of one person's photos.")
-            SettingsCard {
-                ToggleRow("AI images", "Let Triplets pick AI images, at most one per outfit set.", settings.includeAi, settings::updateIncludeAi)
-                ToggleRow(
-                    "Match outfit", "Group every photo of one outfit and scene. Off picks random photos.",
-                    settings.tripletOutfit, settings::updateTripletOutfit, divider = true,
-                )
-                // Outfit sets and random sets each have their own options
-                if (settings.tripletOutfit) {
-                    ToggleRow(
-                        "Skip small sets", "Leave out sets of 3 or fewer photos.",
-                        settings.triptychSkipSmall, settings::updateTriptychSkipSmall, divider = true,
-                    )
-                    ToggleRow(
-                        "Split by face", "Never put two different tagged people in one set.",
-                        settings.triptychFaces, settings::updateTriptychFaces, divider = true,
-                    )
-                } else {
-                    ToggleRow(
-                        "Solo photos only", "Skip group photos with other tagged people.",
-                        settings.tripletSolo, settings::updateTripletSolo, divider = true,
-                    )
-                    Column(
-                        Modifier.divider(true).padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Column {
-                            Text("Photos per set", style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
-                            Text("People with fewer photos than this are left out.", style = BsText.Xs, color = BsColors.Muted)
-                        }
-                        BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
-                    }
-                }
-            }
+            TripletSettingsCard()
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -93,4 +93,13 @@ class ViewSettings(context: Context) {
         tripletSolo = value
         prefs.edit().putBoolean("tripletSolo", value).apply()
     }
+
+    // Random Triplets fill the set with the faces most like the first photo's. Off by default.
+    var tripletMatchFaces by mutableStateOf(prefs.getBoolean("tripletMatchFaces", false))
+        private set
+
+    fun updateTripletMatchFaces(value: Boolean) {
+        tripletMatchFaces = value
+        prefs.edit().putBoolean("tripletMatchFaces", value).apply()
+    }
 }

@@ -85,6 +85,8 @@ fun TriptychScreen(
     onBack: () -> Unit,
     onOpenPhoto: (String) -> Unit,
     prompt: String? = null,
+    // Shows a gear in the header (Triplets: its settings, edited in place)
+    onSettings: (() -> Unit)? = null,
 ) {
     val api = BigShelfApp.api
     val settings = BigShelfApp.settings
@@ -98,7 +100,8 @@ fun TriptychScreen(
     val skipSmall = endpoint == TRIPTYCH_ENDPOINT && settings.triptychSkipSmall
     val faces = endpoint == TRIPTYCH_ENDPOINT && settings.triptychFaces
     val outfit = endpoint == STANCE_ENDPOINT && settings.stanceOutfit
-    val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit)
+    val similar = endpoint == TRIPLETS_ENDPOINT && settings.tripletMatchFaces
+    val options = listOf(includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit, similar)
 
     // Sets by offset for the current options: the visible one plus the prefetched next one
     val cache = remember(options) { mutableStateMapOf<Int, PhotoSet>() }
@@ -110,7 +113,7 @@ fun TriptychScreen(
     var shown by remember { mutableStateOf<PhotoSet?>(null) }
 
     suspend fun fetch(at: Int) = api.photoSet(
-        endpoint, at, includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit,
+        endpoint, at, includeAi, settings.tripletCount, settings.tripletSolo, onlyPerson, skipSmall, faces, outfit, similar,
     )
 
     fun moveTo(next: Int) {
@@ -214,6 +217,7 @@ fun TriptychScreen(
             count = subtitle,
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
         ) {
+            if (onSettings != null) BsIconButton(BsIcons.Gear, "${title} settings", onClick = onSettings)
             BsIconButton(BsIcons.Funnel, "Only this person", onClick = { picking = true }, active = onlyPerson != null)
             if (prompt != null) {
                 BsIconButton(BsIcons.Copy, "Copy prompt", onClick = {

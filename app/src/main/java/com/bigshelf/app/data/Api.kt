@@ -432,13 +432,15 @@ class Api(context: Context, val baseUrl: String) {
         skipSmall: Boolean,
         matchFaces: Boolean,
         sameOutfit: Boolean,
+        // Random Triplets only; not `match_faces`, which is the outfit sets' "Split by face"
+        similarFaces: Boolean,
     ): PhotoSet {
         val (text, headers) = callWithHeaders(
             "GET", endpoint,
             mapOf(
                 "offset" to offset, "include_ai" to includeAi, "count" to count, "solo" to solo,
                 "person_id" to personId, "skip_small" to skipSmall, "match_faces" to matchFaces,
-                "same_outfit" to sameOutfit,
+                "same_outfit" to sameOutfit, "similar_faces" to similarFaces,
             ),
         )
         return PhotoSet(
