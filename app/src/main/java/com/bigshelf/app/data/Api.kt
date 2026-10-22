@@ -245,10 +245,13 @@ class Api(context: Context, val baseUrl: String) {
 
     // ---------- Photos ----------
 
-    suspend fun photos(page: Int, favorite: Boolean? = null, size: Int = PAGE_SIZE, filter: PhotoFilter? = null) =
+    // A [cursor] (PhotoPage.nextCursor) takes over from [page] on Home, Bin and Archive
+    suspend fun photos(
+        page: Int, favorite: Boolean? = null, size: Int = PAGE_SIZE, filter: PhotoFilter? = null, cursor: String? = null,
+    ) =
         get(
             "/api/v1/photos", PhotoPage.serializer(),
-            mapOf("page" to page, "size" to size, "favorite" to favorite) + filterParams(filter),
+            mapOf("page" to page, "size" to size, "favorite" to favorite, "cursor" to cursor) + filterParams(filter),
         )
 
     private fun filterParams(filter: PhotoFilter?): Map<String, Any?> = mapOf(
@@ -283,15 +286,18 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun photo(id: String) = get("/api/v1/photos/$id", Photo.serializer())
 
-    suspend fun bin(page: Int, size: Int = PAGE_SIZE) =
-        get("/api/v1/photos/bin", PhotoPage.serializer(), mapOf("page" to page, "size" to size))
+    suspend fun bin(page: Int, size: Int = PAGE_SIZE, cursor: String? = null) =
+        get("/api/v1/photos/bin", PhotoPage.serializer(), mapOf("page" to page, "size" to size, "cursor" to cursor))
 
     suspend fun emptyBin() = send("POST", "/api/v1/photos/bin/empty", CountResponse.serializer())
 
     suspend fun archiveFolders() = get("/api/v1/photos/archive/folders", ListSerializer(ArchiveFolder.serializer()))
 
-    suspend fun archivePhotos(folder: String, page: Int) =
-        get("/api/v1/photos/archive", PhotoPage.serializer(), mapOf("folder" to folder, "page" to page, "size" to PAGE_SIZE))
+    suspend fun archivePhotos(folder: String, page: Int, cursor: String? = null) =
+        get(
+            "/api/v1/photos/archive", PhotoPage.serializer(),
+            mapOf("folder" to folder, "page" to page, "size" to PAGE_SIZE, "cursor" to cursor),
+        )
 
     suspend fun folderAction(folder: String, delete: Boolean) = send(
         "POST",

@@ -112,11 +112,14 @@ data class CompareResponse(val id: String)
 @Serializable
 data class PhotoPage(
     val items: List<Photo> = emptyList(),
+    // Only the first page is counted on cursor lists; later ones send null, read as 0
     val total: Int = 0,
     val page: Int = 1,
     val size: Int = 50,
+    // Next page's cursor (Home, Bin, Archive); null on the last page and on number-paged lists
+    @SerialName("next_cursor") val nextCursor: String? = null,
 ) {
-    val hasNext get() = page * size < total
+    val hasNext get() = nextCursor != null || page * size < total
 }
 
 @Serializable

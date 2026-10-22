@@ -66,7 +66,7 @@ private fun countLabel(n: Int, noun: String) = "$n ${if (n == 1) noun else "${no
 fun BinScreen(onOpenPhoto: (String) -> Unit, onBack: () -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
-    val feed = rememberPagedPhotos("bin", invalidatedBy = setOf("bin-photos")) { api.bin(it) }
+    val feed = rememberPagedPhotos("bin", invalidatedBy = setOf("bin-photos")) { page, cursor -> api.bin(page, cursor = cursor) }
     var emptying by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
     val total = feed.total ?: feed.photos.size
@@ -278,7 +278,7 @@ private fun FolderCard(folder: ArchiveFolder, busyAction: String?, onOpen: () ->
 @Composable
 fun ArchiveFolderScreen(folder: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
-    val feed = rememberPagedPhotos("archive", folder, invalidatedBy = setOf("archive-photos")) { api.archivePhotos(folder, it) }
+    val feed = rememberPagedPhotos("archive", folder, invalidatedBy = setOf("archive-photos")) { page, cursor -> api.archivePhotos(folder, page, cursor) }
     Column(Modifier.fillMaxSize()) {
         PageHeader(
             folderLabel(folder),

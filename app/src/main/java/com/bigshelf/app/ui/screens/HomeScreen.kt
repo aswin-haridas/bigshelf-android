@@ -52,7 +52,7 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
         q = search.trim()
     }
 
-    val feed = rememberPagedPhotos("home", invalidatedBy = setOf("photos")) { page -> api.photos(page) }
+    val feed = rememberPagedPhotos("home", invalidatedBy = setOf("photos")) { page, cursor -> api.photos(page, cursor = cursor) }
     val textSearch = rememberQuery("search", q, invalidatedBy = setOf("photos")) {
         if (q.isEmpty()) emptyList() else api.searchPhotos(q)
     }

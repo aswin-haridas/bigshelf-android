@@ -154,7 +154,7 @@ fun AlbumScreen(albumId: String, onBack: () -> Unit, onNavigate: (String) -> Uni
     val scope = rememberCoroutineScope()
     val album = rememberQuery("album", albumId, invalidatedBy = setOf("albums")) { api.album(albumId) }
     val children = rememberQuery("album-children", albumId, invalidatedBy = setOf("albums")) { api.albums(parentId = albumId) }
-    val feed = rememberPagedPhotos("album", albumId, invalidatedBy = setOf("albums", "photos")) { api.albumPhotos(albumId, it) }
+    val feed = rememberPagedPhotos("album", albumId, invalidatedBy = setOf("albums", "photos")) { page, _ -> api.albumPhotos(albumId, page) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
     val title = album.data?.title ?: "Album"

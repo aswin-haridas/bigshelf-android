@@ -54,8 +54,12 @@ fun <T> rememberQuery(vararg keys: Any?, invalidatedBy: Set<String>, fetch: susp
     return query
 }
 
-/** Infinite photo feed (web `usePhotoPages`): page/size params, 50 per page. */
-class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (page: Int) -> PhotoPage) {
+/**
+ * Infinite photo feed (web `usePhotoPages`), 50 per page. [load] gets the page number and,
+ * after the first page of a list that returns one, the next page's cursor (send that
+ * instead: deep pages then skip the server's count and offset scan).
+ */
+class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (page: Int, cursor: String?) -> PhotoPage) {
     var photos by mutableStateOf<List<Photo>>(emptyList())
         private set
     var total by mutableStateOf<Int?>(null)
@@ -65,6 +69,7 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
     var isFetching by mutableStateOf(true)
         private set
     private var page = 0
+    private var cursor: String? = null
     private var job: Job? = null
 
     /** Reloads from page 1 (an invalidation); the old photos stay up until it lands. */
@@ -73,10 +78,11 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
         job = scope.launch {
             isFetching = true
             try {
-                val first = load(1)
+                val first = load(1, null)
                 photos = first.items
                 total = first.total
                 hasNextPage = first.hasNext
+                cursor = first.nextCursor
                 page = 1
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -92,10 +98,12 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
         job = scope.launch {
             isFetching = true
             try {
-                val next = load(page + 1)
+                val next = load(page + 1, cursor)
                 photos = photos + next.items.filter { n -> photos.none { it.id == n.id } }
-                total = next.total
+                // Cursor pages aren't counted: keep the first page's total
+                if (next.nextCursor == null && cursor == null) total = next.total
                 hasNextPage = next.hasNext
+                cursor = next.nextCursor
                 page += 1
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -113,7 +121,7 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
 }
 
 @Composable
-fun rememberPagedPhotos(vararg keys: Any?, invalidatedBy: Set<String>, load: suspend (page: Int) -> PhotoPage): PagedPhotos {
+fun rememberPagedPhotos(vararg keys: Any?, invalidatedBy: Set<String>, load: suspend (page: Int, cursor: String?) -> PhotoPage): PagedPhotos {
     val scope = rememberCoroutineScope()
     val paged = remember(*keys) { PagedPhotos(scope, load) }
     LaunchedEffect(paged) {

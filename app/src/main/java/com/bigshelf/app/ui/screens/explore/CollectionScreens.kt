@@ -199,7 +199,7 @@ fun EventsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
 @Composable
 fun FilteredPhotosScreen(title: String, filter: PhotoFilter, onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onNavigate: (String) -> Unit) {
     val api = BigShelfApp.api
-    val feed = rememberPagedPhotos("filtered", filter, invalidatedBy = setOf("photos", "albums")) { api.photos(it, filter = filter) }
+    val feed = rememberPagedPhotos("filtered", filter, invalidatedBy = setOf("photos", "albums")) { page, cursor -> api.photos(page, filter = filter, cursor = cursor) }
     var saving by remember { mutableStateOf(false) }
     val allSelected = feed.photos.isNotEmpty() && feed.photos.all { SelectionStore.isSelected(it.id) }
 
@@ -244,7 +244,7 @@ fun FilteredPhotosScreen(title: String, filter: PhotoFilter, onBack: () -> Unit,
 @Composable
 fun ColorScreen(color: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
-    val feed = rememberPagedPhotos("color", color, invalidatedBy = setOf("photos")) { api.photosByColor(color, it) }
+    val feed = rememberPagedPhotos("color", color, invalidatedBy = setOf("photos")) { page, _ -> api.photosByColor(color, page) }
     Column(Modifier.fillMaxSize()) {
         PageHeader(
             colorLabel(color),
@@ -268,7 +268,7 @@ fun ColorScreen(color: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit
 @Composable
 fun TagScreen(tag: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
-    val feed = rememberPagedPhotos("tag", tag, invalidatedBy = setOf("photos")) { api.photosByTag(tag, it) }
+    val feed = rememberPagedPhotos("tag", tag, invalidatedBy = setOf("photos")) { page, _ -> api.photosByTag(tag, page) }
     Column(Modifier.fillMaxSize()) {
         PageHeader(
             tag.replaceFirstChar { it.uppercase() },
