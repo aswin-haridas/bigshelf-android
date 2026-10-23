@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.size
@@ -165,6 +169,8 @@ fun AppShell() {
                 .weight(1f)
                 .fillMaxWidth()
                 .statusBarsPadding()
+                // Landscape: keep the punch-hole camera off the grid (viewer stays full-bleed)
+                .then(if (fullScreen) Modifier else Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)))
                 .then(if (selecting || floating) Modifier else Modifier.navigationBarsPadding()),
         ) {
             CompositionLocalProvider(LocalBottomBarInset provides if (floating) navInset + 84.dp else 0.dp) {

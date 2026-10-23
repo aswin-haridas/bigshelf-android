@@ -16,18 +16,18 @@ val Sans = FontFamily(
 )
 
 /**
- * Type scale in Inter, sized for phones: nothing under 12sp, 14sp secondary text, 16sp body,
- * 24sp page titles. Names follow the web's `--text-*` tokens.
+ * Type scale in Inter, sized for compact phones (~384dp wide, e.g. Galaxy S23): nothing under
+ * 12sp, 14sp secondary text, 15sp body, 22sp page titles. Names follow the web's `--text-*` tokens.
  */
 object BsText {
     val Xs2 = TextStyle(fontFamily = Sans, fontSize = 12.sp, lineHeight = 16.sp) // text-2xs  -> M3 labelMedium
     val Xs = TextStyle(fontFamily = Sans, fontSize = 14.sp, lineHeight = 20.sp) // text-xs   -> M3 bodyMedium
-    val Sm = TextStyle(fontFamily = Sans, fontSize = 16.sp, lineHeight = 24.sp) // text-sm   -> M3 bodyLarge
+    val Sm = TextStyle(fontFamily = Sans, fontSize = 15.sp, lineHeight = 22.sp) // text-sm   -> M3 bodyLarge
     val Base = TextStyle(fontFamily = Sans, fontSize = 16.sp, lineHeight = 24.sp) // text-base -> M3 bodyLarge
-    val Lg = TextStyle(fontFamily = Sans, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.02).em) // text-lg (page titles) -> M3 titleLarge
-    val Xl = TextStyle(fontFamily = Sans, fontSize = 24.sp, lineHeight = 32.sp) // text-xl   -> M3 headlineSmall
-    val Xl2 = TextStyle(fontFamily = Sans, fontSize = 28.sp, lineHeight = 36.sp) // text-2xl  -> M3 headlineMedium
-    val Xl4 = TextStyle(fontFamily = Sans, fontSize = 36.sp, lineHeight = 44.sp) // text-4xl  -> M3 displaySmall
+    val Lg = TextStyle(fontFamily = Sans, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.02).em) // text-lg (page titles) -> M3 titleLarge
+    val Xl = TextStyle(fontFamily = Sans, fontSize = 22.sp, lineHeight = 28.sp) // text-xl   -> M3 headlineSmall
+    val Xl2 = TextStyle(fontFamily = Sans, fontSize = 26.sp, lineHeight = 32.sp) // text-2xl  -> M3 headlineMedium
+    val Xl4 = TextStyle(fontFamily = Sans, fontSize = 32.sp, lineHeight = 40.sp) // text-4xl  -> M3 displaySmall
 
     /** `tracking-tight` */
     val TrackingTight = (-0.025).em
