@@ -16,8 +16,8 @@ android {
         applicationId = "com.bigshelf.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "1.18.0"
+        versionCode = 24
+        versionName = "1.19.0"
         buildConfigField("String", "API_URL", "\"$apiUrl\"")
     }
 

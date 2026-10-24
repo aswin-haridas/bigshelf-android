@@ -22,6 +22,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,6 +39,7 @@ import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Backup
 import com.bigshelf.app.data.BackupWorker
 import com.bigshelf.app.data.SystemStats
+import com.bigshelf.app.data.Updater
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIconButton
@@ -111,6 +114,32 @@ private fun ToggleRow(label: String, hint: String?, checked: Boolean, onChange: 
 @Composable
 private fun SectionTitle(title: String) {
     Text(title, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+}
+
+/**
+ * Self-update status. Android lets an app install its own updates only after "Install unknown
+ * apps" is switched on for it once; Allow opens that page. From then on updates install silently.
+ */
+@Composable
+private fun AutoUpdateRow() {
+    val context = LocalContext.current
+    // Re-read on return from the system page, where the switch is flipped
+    var allowed by remember { mutableStateOf(Updater.canInstall(context)) }
+    LifecycleResumeEffect(Unit) {
+        allowed = Updater.canInstall(context)
+        onPauseOrDispose {}
+    }
+    SettingRow(
+        "Automatic updates",
+        if (allowed) "New versions install in the background on Wi-Fi" else "Allow installing updates once to turn on",
+        Modifier.divider(true),
+    ) {
+        if (!allowed) {
+            BsButton(onClick = { context.startActivity(Updater.allowIntent(context)) }, variant = ButtonVariant.Secondary) {
+                Text("Allow")
+            }
+        }
+    }
 }
 
 /** Section title with a one-line explanation under it. */
@@ -363,6 +392,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         Text("Regenerate")
                     }
                 }
+                if (Updater.supported()) AutoUpdateRow()
             }
         }
         Box(Modifier.height(8.dp))

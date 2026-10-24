@@ -8,6 +8,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import com.bigshelf.app.data.Api
 import com.bigshelf.app.data.Backup
+import com.bigshelf.app.data.Updater
 import com.bigshelf.app.data.ViewSettings
 
 class BigShelfApp : Application(), SingletonImageLoader.Factory {
@@ -16,6 +17,7 @@ class BigShelfApp : Application(), SingletonImageLoader.Factory {
         api = Api(this, BuildConfig.API_URL)
         settings = ViewSettings(this)
         backup = Backup(this)
+        Updater.schedule(this)
     }
 
     // Images go through the API client so media served by the backend gets the auth header;
