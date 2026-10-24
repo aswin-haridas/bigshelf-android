@@ -8,6 +8,7 @@ import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -126,7 +127,9 @@ object Updater {
 class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         // Failures (offline, GitHub rate limit) just wait for the next run
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) runCatching { Updater.run(applicationContext) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching { Updater.run(applicationContext) }.onFailure { Log.w("Updater", "Update check failed", it) }
+        }
         return Result.success()
     }
 }
