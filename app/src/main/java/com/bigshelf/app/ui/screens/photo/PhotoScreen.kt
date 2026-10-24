@@ -349,7 +349,7 @@ private fun PhotoPage(
         PhotoEvents.invalidations.collect { if ("photo" in it) refresh++ }
     }
 
-    // Until the detail lands, the grid item's (already cached) thumbnail stands in
+    // Until the detail lands, the grid item stands in so a skeleton (not "not found") shows
     val shown = image ?: gridPhoto.takeIf { it.thumbnailUrl != null }
     val context = LocalContext.current
 
@@ -370,23 +370,28 @@ private fun PhotoPage(
         ) {
             when {
                 shown != null -> {
-                    // The 3:4 grid thumbnail stands in until the original loads, then steps aside -
-                    // its crop differs, so leaving it underneath would show around the photo
+                    // Photos go straight to the original, never the thumbnail first: a skeleton
+                    // covers the wait (pressing the grid tile prefetches it). Videos show their
+                    // poster frame.
                     var originalLoaded by remember(shown.url) { mutableStateOf(false) }
-                    if (!originalLoaded || shown.isVideo) {
+                    if (shown.isVideo) {
                         shown.thumbnailUrl?.let {
                             AsyncImage(api.mediaUrl(it), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         }
+                    } else if (!originalLoaded) {
+                        Skeleton(Modifier.fillMaxSize())
                     }
                     if (!shown.isVideo && shown.url != null) {
                         AsyncImage(
-                            // No crossfade: the thumbnail is dropped on success, so a fade-in from
+                            // No crossfade: the skeleton is dropped on success, so a fade-in from
                             // transparent would flash the black background for its 300ms
                             ImageRequest.Builder(context).data(api.mediaUrl(shown.url)).crossfade(false).build(),
                             shown.title ?: shown.filename,
                             Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit,
                             onSuccess = { originalLoaded = true },
+                            // Drop the skeleton on a failed load too
+                            onError = { originalLoaded = true },
                         )
                     }
                     if (shown.isVideo) {

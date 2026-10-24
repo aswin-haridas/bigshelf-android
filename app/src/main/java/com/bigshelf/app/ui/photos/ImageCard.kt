@@ -9,6 +9,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,14 +22,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.ui.components.BsIcon
@@ -37,6 +45,8 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsMotion
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Port of modules/common/components/image-card.tsx: sharp-cornered 3:4 tile with the
@@ -59,11 +69,26 @@ fun ImageCard(
     aspectRatio: Float? = 3f / 4f,
 ) {
     val processing = photo.isProcessing
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     Box(
         modifier
             .then(if (aspectRatio != null) Modifier.fillMaxWidth().aspectRatio(aspectRatio) else Modifier)
             .background(BsColors.Surface.copy(alpha = 0.3f))
             .then(if (processing) Modifier.border(2.dp, BsColors.Info) else Modifier)
+            // Touch stand-in for the web's hover prefetch: a press starts downloading the
+            // original so the photo page opens on it. A short delay, cancelled when the touch
+            // turns into a scroll, keeps flings through the grid from fetching every original.
+            .pointerInput(photo.id) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    val job = scope.launch {
+                        delay(PREFETCH_PRESS_MS)
+                        prefetchOriginal(context, photo)
+                    }
+                    if (waitForUpOrCancellation() == null) job.cancel()
+                }
+            }
             .combinedClickable(onClick = onClick, onLongClick = onToggle),
     ) {
         val src = photo.thumbnailUrl ?: photo.imageSrc
@@ -118,4 +143,15 @@ fun ImageCard(
             Spinner(Modifier.align(Alignment.BottomEnd).padding(6.dp), size = 16.dp, tint = BsColors.Info)
         }
     }
+}
+
+private const val PREFETCH_PRESS_MS = 50L
+
+// Detail (grid items carry no original's URL), then the original into Coil's cache. Videos
+// skip it: their `url` is the video file.
+private suspend fun prefetchOriginal(context: android.content.Context, photo: Photo) {
+    if (photo.isVideo) return
+    val api = BigShelfApp.api
+    val url = runCatching { api.photo(photo.id).url }.getOrNull() ?: return
+    SingletonImageLoader.get(context).enqueue(ImageRequest.Builder(context).data(api.mediaUrl(url)).build())
 }
