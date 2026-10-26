@@ -30,6 +30,15 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("archiveOnDownload", value).apply()
     }
 
+    // Split collages into their panels on upload. On by default.
+    var autosplit by mutableStateOf(prefs.getBoolean("autosplit", true))
+        private set
+
+    fun updateAutosplit(value: Boolean) {
+        autosplit = value
+        prefs.edit().putBoolean("autosplit", value).apply()
+    }
+
     // Triplets groups every photo of one outfit and scene (the old Triptych). On by default;
     // off gives random sets of one person.
     var tripletOutfit by mutableStateOf(prefs.getBoolean("tripletOutfit", true))

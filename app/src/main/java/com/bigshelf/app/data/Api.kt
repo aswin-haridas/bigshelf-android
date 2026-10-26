@@ -1,6 +1,7 @@
 package com.bigshelf.app.data
 
 import android.Manifest
+import com.bigshelf.app.BigShelfApp
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -700,6 +701,7 @@ class Api(context: Context, val baseUrl: String) {
         sendUnit("POST", "/api/v1/photos/uploads/${init.jobId}/complete", buildJsonObject {
             put("key", init.key)
             put("filename", name)
+            put("autosplit", BigShelfApp.settings.autosplit)
             // Lands in this album once processed (yours, or one shared with you)
             if (albumId != null) put("album_id", albumId)
         })

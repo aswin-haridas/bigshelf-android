@@ -322,6 +322,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                 settings::updateArchiveOnDownload,
                 divider = true,
             )
+            ToggleRow(
+                "Autosplit on upload",
+                "Split collages and long images into separate photos on upload.",
+                settings.autosplit,
+                settings::updateAutosplit,
+                divider = true,
+            )
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
