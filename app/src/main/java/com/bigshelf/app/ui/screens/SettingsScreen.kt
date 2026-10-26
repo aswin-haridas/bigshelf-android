@@ -244,6 +244,12 @@ fun TripletSettingsCard() {
             "Match outfit", "Group every photo of one outfit and scene. Off picks random photos.",
             settings.tripletOutfit, settings::updateTripletOutfit, divider = true,
         )
+        ToggleRow(
+            "Match faces",
+            if (settings.tripletOutfit) "Split a set when its photos show different people."
+            else "Fill each set with photos where the face looks most like the first one.",
+            settings.tripletMatchFaces, settings::updateTripletMatchFaces, divider = true,
+        )
         // Outfit sets and random sets each have their own options
         if (settings.tripletOutfit) {
             TabsRow("Smallest set", "Leave out sets with fewer photos than this.") {
@@ -256,10 +262,6 @@ fun TripletSettingsCard() {
             ToggleRow(
                 "Solo photos only", "Skip group photos with other tagged people.",
                 settings.tripletSolo, settings::updateTripletSolo, divider = true,
-            )
-            ToggleRow(
-                "Match faces", "Fill each set with photos where the face looks most like the first one.",
-                settings.tripletMatchFaces, settings::updateTripletMatchFaces, divider = true,
             )
             ToggleRow(
                 "Different scenes", "Spread each set across places and shoots. Off allows one scene's photos together.",
