@@ -330,7 +330,7 @@ fun TriptychScreen(
             PersonList(
                 people = people.data.orEmpty().filter { !it.isSkipped && it.photoCount > 0 },
                 selectedId = onlyPerson,
-                empty = if (people.isLoading) "Loading…" else "No people found",
+                empty = if (people.isLoading) null else "No people found",
                 onPick = {
                     setPerson(it.id)
                     picking = false

@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.screens.people
 
+import com.bigshelf.app.ui.components.TriangleLoader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -40,14 +41,19 @@ fun PersonList(
     modifier: Modifier = Modifier,
     selectedId: String? = null,
     enabled: Boolean = true,
-    empty: String = "No people found",
+    /** Shown when [people] is empty; null means still loading. */
+    empty: String? = "No people found",
 ) {
     Column(
         modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (people.isEmpty()) {
-            Text(empty, Modifier.fillMaxWidth().padding(vertical = 16.dp), style = BsText.Xs, color = BsColors.Muted)
+            if (empty == null) {
+                TriangleLoader(Modifier.align(Alignment.CenterHorizontally).padding(vertical = 16.dp))
+            } else {
+                Text(empty, Modifier.fillMaxWidth().padding(vertical = 16.dp), style = BsText.Xs, color = BsColors.Muted)
+            }
         }
         people.forEach { person ->
             Row(

@@ -126,16 +126,17 @@ fun EmptyState(title: String, modifier: Modifier = Modifier, description: String
     }
 }
 
-/** The web's inline `<p className="text-center text-sm text-muted py-16">Loading…</p>`. */
+/** Screen loader: the web's `<Loader />` centred with `py-16`, plus an optional `text-xs text-muted` line. */
 @Composable
-fun LoadingText(modifier: Modifier = Modifier, text: String = "Loading…") {
-    Text(
-        text,
+fun LoadingText(modifier: Modifier = Modifier, text: String? = null) {
+    Column(
         modifier.fillMaxWidth().padding(vertical = 64.dp),
-        style = BsText.Sm,
-        color = BsColors.Muted,
-        textAlign = TextAlign.Center,
-    )
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        InfinityLoader(tint = BsColors.Muted)
+        if (text != null) ShinyText(text, textAlign = TextAlign.Center)
+    }
 }
 
 /**

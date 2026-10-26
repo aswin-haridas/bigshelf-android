@@ -1,5 +1,7 @@
 package com.bigshelf.app.ui.screens.tools
 
+import com.bigshelf.app.ui.components.ShinyText
+import com.bigshelf.app.ui.components.InfinityLoader
 import android.content.ContentValues
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import android.content.Context
@@ -64,7 +66,6 @@ import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.components.BsTabs
 import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.PageHeader
-import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.TabItem
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.shell.formatBytes
@@ -290,13 +291,8 @@ fun FramerScreen(photoId: String?, onBack: () -> Unit) {
             if (extracting || loadingVideo) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(Modifier.padding(vertical = 64.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Spinner(size = 24.dp, tint = BsColors.Muted)
-                        Text(
-                            if (loadingVideo) "Loading video…" else "Analyzing…",
-                            Modifier.padding(top = 8.dp),
-                            style = BsText.Xs,
-                            color = BsColors.Muted,
-                        )
+                        InfinityLoader(tint = BsColors.Muted)
+                        ShinyText(if (loadingVideo) "Loading video…" else "Analyzing…", Modifier.padding(top = 8.dp))
                     }
                 }
             }

@@ -1,5 +1,8 @@
 package com.bigshelf.app.ui.screens.people
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
+import com.bigshelf.app.ui.components.TriangleLoader
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -116,7 +119,7 @@ fun TagFaceModal(face: FaceItem, onClose: () -> Unit, onDone: () -> Unit = {}) {
             PersonList(
                 people = people.orEmpty(),
                 enabled = !saving,
-                empty = if (people == null) "Searching…" else "No people found",
+                empty = if (people == null) null else "No people found",
                 onPick = { tag(it.id, it.name) },
             )
         }
@@ -175,7 +178,7 @@ fun MergeFaceGroupModal(source: FaceItem, onClose: () -> Unit, onMerged: () -> U
                 color = BsColors.Muted,
             )
             when {
-                faces.isLoading -> Text("Loading faces…", style = BsText.Xs, color = BsColors.Muted)
+                faces.isLoading -> TriangleLoader(Modifier.fillMaxWidth().wrapContentWidth().padding(vertical = 16.dp))
                 candidates.isEmpty() -> Text("No other detected face groups available.", style = BsText.Xs, color = BsColors.Muted)
                 else -> Column(
                     Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()),
@@ -253,7 +256,7 @@ fun MergePersonModal(source: Person, onClose: () -> Unit, onMerged: () -> Unit) 
                 selectedId = target?.id,
                 enabled = !merging,
                 empty = when {
-                    people.isLoading -> "Loading people…"
+                    people.isLoading -> null
                     search.isNotBlank() -> "No matching people found."
                     else -> "No other people available."
                 },

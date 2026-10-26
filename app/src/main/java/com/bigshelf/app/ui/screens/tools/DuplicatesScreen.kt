@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.screens.tools
 
+import com.bigshelf.app.ui.components.ShinyText
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
@@ -50,7 +51,7 @@ import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.PageHeader
-import com.bigshelf.app.ui.components.Spinner
+import com.bigshelf.app.ui.components.InfinityLoader
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.theme.BsColors
@@ -176,8 +177,8 @@ fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Spinner(size = 32.dp, tint = BsColors.Muted)
-                Text("Finding duplicates…", style = BsText.Xs, color = BsColors.Muted)
+                InfinityLoader(tint = BsColors.Muted)
+                ShinyText("Finding duplicates…")
             }
             current == null -> {
                 val auto = data?.autoRemovedCount ?: 0

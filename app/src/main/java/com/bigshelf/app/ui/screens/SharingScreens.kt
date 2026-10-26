@@ -1,5 +1,7 @@
 package com.bigshelf.app.ui.screens
 
+import com.bigshelf.app.ui.components.TriangleLoader
+import com.bigshelf.app.ui.components.ShinyText
 import android.content.Context
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import android.content.Intent
@@ -52,7 +54,6 @@ import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.ConfirmModal
 import com.bigshelf.app.ui.components.PageHeader
-import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.screens.explore.CoverCard
 import com.bigshelf.app.ui.screens.explore.albumSubtitle
@@ -111,7 +112,7 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             Section("Shared with you") {
                 val albums = shared.data.orEmpty()
                 if (albums.isEmpty()) {
-                    Hint(if (shared.isLoading) "Loading…" else "Nothing yet")
+                    if (shared.isLoading) ShinyText("Loading…", Modifier.padding(horizontal = 20.dp)) else Hint("Nothing yet")
                 } else {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -132,7 +133,7 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             Section("Your links") {
                 val list = links.data.orEmpty()
                 if (list.isEmpty()) {
-                    Hint(if (links.isLoading) "Loading…" else "No links")
+                    if (links.isLoading) ShinyText("Loading…", Modifier.padding(horizontal = 20.dp)) else Hint("No links")
                 } else {
                     Column(
                         Modifier
@@ -258,7 +259,7 @@ fun AlbumSharingModal(album: AlbumListItem, onUpload: () -> Unit, onLeft: () -> 
             Text("People", style = BsText.Xs.copy(fontWeight = BsWeight.Medium), color = BsColors.Muted)
             val list = people.data
             if (list == null) {
-                Spinner(size = 16.dp, tint = BsColors.Muted)
+                TriangleLoader(Modifier.align(Alignment.CenterHorizontally))
             } else {
                 list.forEach { person ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {

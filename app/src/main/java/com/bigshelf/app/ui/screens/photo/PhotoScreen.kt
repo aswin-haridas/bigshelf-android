@@ -925,7 +925,7 @@ private fun FaceTagModal(photo: Photo, faceIndex: Int, onChanged: (Photo) -> Uni
             PersonList(
                 people = people.orEmpty().filter { it.name != currentName },
                 enabled = !saving,
-                empty = if (people == null) "Searching…" else "No people found",
+                empty = if (people == null) null else "No people found",
                 onPick = { tag(it.id, it.name) },
             )
         }
