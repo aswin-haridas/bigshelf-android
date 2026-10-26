@@ -1,5 +1,8 @@
 package com.bigshelf.app.ui.screens.tools
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import com.bigshelf.app.ui.components.ShinyText
+import com.bigshelf.app.ui.components.TriangleLoader
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -248,7 +251,14 @@ fun CleanUpModal(onClose: () -> Unit, onOpenPhoto: (String) -> Unit) {
             when {
                 done -> EmptyState("No more photos to suggest")
                 // Scoring reads every thumbnail of the page, so this can take a few seconds
-                items.isEmpty() -> LoadingText(text = "Scoring photos…")
+                items.isEmpty() -> Column(
+                    Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TriangleLoader()
+                    ShinyText("Scoring photos…")
+                }
                 else -> LazyVerticalGrid(
                     GridCells.Fixed(3),
                     Modifier.heightIn(max = 480.dp),

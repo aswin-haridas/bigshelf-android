@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -126,13 +127,13 @@ fun EmptyState(title: String, modifier: Modifier = Modifier, description: String
     }
 }
 
-/** Screen loader: the web's `<Loader />` centred with `py-16`, plus an optional `text-xs text-muted` line. */
+/** Screen loader: the web's `<ScreenLoader />`, centred in the space left below the header, plus an optional shimmering line. */
 @Composable
 fun LoadingText(modifier: Modifier = Modifier, text: String? = null) {
     Column(
-        modifier.fillMaxWidth().padding(vertical = 64.dp),
+        modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
         InfinityLoader(tint = BsColors.Muted)
         if (text != null) ShinyText(text, textAlign = TextAlign.Center)
