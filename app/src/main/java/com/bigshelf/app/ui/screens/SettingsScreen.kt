@@ -246,10 +246,6 @@ fun TripletSettingsCard() {
         )
         // Outfit sets and random sets each have their own options
         if (settings.tripletOutfit) {
-            ToggleRow(
-                "Split by face", "Never put two different tagged people in one set.",
-                settings.triptychFaces, settings::updateTriptychFaces, divider = true,
-            )
             TabsRow("Smallest set", "Leave out sets with fewer photos than this.") {
                 BsTabs(SET_SIZES, settings.triptychMinSize, settings::updateTriptychMinSize)
             }

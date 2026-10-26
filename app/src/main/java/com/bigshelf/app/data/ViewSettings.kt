@@ -61,15 +61,6 @@ class ViewSettings(context: Context) {
         prefs.edit().putInt("triptychMaxSize", value).apply()
     }
 
-    // Outfit sets: never put two different tagged people in one set. Off by default.
-    var triptychFaces by mutableStateOf(prefs.getBoolean("triptychFaces", false))
-        private set
-
-    fun updateTriptychFaces(value: Boolean) {
-        triptychFaces = value
-        prefs.edit().putBoolean("triptychFaces", value).apply()
-    }
-
     // Stance sets also share one outfit. On by default.
     var stanceOutfit by mutableStateOf(prefs.getBoolean("stanceOutfit", true))
         private set

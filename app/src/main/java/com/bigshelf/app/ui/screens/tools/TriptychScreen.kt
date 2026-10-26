@@ -71,7 +71,7 @@ private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
         TRIPTYCH_ENDPOINT -> common + mapOf(
             // 0 = no limit
             "min_size" to s.triptychMinSize, "max_size" to s.triptychMaxSize.takeIf { it > 0 },
-            "match_faces" to s.triptychFaces, "order" to s.tripletOrder,
+            "order" to s.tripletOrder,
         )
         STANCE_ENDPOINT -> common + ("same_outfit" to s.stanceOutfit)
         else -> common
