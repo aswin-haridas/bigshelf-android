@@ -16,8 +16,9 @@ android {
         applicationId = "com.bigshelf.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 25
-        versionName = "1.20.0"
+        // CI (.github/workflows/release.yml) passes these per release; the defaults are for local builds
+        versionCode = (findProperty("bigshelf.versionCode") as String?)?.toInt() ?: 25
+        versionName = (findProperty("bigshelf.versionName") as String?) ?: "1.20.0"
         buildConfigField("String", "API_URL", "\"$apiUrl\"")
     }
 

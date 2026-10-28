@@ -1,0 +1,60 @@
+# Every push to main builds a release APK against the prod API and publishes it as a
+# GitHub release. Versions come from the run number (1.21.0, 1.22.0, ...), so don't bump
+# build.gradle.kts by hand any more.
+name: Release APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One release at a time, in push order
+concurrency: release
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Version
+        # Continues the hand-made releases, which ended at versionCode 25 / 1.20.0
+        run: |
+          echo "CODE=$((25 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
+          echo "NAME=1.$((20 + ${{ github.run_number }})).0" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: >
+          ./gradlew :app:assembleRelease
+          -Pbigshelf.apiUrl=https://bigshelf.aswinharidas.uk
+          -Pbigshelf.versionCode=$CODE -Pbigshelf.versionName=$NAME
+
+      - name: Sign
+        # Same debug key as the earlier releases, so the APK installs over them
+        env:
+          KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > debug.keystore
+          TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$TOOLS/zipalign" -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$TOOLS/apksigner" sign --ks debug.keystore --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --out "bigshelf-$NAME.apk" aligned.apk
+          "$TOOLS/apksigner" verify "bigshelf-$NAME.apk"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Through env, not inlined: a commit message with quotes would break the shell
+          NOTES: ${{ github.event.head_commit.message || 'Manual release' }}
+        run: >
+          gh release create "v$NAME" "bigshelf-$NAME.apk"
+          --title "BigShelf v$NAME" --notes "$NOTES"
