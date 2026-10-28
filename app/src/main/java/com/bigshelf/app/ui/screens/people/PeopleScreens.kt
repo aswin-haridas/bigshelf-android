@@ -107,10 +107,11 @@ private fun PeopleHeader(active: PeopleTab, onTab: (PeopleTab) -> Unit, below: @
 fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     var search by rememberSaveable { mutableStateOf("") }
     val query = rememberQuery("people", invalidatedBy = setOf("people")) { BigShelfApp.api.people() }
-    // Hide people with no photos left (e.g. all their photos were binned)
+    // Hide people with no photos left (e.g. all their photos were binned). Hottest first;
+    // the stable sort keeps unrated people in the server's name order at the end.
     val people = query.data?.items.orEmpty().filter {
         it.photoCount > 0 && it.name.lowercase().contains(search.trim().lowercase())
-    }
+    }.sortedByDescending { it.heat ?: -1.0 }
 
     Column(Modifier.fillMaxSize()) {
         PeopleHeader(PeopleTab.People, onTab) {

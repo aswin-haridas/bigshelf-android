@@ -136,6 +136,8 @@ data class Person(
     @SerialName("photo_count") val photoCount: Int = 0,
     val cover: FaceCover? = null,
     @SerialName("is_skipped") val isSkipped: Boolean = false,
+    // Average Grading heat of their photos (out of 10); null until any is rated
+    val heat: Double? = null,
 )
 
 @Serializable
