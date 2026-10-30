@@ -134,19 +134,18 @@ private fun FaceGrid(batch: FaceReviewBatch, total: Int, query: QueryState<FaceR
     val unticked = remember { mutableStateListOf<String>() }
     var saving by remember { mutableStateOf(false) }
     val tickedCount = batch.faces.size - unticked.size
-    val allUnticked = unticked.size == batch.faces.size
 
-    fun save() {
+    fun save(rejected: List<String> = unticked.toList()) {
         saving = true
         scope.launch {
             try {
-                val rejected = unticked.toList()
                 val next = BigShelfApp.api.resolveFaceReview(
                     batch.personId,
                     batch.faces.map { it.faceId }.filterNot { it in rejected },
                     rejected,
                 )
-                toast.success("$tickedCount confirmed as ${batch.personName}" + if (rejected.isNotEmpty()) ", ${rejected.size} removed" else "")
+                val confirmed = batch.faces.size - rejected.size
+                toast.success("$confirmed confirmed as ${batch.personName}" + if (rejected.isNotEmpty()) ", ${rejected.size} removed" else "")
                 if (next.batch == null && next.merge == null) toast.success("All faces reviewed")
                 query.data = next
                 PhotoEvents.invalidate("photos", "faces", "people")
@@ -162,12 +161,9 @@ private fun FaceGrid(batch: FaceReviewBatch, total: Int, query: QueryState<FaceR
         title = "Are these all ${batch.personName}?",
         onClose = onClose,
         footer = {
-            BsButton(
-                onClick = { if (allUnticked) unticked.clear() else { unticked.clear(); unticked += batch.faces.map { it.faceId } } },
-                variant = ButtonVariant.Ghost,
-                enabled = !saving,
-            ) { Text(if (allUnticked) "Tick all" else "None are them") }
-            BsButton(onClick = ::save, loading = saving, enabled = !saving) {
+            // Rejects the whole batch and moves on to the next one
+            BsButton(onClick = { save(batch.faces.map { it.faceId }) }, variant = ButtonVariant.Ghost, enabled = !saving) { Text("None are them") }
+            BsButton(onClick = { save() }, loading = saving, enabled = !saving) {
                 Text(if (tickedCount > 0) "Confirm $tickedCount" else "Save")
             }
         },
@@ -194,21 +190,22 @@ private fun FaceGrid(batch: FaceReviewBatch, total: Int, query: QueryState<FaceR
                             .aspectRatio(1f)
                             .bsClickable(scale = 0.95f) { if (out) unticked -= face.faceId else unticked += face.faceId },
                     ) {
+                        // Ticked is the default, so only rejected faces are marked
                         FaceThumb(
                             face.faceThumbnail,
                             Dp.Unspecified,
                             Modifier
                                 .fillMaxSize()
                                 .alpha(if (out) 0.4f else 1f)
-                                .border(2.dp, if (out) BsColors.Danger else BsColors.Border, BsShapes.Lg)
+                                .then(if (out) Modifier.border(2.dp, BsColors.Danger, BsShapes.Lg) else Modifier)
                                 .clip(BsShapes.Lg),
                         )
-                        BsIcon(
-                            if (out) BsIcons.XCircleFill else BsIcons.CheckCircleFill,
+                        if (out) BsIcon(
+                            BsIcons.XCircleFill,
                             Modifier.align(Alignment.BottomEnd).padding(4.dp),
                             size = 20.dp,
-                            tint = if (out) BsColors.Danger else BsColors.Success,
-                            contentDescription = if (out) "Not ${batch.personName}" else batch.personName,
+                            tint = BsColors.Danger,
+                            contentDescription = "Not ${batch.personName}",
                         )
                     }
                 }

@@ -65,8 +65,6 @@ import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.launch
-import com.bigshelf.app.data.Downloads
-import androidx.compose.ui.platform.LocalContext
 
 enum class PeopleTab { People, Faces, Untagged }
 
@@ -305,19 +303,17 @@ fun UntaggedScreen(onOpenPhoto: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
 
 /**
  * A person laid out like an Instagram profile: avatar beside Photos / Videos / Years, the name,
- * Rename, Download and Merge buttons, then their photos in the server's similarity order.
+ * Rename and Merge buttons, then their photos in the server's similarity order.
  */
 @Composable
 fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val query = rememberQuery("person", personId, invalidatedBy = setOf("people")) { api.personPhotos(personId) }
     val data = query.data
     var editing by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
-    var downloading by remember { mutableStateOf(false) }
     var merging by remember { mutableStateOf(false) }
 
     fun save() {
@@ -370,25 +366,6 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
                             modifier = Modifier.weight(1f),
                             variant = ButtonVariant.Secondary,
                         ) { Text("Rename") }
-                        BsButton(
-                            onClick = {
-                                downloading = true
-                                scope.launch {
-                                    try {
-                                        Downloads.save(context, data.items)
-                                        toast.success("Downloading ${data.items.size} photos")
-                                    } catch (_: Exception) {
-                                        toast.error("Download failed")
-                                    } finally {
-                                        downloading = false
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            variant = ButtonVariant.Secondary,
-                            enabled = data.items.isNotEmpty(),
-                            loading = downloading,
-                        ) { Text("Download all") }
                         BsButton(onClick = { merging = true }, modifier = Modifier.weight(1f), variant = ButtonVariant.Secondary) {
                             Text("Merge")
                         }
@@ -424,13 +401,12 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
 
 /**
  * Photos of one detected face group (web face-photos-view.tsx), with Tag, Merge (into
- * another group), Forget and Download all.
+ * another group) and Forget.
  */
 @Composable
 fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val query = rememberQuery("face", faceId, invalidatedBy = setOf("faces")) { api.facePhotos(faceId) }
     val data = query.data
     var modal by remember { mutableStateOf<String?>(null) }
@@ -471,25 +447,6 @@ fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -
                     ProfileHeader(faceImageSrc(data.face), data.face.faceName ?: "Untagged face", data.items, data.total) {
                         BsButton(onClick = { modal = "tag" }, modifier = Modifier.weight(1f)) { Text("Tag") }
                         BsButton(onClick = { modal = "merge" }, modifier = Modifier.weight(1f), variant = ButtonVariant.Secondary) { Text("Merge") }
-                        BsButton(
-                            onClick = {
-                                busy = "download"
-                                scope.launch {
-                                    try {
-                                        Downloads.save(context, data.items)
-                                        toast.success("Downloading ${data.items.size} photos")
-                                    } catch (_: Exception) {
-                                        toast.error("Download failed")
-                                    } finally {
-                                        busy = null
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            variant = ButtonVariant.Secondary,
-                            enabled = data.items.isNotEmpty(),
-                            loading = busy == "download",
-                        ) { Text("Download") }
                     }
                 },
             )

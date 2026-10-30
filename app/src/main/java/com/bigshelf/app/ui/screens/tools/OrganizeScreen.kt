@@ -33,11 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
 import coil3.compose.AsyncImage
-import com.bigshelf.app.data.Downloads
 import com.bigshelf.app.data.UglyPage
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.SelectionStore
@@ -83,13 +81,12 @@ private val BUCKETS = listOf(
 
 /**
  * Port of modules/organize: photos sorted into review buckets, shown as cards; a card opens its photos.
- * Select all, Download all, and on Failed, Reprocess all.
+ * Select all, and on Failed, Reprocess all.
  */
 @Composable
 fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicates: () -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val query = rememberQuery("organize", invalidatedBy = setOf("organize")) { api.organize(BUCKET_LIMIT) }
     // null: the bucket cards; picking one opens its photos
     var tab by rememberSaveable { mutableStateOf<String?>(null) }
@@ -98,7 +95,6 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicat
         tab = null
     }
     BackHandler(tab != null, closeBucket)
-    var downloading by remember { mutableStateOf(false) }
     var reprocessing by remember { mutableStateOf(false) }
 
     val bucket = tab?.let { query.data?.get(it) }
@@ -129,19 +125,6 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicat
                         }
                     })
                 }
-                BsIconButton(BsIcons.DownloadSimple, "Download all", loading = downloading, onClick = {
-                    downloading = true
-                    scope.launch {
-                        try {
-                            Downloads.save(context, items)
-                            toast.success("Downloading ${items.size} photos")
-                        } catch (_: Exception) {
-                            toast.error("Failed to download")
-                        } finally {
-                            downloading = false
-                        }
-                    }
-                })
                 BsIconButton(
                     BsIcons.SelectionAll,
                     if (allSelected) "Clear selection" else "Select all",
