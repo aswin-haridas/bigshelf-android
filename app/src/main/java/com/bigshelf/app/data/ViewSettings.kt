@@ -30,8 +30,8 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("archiveOnDownload", value).apply()
     }
 
-    // Split collages into their panels on upload. On by default.
-    var autosplit by mutableStateOf(prefs.getBoolean("autosplit", true))
+    // Split collages into their panels on upload. Off by default.
+    var autosplit by mutableStateOf(prefs.getBoolean("autosplit", false))
         private set
 
     fun updateAutosplit(value: Boolean) {
