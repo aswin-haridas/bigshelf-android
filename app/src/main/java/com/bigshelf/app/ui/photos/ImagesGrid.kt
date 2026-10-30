@@ -39,6 +39,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import coil3.SingletonImageLoader
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.state.SelectionStore
 import com.bigshelf.app.state.ViewerList
@@ -98,6 +103,9 @@ private fun exploreBlocks(photos: List<Photo>): List<List<Photo>> {
     return blocks
 }
 
+// About three screens of tiles at 3 columns
+private const val PREFETCH_AHEAD = 40
+
 fun photoCount(n: Int) = "${NumberFormat.getIntegerInstance(Locale.US).format(n)} ${if (n == 1) "photo" else "photos"}"
 
 /**
@@ -146,6 +154,31 @@ fun ImagesGrid(
         val info = state.layoutInfo
         val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
         if (canLoad && info.totalItemsCount > 0 && last >= info.totalItemsCount - 12) loadMore?.invoke()
+    }
+
+    // Thumbnails of the next photos past the last visible tile go into Coil's disk cache ahead
+    // of the scroll, so flings land on cached tiles instead of starting downloads a row ahead.
+    // Memory cache is skipped: prefetches would evict what's on screen.
+    val context = LocalContext.current
+    val indexById = remember(photos) { photos.withIndex().associate { it.value.id to it.index } }
+    val prefetched = remember { HashSet<String>() }
+    LaunchedEffect(state, indexById) {
+        snapshotFlow {
+            // Tiles are keyed by photo id; explore blocks by "block-" + their first photo's id
+            state.layoutInfo.visibleItemsInfo.maxOfOrNull { indexById[(it.key as? String)?.removePrefix("block-")] ?: -1 } ?: -1
+        }.distinctUntilChanged().collect { last ->
+            val loader = SingletonImageLoader.get(context)
+            for (photo in photos.subList(minOf(last + 1, photos.size), minOf(last + 1 + PREFETCH_AHEAD, photos.size))) {
+                val src = photo.thumbnailUrl ?: photo.imageSrc ?: continue
+                if (!prefetched.add(photo.id)) continue
+                loader.enqueue(
+                    ImageRequest.Builder(context)
+                        .data(BigShelfApp.api.mediaUrl(src))
+                        .memoryCachePolicy(CachePolicy.DISABLED)
+                        .build(),
+                )
+            }
+        }
     }
 
     val selectionActive = SelectionStore.count > 0
