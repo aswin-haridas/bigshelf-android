@@ -25,7 +25,8 @@ object Routes {
     const val TRIPLETS = "triplets"
     const val STANCE = "stance"
     const val COMPOSER = "composer"
-    const val GRADING = "grading"
+    const val RATING = "rating"
+    const val SWIPE = "swipe"
     // ?photo=<id>: open a library video (from the photo viewer)
     const val FRAMER = "framer?photo={photo}"
 

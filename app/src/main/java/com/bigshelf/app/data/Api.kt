@@ -596,22 +596,22 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun uglyPhotos(before: String?) =
         get("/api/v1/photos/organize/ugly", UglyPage.serializer(), mapOf("before" to before))
 
-    // ---------- Grading ----------
+    // ---------- Rating ----------
 
-    suspend fun gradingPairs(limit: Int) = get("/api/v1/grading", GradingResponse.serializer(), mapOf("limit" to limit))
+    suspend fun ratingPairs(limit: Int) = get("/api/v1/rating", RatingResponse.serializer(), mapOf("limit" to limit))
 
     /** [winnerId] is hotter than [loserId]; returns the stored answer's id for Undo. */
     suspend fun compare(winnerId: String, loserId: String) = send(
-        "POST", "/api/v1/grading/compare", CompareResponse.serializer(),
+        "POST", "/api/v1/rating/compare", CompareResponse.serializer(),
         buildJsonObject {
             put("winner_id", winnerId)
             put("loser_id", loserId)
         },
     ).id
 
-    suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/grading/compare/$id")
+    suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/rating/compare/$id")
 
-    suspend fun resetGrading() = send("DELETE", "/api/v1/grading", ClearedResponse.serializer())
+    suspend fun resetRating() = send("DELETE", "/api/v1/rating", ClearedResponse.serializer())
 
     // ---------- Sharing ----------
 

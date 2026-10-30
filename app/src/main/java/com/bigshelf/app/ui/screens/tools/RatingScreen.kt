@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import com.bigshelf.app.BigShelfApp
-import com.bigshelf.app.data.GradingPair
+import com.bigshelf.app.data.RatingPair
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.ui.components.BsButton
@@ -47,26 +47,26 @@ import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
-// Pairs fetched per call; more are fetched once the queue runs this low (web useGrading)
+// Pairs fetched per call; more are fetched once the queue runs this low (web useRating)
 private const val WINDOW_SIZE = 10
 private const val REFILL_AT = 2
 // How many answers Undo can walk back
 private const val UNDO_LIMIT = 3
 
 // An answer; `done` completes with the stored answer's id once the server has it
-private class Answer(val pair: GradingPair, val done: CompletableDeferred<String?>)
+private class Answer(val pair: RatingPair, val done: CompletableDeferred<String?>)
 
 /**
- * Port of modules/grading: one random pair at a time, tap the hotter photo. Each answer
+ * Port of modules/rating: one random pair at a time, tap the hotter photo. Each answer
  * retrains the taste model on the server, which re-rates every photo's heat. The queue is
  * local so a refill never swaps the pair on screen.
  */
 @Composable
-fun GradingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
+fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val queue = remember { mutableStateListOf<GradingPair>() }
+    val queue = remember { mutableStateListOf<RatingPair>() }
     val history = remember { mutableStateListOf<Answer>() }
     var rated by remember { mutableStateOf<Int?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -76,7 +76,7 @@ fun GradingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     LaunchedEffect(queue.size <= REFILL_AT) {
         if (queue.size > REFILL_AT) return@LaunchedEffect
         try {
-            val data = api.gradingPairs(WINDOW_SIZE)
+            val data = api.ratingPairs(WINDOW_SIZE)
             // Server count only once: later it may lag answers still in flight
             if (rated == null) rated = data.rated
             queue.addAll(data.pairs.filter { p -> queue.none { it.id == p.id } })
@@ -104,7 +104,7 @@ fun GradingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     fun refresh() = PhotoEvents.invalidate("photo")
 
     // The user found `winner` hotter: show the next pair at once, the server catches up
-    fun pick(pair: GradingPair, winner: Photo) {
+    fun pick(pair: RatingPair, winner: Photo) {
         val loser = pair.items.firstOrNull { it.id != winner.id } ?: return
         queue.remove(pair)
         rated = (rated ?: 0) + 1
@@ -145,7 +145,7 @@ fun GradingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
         resetting = true
         scope.launch {
             try {
-                val cleared = api.resetGrading().clearedCount
+                val cleared = api.resetRating().clearedCount
                 rated = 0
                 history.clear()
                 refresh()
@@ -160,7 +160,7 @@ fun GradingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         PageHeader(
-            "Grading",
+            "Rating",
             count = rated?.let { "$it rated" },
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
         ) {
@@ -176,7 +176,7 @@ fun GradingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             current == null -> EmptyState(
                 "Not enough photos to compare",
                 Modifier.padding(horizontal = 24.dp),
-                description = "Photos can be graded once processing has finished",
+                description = "Photos can be rated once processing has finished",
             )
             else -> Column(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current),

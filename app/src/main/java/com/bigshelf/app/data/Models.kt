@@ -63,7 +63,7 @@ data class Photo(
     @SerialName("ai_source") val aiSource: String? = null,
     // Detail-only: 0-1 chance the AI detector gives that it is AI; null until it has run
     @SerialName("ai_score") val aiScore: Double? = null,
-    // Heat out of 10 from the Grading taste model (detail only); null until trained
+    // Heat out of 10 from the Rating taste model (detail only); null until trained
     val heat: Double? = null,
     @SerialName("is_archived") val isArchived: Boolean = false,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
@@ -99,12 +99,12 @@ const val USER_MARKED_AI = "Marked by user"
 /** Mirrors backend AI_MODEL_SOURCE: flagged by the AI detector pipeline, also clearable. */
 const val AI_MODEL_SOURCE = "Detected by model"
 
-/** Two random photos to ask "which is hotter?" (Grading). */
+/** Two random photos to ask "which is hotter?" (Rating). */
 @Serializable
-data class GradingPair(val id: String, val items: List<Photo>)
+data class RatingPair(val id: String, val items: List<Photo>)
 
 @Serializable
-data class GradingResponse(val rated: Int = 0, val pairs: List<GradingPair> = emptyList())
+data class RatingResponse(val rated: Int = 0, val pairs: List<RatingPair> = emptyList())
 
 @Serializable
 data class CompareResponse(val id: String)
@@ -136,7 +136,7 @@ data class Person(
     @SerialName("photo_count") val photoCount: Int = 0,
     val cover: FaceCover? = null,
     @SerialName("is_skipped") val isSkipped: Boolean = false,
-    // Average Grading heat of their photos (out of 10); null until any is rated
+    // Average Rating heat of their photos (out of 10); null until any is rated
     val heat: Double? = null,
 )
 
