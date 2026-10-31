@@ -23,7 +23,6 @@ object Routes {
     const val ORGANIZE = "organize"
     const val PHOTO = "photos/{photoId}"
     const val TRIPLETS = "triplets"
-    const val STANCE = "stance"
     const val COMPOSER = "composer"
     const val RATING = "rating"
     const val SWIPE = "swipe"

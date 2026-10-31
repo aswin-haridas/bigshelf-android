@@ -264,6 +264,10 @@ fun TripletSettingsCard() {
                 settings.tripletSolo, settings::updateTripletSolo, divider = true,
             )
             ToggleRow(
+                "Match pose", "Fill each set with photos where the person stands or sits most like in the first one.",
+                settings.tripletMatchPose, settings::updateTripletMatchPose, divider = true,
+            )
+            ToggleRow(
                 "Different scenes", "Spread each set across places and shoots. Off allows one scene's photos together.",
                 settings.tripletVariety, settings::updateTripletVariety, divider = true,
             )
@@ -336,13 +340,6 @@ fun SettingsScreen(onBack: () -> Unit) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Section("Triplets", "How Triplets picks each set of one person's photos.")
             TripletSettingsCard()
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Stance", "How Stance picks each set of one person in the same pose.")
-            SettingsCard {
-                ToggleRow("Match outfit", "Only group photos where the clothes match too.", settings.stanceOutfit, settings::updateStanceOutfit)
-            }
         }
 
         SkippedPeople()

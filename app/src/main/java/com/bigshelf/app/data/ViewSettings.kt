@@ -70,15 +70,6 @@ class ViewSettings(context: Context) {
         prefs.edit().putInt("triptychMaxSize", value).apply()
     }
 
-    // Stance sets also share one outfit. On by default.
-    var stanceOutfit by mutableStateOf(prefs.getBoolean("stanceOutfit", true))
-        private set
-
-    fun updateStanceOutfit(value: Boolean) {
-        stanceOutfit = value
-        prefs.edit().putBoolean("stanceOutfit", value).apply()
-    }
-
     // Let Triplets (at most one per outfit set) and Composer pick AI images too
     var includeAi by mutableStateOf(prefs.getBoolean("includeAi", false))
         private set
@@ -113,6 +104,15 @@ class ViewSettings(context: Context) {
     fun updateTripletMatchFaces(value: Boolean) {
         tripletMatchFaces = value
         prefs.edit().putBoolean("tripletMatchFaces", value).apply()
+    }
+
+    // Random Triplets fill the set with the body poses most like the first photo's. Off by default.
+    var tripletMatchPose by mutableStateOf(prefs.getBoolean("tripletMatchPose", false))
+        private set
+
+    fun updateTripletMatchPose(value: Boolean) {
+        tripletMatchPose = value
+        prefs.edit().putBoolean("tripletMatchPose", value).apply()
     }
 
     // Random Triplets spread each set across scenes. On by default; off allows one scene's photos together.

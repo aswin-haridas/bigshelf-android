@@ -77,7 +77,6 @@ import com.bigshelf.app.ui.screens.tools.COMPOSER_ENDPOINT
 import com.bigshelf.app.ui.screens.tools.DuplicatesScreen
 import com.bigshelf.app.ui.screens.tools.RatingScreen
 import com.bigshelf.app.ui.screens.tools.SwipeScreen
-import com.bigshelf.app.ui.screens.tools.STANCE_ENDPOINT
 import com.bigshelf.app.ui.screens.tools.FramerScreen
 import com.bigshelf.app.ui.screens.tools.OUTFIT_SWAP_PROMPT
 import com.bigshelf.app.ui.screens.tools.TRIPLETS_ENDPOINT
@@ -332,10 +331,6 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                     TripletSettingsCard()
                 }
             }
-        }
-        composable(Routes.STANCE) {
-            // 2 or more photos of one tagged person in the same pose; downloading archives them too
-            TriptychScreen("Stance", "One person in the same pose", STANCE_ENDPOINT, onBack = onBack, onOpenPhoto = openPhoto)
         }
         composable(Routes.RATING) { RatingScreen(onBack = onBack, onOpenPhoto = openPhoto) }
         composable(Routes.SWIPE) { SwipeScreen(onBack = onBack) }

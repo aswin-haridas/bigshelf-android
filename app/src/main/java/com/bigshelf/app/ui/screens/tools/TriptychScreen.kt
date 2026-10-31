@@ -55,7 +55,6 @@ import kotlinx.coroutines.launch
 
 const val TRIPTYCH_ENDPOINT = "/api/v1/triptych"
 const val TRIPLETS_ENDPOINT = "/api/v1/triplets"
-const val STANCE_ENDPOINT = "/api/v1/stance"
 
 /**
  * The Settings options [endpoint] takes, as its query params (the web's endpointParams). Only
@@ -66,6 +65,7 @@ private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
     return when (endpoint) {
         TRIPLETS_ENDPOINT -> common + mapOf(
             "count" to s.tripletCount, "solo" to s.tripletSolo, "similar_faces" to s.tripletMatchFaces,
+            "similar_pose" to s.tripletMatchPose,
             "variety" to s.tripletVariety, "clear_lead" to s.tripletClearLead, "order" to s.tripletOrder,
         )
         TRIPTYCH_ENDPOINT -> common + mapOf(
@@ -73,7 +73,6 @@ private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
             "min_size" to s.triptychMinSize, "max_size" to s.triptychMaxSize.takeIf { it > 0 },
             "match_faces" to s.tripletMatchFaces, "order" to s.tripletOrder,
         )
-        STANCE_ENDPOINT -> common + ("same_outfit" to s.stanceOutfit)
         else -> common
     }
 }
