@@ -34,7 +34,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Downloads
@@ -139,24 +138,16 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
     @Composable
     fun RowScope.Action(name: String, icon: ImageVector, label: String, danger: Boolean = false, onClick: () -> Unit) {
         val tint = if (danger) BsColors.Danger else BsColors.Foreground
-        Column(
+        // Icon-only like the nav; [label] is for screen readers
+        Box(
             Modifier.weight(1f).fillMaxHeight().bsClickable(enabled = !busy, scale = 0.94f, onClick = onClick),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            contentAlignment = Alignment.Center,
         ) {
-            if (pending == name) Spinner(size = 24.dp, tint = tint) else BsIcon(icon, size = 24.dp, tint = tint)
-            Text(
-                label,
-                Modifier.padding(top = 4.dp),
-                style = BsText.Xs2.copy(fontWeight = BsWeight.Medium),
-                color = if (danger) BsColors.Danger else BsColors.MutedSoft,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (pending == name) Spinner(size = 24.dp, tint = tint) else BsIcon(icon, size = 24.dp, tint = tint, contentDescription = label)
         }
     }
 
-    // Docked where the bottom nav sits: count row, then the actions laid out like nav tabs
+    // Docked where the bottom nav sits: count row, then a row of icon actions
     Column(
         modifier
             .fillMaxWidth()
@@ -184,7 +175,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                 )
             }
         }
-        Row(Modifier.fillMaxWidth().height(64.dp)) {
+        Row(Modifier.fillMaxWidth().height(56.dp)) {
             if (mode == "bin") {
                 Action("restore", BsIcons.ArrowCounterClockwise, "Restore") {
                     runBulk("restore", { "${plural(it)} restored" }, "Failed to restore photos") { api.flagDeleted(it, false) }

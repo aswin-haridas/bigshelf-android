@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.screens.people
 
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import com.bigshelf.app.ui.components.TriangleLoader
@@ -245,7 +246,7 @@ fun MergePersonModal(source: Person, onClose: () -> Unit, onMerged: () -> Unit) 
                 enabled = target != null && !merging,
                 loading = merging,
                 textStyle = BsText.Xs,
-            ) { Text("Merge into ${target?.name ?: "person"}") }
+            ) { Text("Merge into ${target?.name ?: "person"}", maxLines = 1, overflow = TextOverflow.Ellipsis) }
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

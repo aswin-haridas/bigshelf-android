@@ -72,7 +72,7 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            BsSearchBar(search, { search = it }, Modifier.weight(1f), placeholder = "Search your photos")
+            BsSearchBar(search, { search = it }, Modifier.weight(1f), placeholder = "Search photos")
             // The signed-in user's initial; opens Settings (upload lives in Library and the share sheet)
             Box(
                 Modifier

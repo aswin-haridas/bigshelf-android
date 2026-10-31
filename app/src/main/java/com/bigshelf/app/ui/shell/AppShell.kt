@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
@@ -89,7 +88,6 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
-import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.BsMotion
 
 /** The concrete path of a back-stack entry, e.g. "people/42" (web `location.pathname`). */
@@ -190,12 +188,12 @@ fun AppShell() {
 /** Height the floating bar covers at the bottom of the page; scrolling content pads by it. */
 val LocalBottomBarInset = staticCompositionLocalOf { 0.dp }
 
-/** Floating pill (Photos, People, Library) beside a round Search button, over the content. */
+/** Floating icon pill (Photos, People, Library) beside a round Search button, over the content. */
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     val search = TABS.first { it.route == Routes.SEARCH }
     Row(
-        modifier.navigationBarsPadding().padding(bottom = 12.dp),
+        modifier.navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -203,24 +201,21 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit, modifier: Modi
             Modifier
                 .shadow(8.dp, BsShapes.Full)
                 .background(BsColors.SurfaceHover, BsShapes.Full)
-                .padding(6.dp)
-                .animateContentSize(BsMotion.spec()),
+                .padding(6.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TABS.filter { it != search }.forEach { tab ->
                 val selected = tab.route == active
                 val tint by animateColorAsState(if (selected) BsColors.Foreground else BsColors.Muted, BsMotion.fast(), label = "tabTint")
-                Row(
+                // Icon-only: the filled icon and pill mark the active tab; labels are for screen readers
+                Box(
                     Modifier
-                        .height(48.dp)
+                        .size(width = 64.dp, height = 48.dp)
                         .background(if (selected) BsColors.BorderFocus else Color.Transparent, BsShapes.Full)
-                        .bsClickable(scale = 0.9f) { onSelect(tab.route) }
-                        .padding(horizontal = if (selected) 18.dp else 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .bsClickable(scale = 0.9f) { onSelect(tab.route) },
+                    contentAlignment = Alignment.Center,
                 ) {
                     BsIcon(if (selected) tab.activeIcon else tab.icon, size = 24.dp, tint = tint, contentDescription = tab.label)
-                    if (selected) Text(tab.label, style = BsText.Sm, fontWeight = BsWeight.Medium, color = tint)
                 }
             }
         }

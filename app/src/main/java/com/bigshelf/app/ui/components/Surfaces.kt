@@ -52,7 +52,8 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
             val bg by animateColorAsState(if (selected) BsColors.SurfaceHover else Color.Transparent, BsMotion.fast(), label = "tabBg")
             Box(
                 Modifier
-                    .weight(1f)
+                    // Roughly by label length, so long labels ("Untagged") don't ellipsize next to short ones
+                    .weight(tab.label.length + 4f)
                     .fillMaxHeight()
                     .clip(BsShapes.Full)
                     .background(bg)
@@ -165,7 +166,7 @@ fun PageHeader(
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
-            if (count != null) Text(count, Modifier.padding(top = 2.dp), style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted)
+            if (count != null) Text(count, Modifier.padding(top = 2.dp), style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
     }

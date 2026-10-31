@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.screens.explore
 
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.layout.Box
@@ -447,11 +448,13 @@ private fun SelectChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(BsShapes.Full)
             .background(if (selected) Neutral.N800 else BsColors.Surface)
             .border(1.dp, if (selected) BsColors.BorderFocus else BsColors.Border, BsShapes.Full)
+            .widthIn(max = 200.dp)
             .bsClickable(scale = 0.96f, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
         color = if (selected) BsColors.Foreground else BsColors.Muted,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 

@@ -1,5 +1,7 @@
 package com.bigshelf.app.ui.screens.photo
 
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import android.net.Uri
@@ -180,7 +182,23 @@ fun PhotoScreen(
         val current = details[list[pager.currentPage].id]
         val cropping = current != null && croppingId == current.id
         AnimatedVisibility(chrome && !cropping, Modifier.align(Alignment.TopCenter), enter = fadeIn(BsMotion.fast()), exit = fadeOut(BsMotion.fast())) {
-            TopBar(current, onBack)
+            // Rotate, crop and split re-encode the image, so the options are images-only
+            TopBar(
+                current, onBack,
+                options = if (current == null || current.isVideo) null else { open, close ->
+                    PhotoOptionsMenu(
+                        current, open, close,
+                        onChanged = { details[it.id] = it },
+                        onDeleted = onBack,
+                        onCrop = { croppingId = current.id },
+                        // The original is in the Bin now, so the first new photo takes its place
+                        onSplit = { id ->
+                            onBack()
+                            onOpenPhoto(id)
+                        },
+                    )
+                },
+            )
         }
         if (current != null) {
             AnimatedVisibility(chrome && !cropping, Modifier.align(Alignment.BottomCenter), enter = fadeIn(BsMotion.fast()), exit = fadeOut(BsMotion.fast())) {
@@ -189,12 +207,6 @@ fun PhotoScreen(
                     onInfo = { showInfo = true },
                     onChanged = { details[it.id] = it },
                     onDeleted = onBack,
-                    onCrop = { croppingId = current.id },
-                    // The original is in the Bin now, so the first new photo takes its place
-                    onSplit = { id ->
-                        onBack()
-                        onOpenPhoto(id)
-                    },
                     onFramer = { onFramer(current.id) },
                 )
             }
@@ -420,14 +432,17 @@ private fun PhotoPage(
     }
 }
 
-/** Back button and the photo's name/date over a black-to-clear scrim. */
+/**
+ * Back button, the photo's name/date and the ⋮ options over a black-to-clear scrim.
+ * [options] draws the dropdown, given whether it's open and how to close it.
+ */
 @Composable
-private fun TopBar(image: Photo?, onBack: () -> Unit) {
+private fun TopBar(image: Photo?, onBack: () -> Unit, options: (@Composable (Boolean, () -> Unit) -> Unit)?) {
     Row(
         Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
-            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+            .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -437,7 +452,7 @@ private fun TopBar(image: Photo?, onBack: () -> Unit) {
         if (image != null) {
             Column(Modifier.weight(1f)) {
                 formatDate(image.takenAt ?: image.createdAt)?.let {
-                    Text(it, style = BsText.Sm.copy(fontWeight = BsWeight.Medium), maxLines = 1)
+                    Text(it, style = BsText.Sm.copy(fontWeight = BsWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text(
                     image.title ?: image.filename,
@@ -448,10 +463,20 @@ private fun TopBar(image: Photo?, onBack: () -> Unit) {
                 )
             }
         }
+        if (options != null) {
+            var open by remember { mutableStateOf(false) }
+            // The dropdown anchors to this box, so it opens under the ⋮, right-aligned
+            Box {
+                Box(Modifier.size(48.dp).clip(BsShapes.Full).bsClickable { open = true }, contentAlignment = Alignment.Center) {
+                    BsIcon(BsIcons.DotsThreeVertical, size = 24.dp, tint = BsColors.Foreground, contentDescription = "More options")
+                }
+                options(open) { open = false }
+            }
+        }
     }
 }
 
-/** One bottom-bar action: 24dp icon over a `text-xs` label, 64dp wide touch area. */
+/** One bottom-bar action: a bare 24dp icon; [label] is for screen readers. */
 @Composable
 private fun Action(
     icon: ImageVector,
@@ -462,20 +487,18 @@ private fun Action(
     loading: Boolean = false,
     tint: Color = BsColors.Foreground,
 ) {
-    Column(
-        modifier.clip(BsShapes.Lg).bsClickable(enabled = enabled && !loading, onClick = onClick).padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Box(
+        modifier.clip(BsShapes.Lg).bsClickable(enabled = enabled && !loading, onClick = onClick).padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
     ) {
         val color = if (enabled) tint else BsColors.MutedFaint
-        if (loading) Spinner(size = 24.dp, tint = color) else BsIcon(icon, size = 24.dp, tint = color)
-        Text(label, style = BsText.Xs2, color = if (enabled) BsColors.MutedSoft else BsColors.MutedFaint, maxLines = 1)
+        if (loading) Spinner(size = 24.dp, tint = color) else BsIcon(icon, size = 24.dp, tint = color, contentDescription = label)
     }
 }
 
 /**
- * Port of image-header.tsx as a bottom bar: favourite, info, download, mark-as-AI, rotate,
- * delete - over a clear-to-black scrim.
+ * Port of image-header.tsx as a bottom bar: favourite, info, download, delete over a
+ * clear-to-black scrim. Rotate, mark-as-AI, crop and split are in the header's ⋮ options.
  */
 @Composable
 private fun ActionBar(
@@ -483,8 +506,6 @@ private fun ActionBar(
     onInfo: () -> Unit,
     onChanged: (Photo) -> Unit,
     onDeleted: () -> Unit,
-    onCrop: () -> Unit,
-    onSplit: (String) -> Unit,
     onFramer: () -> Unit,
 ) {
     val api = BigShelfApp.api
@@ -492,13 +513,6 @@ private fun ActionBar(
     val context = LocalContext.current
     var busy by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
-    var showMore by remember { mutableStateOf(false) }
-    // Only the user's own mark and the AI detector's guess can be undone; photos detected
-    // as AI (metadata, filename, size) stay AI
-    val markedByUser = image.aiSource == USER_MARKED_AI
-    val guessedByModel = image.aiSource == AI_MODEL_SOURCE
-    val detectedAi = image.isAiImage && !markedByUser && !guessedByModel
-    val unmarkable = markedByUser || guessedByModel
 
     fun act(name: String, failure: String, block: suspend () -> Unit) {
         if (busy != null) return
@@ -548,66 +562,9 @@ private fun ActionBar(
             modifier = cell,
             loading = busy == "download",
         )
-        if (!image.isVideo) {
-            // Filled when the photo counts as AI; disabled when that was detected, not marked
-            Action(
-                if (image.isAiImage) BsIcons.FlowerTulipFill else BsIcons.FlowerTulip,
-                if (detectedAi) "AI" else if (unmarkable) "Unmark AI" else "Mark AI",
-                onClick = {
-                    act("ai", "Failed to update AI mark") {
-                        onChanged(api.markAi(image.id, !unmarkable))
-                        PhotoEvents.invalidate("photos")
-                        toast.success(if (unmarkable) "Removed AI mark" else "Marked as AI")
-                    }
-                },
-                modifier = cell,
-                enabled = !detectedAi,
-                loading = busy == "ai",
-            )
-            Action(
-                BsIcons.ArrowClockwise,
-                "Rotate",
-                onClick = {
-                    act("rotate", "Failed to rotate photo") {
-                        onChanged(api.rotate(image.id))
-                        PhotoEvents.invalidate("photos")
-                    }
-                },
-                modifier = cell,
-                loading = busy == "rotate",
-            )
-            // Crop and split re-encode the image, so they're images-only like rotate
-            Action(BsIcons.DotsThreeVertical, "More", onClick = { showMore = true }, modifier = cell, loading = busy == "split")
-        } else {
-            // Videos: pick the best frames of this one in Framer
-            Action(BsIcons.FilmStrip, "Framer", onClick = onFramer, modifier = cell)
-        }
+        // Videos: pick the best frames of this one in Framer
+        if (image.isVideo) Action(BsIcons.FilmStrip, "Framer", onClick = onFramer, modifier = cell)
         Action(BsIcons.Trash, "Delete", onClick = { confirmDelete = true }, modifier = cell, loading = busy == "delete", tint = BsColors.Danger)
-    }
-
-    if (showMore) {
-        BsModal(title = "Edit", onClose = { showMore = false }) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                // The 3:4 window needs the dimensions to size itself
-                if (image.width != null && image.height != null) {
-                    MenuRow(BsIcons.Crop, "Crop to 3:4") {
-                        showMore = false
-                        onCrop()
-                    }
-                }
-                // Splits a collage into its photos; the original moves to the Bin
-                MenuRow(BsIcons.SquareSplitVertical, "Split") {
-                    showMore = false
-                    act("split", "Failed to split photo") {
-                        val created = api.split(image.id).createdPhotos
-                        PhotoEvents.invalidate("photos", "bin-photos")
-                        toast.success("Photo split initiated")
-                        // Show the first new photo now that the original is in the Bin
-                        created.firstOrNull()?.let { onSplit(it.id) } ?: onDeleted()
-                    }
-                }
-            }
-        }
     }
 
     if (confirmDelete) {
@@ -625,6 +582,81 @@ private fun ActionBar(
             },
             onClose = { confirmDelete = false },
         )
+    }
+}
+
+/** The viewer's ⋮ dropdown: rotate, mark/unmark AI, crop and split. */
+@Composable
+private fun PhotoOptionsMenu(
+    image: Photo,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onChanged: (Photo) -> Unit,
+    onDeleted: () -> Unit,
+    onCrop: () -> Unit,
+    onSplit: (String) -> Unit,
+) {
+    val api = BigShelfApp.api
+    val scope = rememberCoroutineScope()
+    // Only the user's own mark and the AI detector's guess can be undone; photos detected
+    // as AI (metadata, filename, size) stay AI
+    val markedByUser = image.aiSource == USER_MARKED_AI
+    val guessedByModel = image.aiSource == AI_MODEL_SOURCE
+    val detectedAi = image.isAiImage && !markedByUser && !guessedByModel
+    val unmarkable = markedByUser || guessedByModel
+
+    fun act(failure: String, block: suspend () -> Unit) {
+        onDismiss()
+        scope.launch {
+            try {
+                block()
+            } catch (_: Exception) {
+                toast.error(failure)
+            }
+        }
+    }
+
+    @Composable
+    fun Item(icon: ImageVector, label: String, onClick: () -> Unit) = DropdownMenuItem(
+        text = { Text(label, style = BsText.Sm) },
+        leadingIcon = { BsIcon(icon, size = 20.dp, tint = BsColors.Muted) },
+        onClick = onClick,
+    )
+
+    DropdownMenu(expanded, onDismissRequest = onDismiss, containerColor = BsColors.Surface) {
+        Item(BsIcons.ArrowClockwise, "Rotate") {
+            act("Failed to rotate photo") {
+                onChanged(api.rotate(image.id))
+                PhotoEvents.invalidate("photos")
+            }
+        }
+        // Photos detected as AI (metadata, filename, size) can't be unmarked, so no item
+        if (!detectedAi) {
+            Item(if (image.isAiImage) BsIcons.FlowerTulipFill else BsIcons.FlowerTulip, if (unmarkable) "Unmark AI" else "Mark as AI") {
+                act("Failed to update AI mark") {
+                    onChanged(api.markAi(image.id, !unmarkable))
+                    PhotoEvents.invalidate("photos")
+                    toast.success(if (unmarkable) "Removed AI mark" else "Marked as AI")
+                }
+            }
+        }
+        // The 3:4 window needs the dimensions to size itself
+        if (image.width != null && image.height != null) {
+            Item(BsIcons.Crop, "Crop to 3:4") {
+                onDismiss()
+                onCrop()
+            }
+        }
+        // Splits a collage into its photos; the original moves to the Bin
+        Item(BsIcons.SquareSplitVertical, "Split") {
+            act("Failed to split photo") {
+                val created = api.split(image.id).createdPhotos
+                PhotoEvents.invalidate("photos", "bin-photos")
+                toast.success("Photo split initiated")
+                // Show the first new photo now that the original is in the Bin
+                created.firstOrNull()?.let { onSplit(it.id) } ?: onDeleted()
+            }
+        }
     }
 }
 
@@ -933,18 +965,6 @@ private fun FaceTagModal(photo: Photo, faceIndex: Int, onChanged: (Photo) -> Uni
 }
 
 /** Menu entry in the viewer's Edit sheet: icon and label. */
-@Composable
-private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(BsShapes.Md).bsClickable(scale = 0.98f, onClick = onClick).padding(horizontal = 8.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        BsIcon(icon, size = 20.dp, tint = BsColors.Muted)
-        Text(label, style = BsText.Sm)
-    }
-}
-
 /** Port of similar-images.tsx: visually similar photos, three across, in the Info sheet. */
 @Composable
 private fun SimilarPhotos(photoId: String, onOpenPhoto: (String) -> Unit) {

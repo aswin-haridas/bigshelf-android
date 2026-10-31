@@ -5,9 +5,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -44,6 +49,7 @@ import com.bigshelf.app.ui.theme.BsMotion
  * max-w-md` dialog, `text-sm font-semibold` title with an X button, optional bordered footer.
  * Fades/scales in over 200ms like the web's `starting:opacity-0 starting:scale-95`.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BsModal(
     title: String,
@@ -87,7 +93,14 @@ fun BsModal(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(title, style = BsText.Sm.copy(fontWeight = BsWeight.Semibold))
+                    // Titles carry names ("Share \"…\"", "Edit: …"): never push the X off the dialog
+                    Text(
+                        title,
+                        Modifier.weight(1f).padding(end = 8.dp),
+                        style = BsText.Sm.copy(fontWeight = BsWeight.Semibold),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Box(
                         Modifier
                             .bsClickable(onClick = onClose)
@@ -97,17 +110,24 @@ fun BsModal(
                         BsIcon(BsIcons.XBold, size = 16.dp, tint = BsColors.Muted, contentDescription = "Close")
                     }
                 }
-                Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) { content() }
+                // Tall content scrolls between a fixed header and footer, so the buttons stay reachable
+                Box(
+                    Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                ) { content() }
                 if (footer != null) {
-                    Row(
+                    // Wraps onto a second line when the buttons don't fit (long names, big text)
+                    FlowRow(
                         Modifier
                             .fillMaxWidth()
                             .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
                             .padding(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                        verticalAlignment = Alignment.CenterVertically,
-                        content = footer,
-                    )
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) { footer() }
                 }
             }
         }

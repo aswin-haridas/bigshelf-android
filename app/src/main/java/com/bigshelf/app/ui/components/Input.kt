@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
@@ -90,7 +91,7 @@ fun BsInput(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box(Modifier.weight(1f)) {
-                    if (value.isEmpty()) Text(placeholder, style = textStyle, color = BsColors.MutedFaint, maxLines = 1)
+                    if (value.isEmpty()) Text(placeholder, style = textStyle, color = BsColors.MutedFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
                 trailing?.invoke()
@@ -100,8 +101,9 @@ fun BsInput(
 }
 
 /**
- * Port of components/Field.tsx: `text-xs text-muted-soft` label over an [BsInput], an eye
- * toggle for passwords, and an optional `text-2xs text-muted-faint font-light` hint.
+ * Port of components/Field.tsx, minus the visible label: on a phone the [label] doubles as the
+ * placeholder of an [BsInput]. Eye toggle for passwords, and an optional
+ * `text-2xs text-muted-faint font-light` hint.
  */
 @Composable
 fun BsField(
@@ -109,7 +111,6 @@ fun BsField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "",
     hint: String? = null,
     password: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
@@ -118,11 +119,10 @@ fun BsField(
 ) {
     var show by rememberSaveable { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, style = BsText.Xs.copy(fontWeight = BsWeight.Normal), color = BsColors.MutedSoft)
         BsInput(
             value = value,
             onValueChange = onValueChange,
-            placeholder = placeholder,
+            placeholder = label,
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (password) KeyboardType.Password else keyboardType,
                 imeAction = imeAction,
@@ -187,7 +187,7 @@ fun BsSearchBar(
             ) {
                 BsIcon(BsIcons.MagnifyingGlass, Modifier.size(20.dp), tint = BsColors.Muted)
                 Box(Modifier.padding(start = 12.dp).weight(1f)) {
-                    if (value.isEmpty()) Text(placeholder, style = style, color = BsColors.Muted, maxLines = 1)
+                    if (value.isEmpty()) Text(placeholder, style = style, color = BsColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
                 if (value.isNotEmpty()) {

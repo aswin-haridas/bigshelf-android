@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.auth
 
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -106,11 +107,13 @@ private fun AuthFooter(prompt: String, linkText: String, onClick: () -> Unit) {
         Text(
             buildAnnotatedString {
                 append("$prompt ")
-                withStyle(SpanStyle(color = BsColors.Foreground, fontWeight = BsWeight.Semibold)) { append(linkText) }
+                // Non-breaking: on narrow screens the link wraps as a whole, never "Sign / Up"
+                withStyle(SpanStyle(color = BsColors.Foreground, fontWeight = BsWeight.Semibold)) { append(linkText.replace(' ', '\u00A0')) }
             },
             Modifier.bsClickable(scale = 1f, onClick = onClick),
             style = BsText.Xs,
             color = BsColors.Muted,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -152,14 +155,12 @@ fun LoginScreen(onRegister: () -> Unit) {
             label = "Username or Email",
             value = identifier,
             onValueChange = { identifier = it },
-            placeholder = "johnfrans or john@example.com",
             keyboardType = KeyboardType.Email,
         )
         BsField(
             label = "Password",
             value = password,
             onValueChange = { password = it },
-            placeholder = "Enter your password",
             password = true,
             imeAction = ImeAction.Done,
             keyboardActions = KeyboardActions(onDone = { submit() }),
@@ -194,16 +195,15 @@ fun RegisterScreen(onLogin: () -> Unit) {
     AuthHeader("Sign up")
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BsField("First Name", firstName, { firstName = it }, Modifier.weight(1f), placeholder = "eg. John")
-            BsField("Last Name", lastName, { lastName = it }, Modifier.weight(1f), placeholder = "eg. Francisco")
+            BsField("First Name", firstName, { firstName = it }, Modifier.weight(1f))
+            BsField("Last Name", lastName, { lastName = it }, Modifier.weight(1f))
         }
-        BsField("Email", email, { email = it }, placeholder = "eg. johnfrans@gmail.com", keyboardType = KeyboardType.Email)
-        BsField("Username", username, { username = it }, placeholder = "eg. johnfrans")
+        BsField("Email", email, { email = it }, keyboardType = KeyboardType.Email)
+        BsField("Username", username, { username = it })
         BsField(
             label = "Password",
             value = password,
             onValueChange = { password = it },
-            placeholder = "Enter your password",
             hint = "Must be at least 8 characters.",
             password = true,
             imeAction = ImeAction.Done,

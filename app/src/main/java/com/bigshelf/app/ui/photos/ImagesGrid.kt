@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.photos
 
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
@@ -330,6 +331,8 @@ private fun DateHeader(label: String, count: Int, selectable: List<Photo>?, modi
                 letterSpacing = BsText.TrackingWider,
             ),
             color = BsColors.MutedSoft,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             "$count ${if (count == 1) "photo" else "photos"}",

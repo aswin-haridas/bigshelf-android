@@ -114,7 +114,6 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PeopleHeader(PeopleTab.People, onTab) {
             BsSearchBar(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "Search people")
-            FaceReviewBanner()
         }
         when {
             query.isLoading -> LoadingText()
@@ -217,7 +216,6 @@ fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
                     textStyle = BsText.Xs,
                 ) { Text(if (selecting) "Done" else "Select") }
             }
-            FaceReviewBanner()
         }
         Box(Modifier.weight(1f)) {
             when {
@@ -462,8 +460,8 @@ fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -
 }
 
 /**
- * Instagram profile header: 88dp avatar beside Photos / Videos / Years, the name with the
- * first year under it, then an optional row of equal-width buttons.
+ * Instagram profile header: 72dp avatar beside Photos / Videos / Years, the first year under
+ * it, then an optional row of equal-width buttons.
  */
 @Composable
 private fun ProfileHeader(
@@ -476,15 +474,15 @@ private fun ProfileHeader(
     val years = remember(photos) { photos.mapNotNull { (it.takenAt ?: it.createdAt)?.take(4)?.toIntOrNull() }.toSet() }
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Avatar(imageSrc, name, Modifier.size(88.dp))
+            Avatar(imageSrc, name, Modifier.size(72.dp))
             Row(Modifier.weight(1f).padding(start = 16.dp)) {
                 Stat(total, if (total == 1) "Photo" else "Photos")
                 Stat(photos.count { it.isVideo }, "Videos")
                 Stat(years.size, if (years.size == 1) "Year" else "Years")
             }
         }
-        Text(name, Modifier.padding(top = 12.dp), style = BsText.Sm.copy(fontWeight = BsWeight.Semibold))
-        years.minOrNull()?.let { Text("Since $it", style = BsText.Xs, color = BsColors.Muted) }
+        // The name is already the page title, so only the first year sits under the avatar
+        years.minOrNull()?.let { Text("Since $it", Modifier.padding(top = 12.dp), style = BsText.Xs, color = BsColors.Muted) }
         if (actions != null) {
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), content = actions)
         }
@@ -495,6 +493,6 @@ private fun ProfileHeader(
 private fun RowScope.Stat(value: Int, label: String) {
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("$value", style = BsText.Base.copy(fontWeight = BsWeight.Semibold))
-        Text(label, style = BsText.Xs, color = BsColors.Muted)
+        Text(label, style = BsText.Xs, color = BsColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

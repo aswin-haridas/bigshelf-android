@@ -150,7 +150,7 @@ fun RowGroup(modifier: Modifier, rows: List<Pair<Triple<String, ImageVector, Str
 fun Chip(label: String, onClick: () -> Unit, icon: ImageVector? = null, swatch: Color? = null) {
     Row(
         Modifier
-            .height(40.dp)
+            .heightIn(min = 40.dp)
             .clip(BsShapes.Full)
             .background(BsColors.Surface)
             .border(1.dp, BsColors.Border, BsShapes.Full)
@@ -161,7 +161,7 @@ fun Chip(label: String, onClick: () -> Unit, icon: ImageVector? = null, swatch: 
     ) {
         if (swatch != null) Box(Modifier.size(16.dp).clip(BsShapes.Full).background(swatch).border(1.dp, BsColors.BorderFocus, BsShapes.Full))
         if (icon != null) BsIcon(icon, size = 16.dp, tint = BsColors.Muted)
-        Text(label, style = BsText.Xs.copy(fontWeight = BsWeight.Medium), maxLines = 1)
+        Text(label, Modifier.weight(1f, fill = false), style = BsText.Xs.copy(fontWeight = BsWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
