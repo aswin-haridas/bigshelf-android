@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
@@ -53,6 +54,7 @@ fun BsButton(
     contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
     textStyle: TextStyle = BsText.Sm,
     gap: Dp = 6.dp,
+    shape: Shape = BsShapes.Lg,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -69,7 +71,7 @@ fun BsButton(
     Row(
         modifier = modifier
             .pressScale(interaction, if (clickable) 0.97f else 1f)
-            .clip(BsShapes.Lg)
+            .clip(shape)
             .background(bg)
             .clickable(interaction, indication = null, enabled = clickable, onClick = onClick)
             .padding(contentPadding),

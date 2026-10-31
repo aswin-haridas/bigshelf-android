@@ -165,7 +165,7 @@ fun LoginScreen(onRegister: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
         AuthError(AuthStore.error)
-        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading) {
+        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading, shape = BsShapes.Xl) {
             Text(if (loading) "Logging in..." else "Log in")
         }
     }
@@ -210,7 +210,7 @@ fun RegisterScreen(onLogin: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
         AuthError(AuthStore.error)
-        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading) {
+        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading, shape = BsShapes.Xl) {
             Text(if (loading) "Signing up..." else "Sign Up")
         }
     }
