@@ -25,7 +25,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,7 +42,6 @@ import com.bigshelf.app.data.MergeSuggestion
 import com.bigshelf.app.data.MergeSuggestionPerson
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.QueryState
-import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsModal
@@ -57,64 +55,9 @@ import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.launch
 
-/**
- * Port of face-confirmation-popup.tsx: a dismissible "Face review" card that opens the
- * review modal. Renders nothing when the queue is empty.
- */
-@Composable
-fun FaceReviewBanner(modifier: Modifier = Modifier) {
-    val query = rememberQuery("face-review", invalidatedBy = setOf("people", "faces")) { BigShelfApp.api.faceReview() }
-    var dismissed by rememberSaveable { mutableStateOf(false) }
-    var open by remember { mutableStateOf(false) }
-    val data = query.data
-    val batch = data?.batch
-    val merge = data?.merge
-
-    if (open) FaceReviewModal(query, onClose = { open = false })
-    if (dismissed || (batch == null && merge == null)) return
-
-    Column(
-        modifier
-            .fillMaxWidth()
-            .clip(BsShapes.Xl)
-            .background(BsColors.Surface)
-            .border(1.dp, BsColors.Border, BsShapes.Xl)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // The pair for a merge question (asked first), else the reference + first faces
-            val thumbs = if (merge != null) listOf(merge.keep.faceThumbnail, merge.merge.faceThumbnail)
-            else listOfNotNull(batch?.reference?.faceThumbnail) + batch?.faces.orEmpty().take(2).map { it.faceThumbnail }
-            Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
-                thumbs.forEach { FaceThumb(it, 40.dp, Modifier.border(2.dp, BsColors.Surface, BsShapes.Full).clip(BsShapes.Full)) }
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (merge != null) "Is ${merge.merge.personName} the same as ${merge.keep.personName}?"
-                    else "Are these all ${batch?.personName}?",
-                    style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    if (merge != null) "Two people look nearly identical"
-                    else "${data?.total} face${if (data?.total == 1) "" else "s"} to review",
-                    style = BsText.Xs2,
-                    color = BsColors.Muted,
-                )
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-            BsButton(onClick = { dismissed = true }, variant = ButtonVariant.Ghost) { Text("Dismiss") }
-            BsButton(onClick = { open = true }) { Text("Review") }
-        }
-    }
-}
-
 /** Port of face-confirmation-modal.tsx: the merge question first, then one face grid per person. */
 @Composable
-private fun FaceReviewModal(query: QueryState<FaceReview>, onClose: () -> Unit) {
+fun FaceReviewModal(query: QueryState<FaceReview>, onClose: () -> Unit) {
     val data = query.data
     val merge = data?.merge
     val batch = data?.batch

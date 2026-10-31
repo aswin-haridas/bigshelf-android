@@ -14,12 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import com.bigshelf.app.ui.screens.tools.CleanUpModal
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -108,8 +103,6 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
     val storage = rememberQuery("storage", invalidatedBy = setOf("photos")) { BigShelfApp.api.storage() }
     // System photo picker stands in for the web dropzone / file dialog
     val upload = rememberUploadPicker()
-    // "Clean up" review of low-scoring photos across the whole library
-    var cleaningUp by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Library", count = storage.data?.let { "${formatBytes(it.usedBytes)} used" })
@@ -135,7 +128,6 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
                 LibraryRow("Composer", BsIcons.Sparkle, divider = true, onClick = { onNavigate(Routes.COMPOSER) })
                 LibraryRow("Pipelines", BsIcons.FlowArrow, divider = true, onClick = { onNavigate(Routes.PIPELINES) })
                 LibraryRow("Organize", BsIcons.Funnel, divider = true, onClick = { onNavigate(Routes.ORGANIZE) })
-                LibraryRow("Clean up", BsIcons.Broom, divider = true, caret = false, onClick = { cleaningUp = true })
                 LibraryRow("Rating", BsIcons.Fire, divider = true, onClick = { onNavigate(Routes.RATING) })
                 LibraryRow("Swipe", BsIcons.Heart, divider = true, onClick = { onNavigate(Routes.SWIPE) })
             }
@@ -148,5 +140,4 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
             Spacer(Modifier.height(8.dp))
         }
     }
-    if (cleaningUp) CleanUpModal(onClose = { cleaningUp = false }, onOpenPhoto = { onNavigate(Routes.photo(it)) })
 }

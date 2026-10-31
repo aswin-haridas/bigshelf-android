@@ -249,10 +249,11 @@ class Api(context: Context, val baseUrl: String) {
     // A [cursor] (PhotoPage.nextCursor) takes over from [page] on Home, Bin and Archive
     suspend fun photos(
         page: Int, favorite: Boolean? = null, size: Int = PAGE_SIZE, filter: PhotoFilter? = null, cursor: String? = null,
+        people: Boolean? = null,
     ) =
         get(
             "/api/v1/photos", PhotoPage.serializer(),
-            mapOf("page" to page, "size" to size, "favorite" to favorite, "cursor" to cursor) + filterParams(filter),
+            mapOf("page" to page, "size" to size, "favorite" to favorite, "cursor" to cursor, "people" to people) + filterParams(filter),
         )
 
     private fun filterParams(filter: PhotoFilter?): Map<String, Any?> = mapOf(
@@ -594,6 +595,13 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun organize(limit: Int) =
         get("/api/v1/photos/organize", MapSerializer(String.serializer(), Bucket.serializer()), mapOf("limit" to limit))
+
+    /** Predicted capture dates the backend isn't sure of (Organize > Dates). */
+    suspend fun photoDates() = get("/api/v1/photos/organize/dates", DatesPage.serializer())
+
+    /** Set or confirm a capture date (ISO-8601); the backend then treats it as ground truth. */
+    suspend fun setTakenAt(id: String, takenAt: String) =
+        send("PATCH", "/api/v1/photos/$id", Photo.serializer(), buildJsonObject { put("taken_at", takenAt) })
 
     /** The next page's low framer scores (worst first), photos older than [before]. */
     suspend fun uglyPhotos(before: String?) =

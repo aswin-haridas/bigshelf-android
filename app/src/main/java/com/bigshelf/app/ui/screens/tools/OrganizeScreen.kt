@@ -51,6 +51,7 @@ import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.photos.ImagesGrid
 import com.bigshelf.app.ui.screens.explore.CoverCard
+import com.bigshelf.app.ui.screens.people.FaceReviewModal
 import com.bigshelf.app.ui.photos.photoCount
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
@@ -61,6 +62,20 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberDatePickerState
+import com.bigshelf.app.data.Photo
+import com.bigshelf.app.ui.components.bsClickable
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 // Kept in sync with the backend's organize bucket cap (web MAX_ZIP_PHOTOS)
 private const val BUCKET_LIMIT = 300
@@ -96,6 +111,9 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicat
     }
     BackHandler(tab != null, closeBucket)
     var reprocessing by remember { mutableStateOf(false) }
+    // Clean up and Face review open as modals over the cards
+    var modal by rememberSaveable { mutableStateOf<String?>(null) }
+    val faceReview = rememberQuery("face-review", invalidatedBy = setOf("people", "faces")) { api.faceReview() }
 
     val bucket = tab?.let { query.data?.get(it) }
     val items = bucket?.items.orEmpty()
@@ -150,6 +168,13 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicat
                 }
                 // Duplicates lives here too, as one more card next to the buckets
                 item(key = "duplicates") { CoverCard("Duplicates", null, null, onClick = onDuplicates, icon = BsIcons.Copy) }
+                item(key = "cleanup") { CoverCard("Clean up", null, null, onClick = { modal = "cleanup" }, icon = BsIcons.Broom) }
+                // Predicted capture dates the pipeline isn't sure of
+                item(key = "dates") { CoverCard("Dates", null, null, onClick = { modal = "dates" }, icon = BsIcons.CalendarBlank) }
+                // The people-page confirmation queue ("Are these all Anna?")
+                item(key = "faces") {
+                    CoverCard("Face review", faceReview.data?.let { "${it.total} to review" }, null, onClick = { modal = "faces" }, icon = BsIcons.Users)
+                }
             }
             items.isEmpty() -> EmptyState("Nothing here")
             else -> ImagesGrid(
@@ -159,6 +184,11 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicat
                 groupByDate = false,
             )
         }
+    }
+    when (modal) {
+        "cleanup" -> CleanUpModal(onClose = { modal = null }, onOpenPhoto = onOpenPhoto)
+        "faces" -> FaceReviewModal(faceReview, onClose = { modal = null })
+        "dates" -> DatesModal(onClose = { modal = null })
     }
 }
 
@@ -291,5 +321,85 @@ fun CleanUpModal(onClose: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 }
             }
         }
+    }
+}
+
+private val DATE_SOURCE = mapOf("filename" to "From filename", "scene" to "From similar photos", "upload" to "Upload time")
+
+/**
+ * Port of organize/components/dates.tsx: photos whose upload had no EXIF date and whose
+ * predicted date is a low-confidence guess. Confirm the guess, or pick the right day.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatesModal(onClose: () -> Unit) {
+    val api = BigShelfApp.api
+    val scope = rememberCoroutineScope()
+    val query = rememberQuery("photo-dates", invalidatedBy = setOf("organize")) { api.photoDates() }
+    // Confirmed this session: hidden at once, before the refetch lands
+    var done by remember { mutableStateOf(setOf<String>()) }
+    var picking by remember { mutableStateOf<Photo?>(null) }
+    val items = query.data?.items.orEmpty().filter { it.id !in done }
+
+    fun save(photo: Photo, takenAt: OffsetDateTime) = scope.launch {
+        try {
+            api.setTakenAt(photo.id, takenAt.toString())
+            done = done + photo.id
+            PhotoEvents.invalidate("photos")
+        } catch (_: Exception) {
+            toast.error("Failed to save the date")
+        }
+    }
+
+    BsModal("Confirm dates", onClose = onClose, footer = { BsButton(onClose, variant = ButtonVariant.Ghost) { Text("Done") } }) {
+        when {
+            query.data == null -> LoadingText()
+            items.isEmpty() -> EmptyState("Every photo has a date")
+            else -> LazyColumn(Modifier.heightIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item { Text("Guessed from filenames and similar photos. Tap the date to change it.", style = BsText.Xs, color = BsColors.Muted) }
+                items(items, key = { it.id }) { photo ->
+                    val takenAt = photo.takenAt?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() } ?: OffsetDateTime.now()
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AsyncImage(
+                            api.mediaUrl(photo.thumbnailUrl ?: ""),
+                            photo.filename,
+                            Modifier.size(width = 48.dp, height = 64.dp).clip(BsShapes.Md),
+                            contentScale = ContentScale.Crop,
+                        )
+                        Column(Modifier.weight(1f).bsClickable(scale = 1f) { picking = photo }) {
+                            Text(
+                                takenAt.atZoneSameInstant(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a")),
+                                style = BsText.Sm,
+                            )
+                            Text(
+                                (DATE_SOURCE[photo.takenAtSource] ?: "Guess") +
+                                    (photo.takenAtConfidence?.takeIf { it > 0 }?.let { " · ${(it * 100).toInt()}%" } ?: ""),
+                                style = BsText.Xs2,
+                                color = BsColors.Muted,
+                            )
+                        }
+                        BsButton({ save(photo, takenAt) }, variant = ButtonVariant.Secondary) { Text("Confirm") }
+                    }
+                }
+            }
+        }
+    }
+
+    picking?.let { photo ->
+        val guess = photo.takenAt?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() } ?: OffsetDateTime.now()
+        val state = rememberDatePickerState(initialSelectedDateMillis = guess.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { picking = null },
+            confirmButton = {
+                BsButton({
+                    // ponytail: only the day is picked; the guessed time of day is kept
+                    state.selectedDateMillis?.let { ms ->
+                        val day = Instant.ofEpochMilli(ms).atOffset(ZoneOffset.UTC).toLocalDate()
+                        save(photo, guess.with(day))
+                    }
+                    picking = null
+                }) { Text("Save") }
+            },
+        ) { DatePicker(state) }
     }
 }

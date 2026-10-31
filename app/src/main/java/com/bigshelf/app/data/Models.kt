@@ -76,6 +76,11 @@ data class Photo(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val exif: CameraInfo? = null,
+    // Home feed only (photos(people = true)): named people tagged on it, for the post header
+    val people: List<PhotoPersonTag>? = null,
+    // Organize > Dates only: how taken_at was guessed (filename / scene / upload) and how sure
+    @SerialName("taken_at_source") val takenAtSource: String? = null,
+    @SerialName("taken_at_confidence") val takenAtConfidence: Double? = null,
 ) {
     /** Same fallback as web `withIsAi`: server flag, else the ChatGPT filename rule. */
     val isAiImage get() = isAi || filename.lowercase().startsWith("chatgpt")
@@ -391,6 +396,13 @@ data class ClearedResponse(@SerialName("cleared_count") val clearedCount: Int = 
 data class Bucket(val count: Int = 0, val items: List<Photo> = emptyList())
 
 /** Organize's Clean up: photos scored under the cut-off; [nextBefore] is null once the library runs out. */
+@Serializable
+data class PhotoPersonTag(val id: String, val name: String, @SerialName("face_thumbnail") val faceThumbnail: String? = null)
+
+/** Photos with a low-confidence predicted capture date, least confident first. */
+@Serializable
+data class DatesPage(val items: List<Photo> = emptyList(), val total: Int = 0)
+
 @Serializable
 data class UglyPage(
     val items: List<Photo> = emptyList(),
