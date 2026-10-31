@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.size
+import com.bigshelf.app.ui.components.FitText
+import com.bigshelf.app.ui.components.bsClickable
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -233,22 +237,30 @@ fun SwipeScreen(onBack: () -> Unit) {
                     // key remounts per photo so the drag offset starts at zero
                     key(current.id) { SwipeCard(current, card) { swipe(current, it) } }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    VerdictButton(BsIcons.Trash, "Bin") { swipe(current, Verdict.Bin) }
-                    VerdictButton(BsIcons.Wrench, "Rework") { swipe(current, Verdict.Rework) }
-                    VerdictButton(BsIcons.Heart, "Favourite") { swipe(current, Verdict.Favorite) }
-                    VerdictButton(BsIcons.CheckBold, "Keep") { swipe(current, Verdict.Keep) }
+                // Left to right as the swipes go: Bin is a left swipe, Keep a right one
+                Row(Modifier.fillMaxWidth()) {
+                    VerdictButton(BsIcons.Trash, Verdict.Bin) { swipe(current, Verdict.Bin) }
+                    VerdictButton(BsIcons.Wrench, Verdict.Rework) { swipe(current, Verdict.Rework) }
+                    VerdictButton(BsIcons.Heart, Verdict.Favorite) { swipe(current, Verdict.Favorite) }
+                    VerdictButton(BsIcons.CheckBold, Verdict.Keep) { swipe(current, Verdict.Keep) }
                 }
             }
         }
     }
 }
 
+/** Equal-width thumb target: the verdict's colour on a 56dp circle, a small label under it. */
 @Composable
-private fun VerdictButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    BsButton(onClick = onClick, variant = ButtonVariant.Secondary) {
-        BsIcon(icon, size = 14.dp)
-        Text(label)
+private fun RowScope.VerdictButton(icon: androidx.compose.ui.graphics.vector.ImageVector, verdict: Verdict, onClick: () -> Unit) {
+    Column(
+        Modifier.weight(1f).bsClickable(scale = 0.92f, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.size(56.dp).clip(BsShapes.Full).background(BsColors.Surface), contentAlignment = Alignment.Center) {
+            BsIcon(icon, size = 24.dp, tint = verdict.color)
+        }
+        FitText(verdict.label, BsText.Xs2.copy(color = BsColors.Muted))
     }
 }
 

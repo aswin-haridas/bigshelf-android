@@ -156,8 +156,9 @@ fun AppShell() {
 
     val selecting = SelectionStore.count > 0
     val inViewer = path.startsWith("photos/")
-    // Landscape-locked Duplicates needs every bit of height, so it drops the bottom bar too
-    val fullScreen = inViewer || path == Routes.DUPLICATES
+    // Landscape-locked Duplicates needs every bit of height, and Swipe keeps its actions where the
+    // thumb rests, so both drop the bottom bar
+    val fullScreen = inViewer || path == Routes.DUPLICATES || path == Routes.SWIPE
     // Nav and selection bar both dock below the page; selection replaces the nav
     val showNav = !selecting && !fullScreen
     Column(Modifier.fillMaxSize().background(BsColors.Background)) {

@@ -1,5 +1,7 @@
 package com.bigshelf.app.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -169,7 +171,7 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
     }
 }
 
-/** One post: people + date header, the photos as slides with a counter and dots. */
+/** One post: people + date header, the photos as slides with a counter and dots shown while swiping. */
 @Composable
 private fun Post(photos: List<Photo>, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
@@ -194,10 +196,21 @@ private fun Post(photos: List<Photo>, onOpenPhoto: (String) -> Unit) {
                 }
             }
             if (photos.size > 1) {
+                // Counter and dots sit on the photo and only show while swiping, fading out after
+                var showDots by remember { mutableStateOf(false) }
+                LaunchedEffect(pager.isScrollInProgress, pager.currentPage) {
+                    if (pager.isScrollInProgress) showDots = true
+                    else {
+                        delay(1500)
+                        showDots = false
+                    }
+                }
+                val dotsAlpha by animateFloatAsState(if (showDots) 1f else 0f, label = "dots")
                 Text(
                     "${pager.currentPage + 1}/${photos.size}",
                     Modifier
                         .align(Alignment.TopEnd)
+                        .graphicsLayer { alpha = dotsAlpha }
                         .padding(12.dp)
                         .clip(BsShapes.Full)
                         .background(BsColors.Background.copy(alpha = 0.6f))
@@ -205,20 +218,24 @@ private fun Post(photos: List<Photo>, onOpenPhoto: (String) -> Unit) {
                     style = BsText.Xs2,
                     color = BsColors.Foreground,
                 )
-            }
-        }
-        if (photos.size > 1) {
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            ) {
-                repeat(photos.size) { i ->
-                    Box(
-                        Modifier
-                            .size(6.dp)
-                            .clip(BsShapes.Full)
-                            .background(if (i == pager.currentPage) BsColors.Primary else BsColors.MutedFaint),
-                    )
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .graphicsLayer { alpha = dotsAlpha }
+                        .padding(12.dp)
+                        .clip(BsShapes.Full)
+                        .background(BsColors.Background.copy(alpha = 0.6f))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    repeat(photos.size) { i ->
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .clip(BsShapes.Full)
+                                .background(if (i == pager.currentPage) BsColors.Foreground else BsColors.Foreground.copy(alpha = 0.4f)),
+                        )
+                    }
                 }
             }
         }
