@@ -93,6 +93,7 @@ import com.adamglin.phosphoricons.regular.Tag
 import com.adamglin.phosphoricons.regular.Trash
 import com.adamglin.phosphoricons.regular.UploadSimple
 import com.adamglin.phosphoricons.regular.Users
+import com.adamglin.phosphoricons.regular.Wrench
 
 /**
  * Phosphor icons - the same set the web app imports from @phosphor-icons/react.
@@ -186,6 +187,7 @@ object BsIcons {
     val Tag: ImageVector get() = PhosphorIcons.Regular.Tag
     val Trash: ImageVector get() = PhosphorIcons.Regular.Trash
     val UploadSimple: ImageVector get() = PhosphorIcons.Regular.UploadSimple
+    val Wrench: ImageVector get() = PhosphorIcons.Regular.Wrench
     val Users: ImageVector get() = PhosphorIcons.Regular.Users
     val UsersFill: ImageVector get() = PhosphorIcons.Fill.FillUsers
     val WarningCircleFill: ImageVector get() = PhosphorIcons.Fill.FillWarningCircle

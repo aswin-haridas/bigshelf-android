@@ -63,6 +63,8 @@ import kotlin.math.abs
 private const val SWIPE_WINDOW = 10
 private const val SWIPE_REFILL_AT = 3
 private const val SWIPE_UNDO_LIMIT = 3
+// A keep this soon (ms) after the photo came up is a gut "yes": it gets a point of heat
+private const val QUICK_KEEP_MS = 1500L
 // How far a drag must travel to count as a swipe
 private val THRESHOLD = 100.dp
 
@@ -70,13 +72,15 @@ private enum class Verdict(val label: String, val color: Color) {
     Keep("Keep", BsColors.Success),
     Bin("Bin", BsColors.Danger),
     Favorite("Favourite", Color(0xFFF472B6)),
+    Rework("Rework", Color(0xFFFBBF24)),
 }
 
 // A swipe; `compared` completes with the Rating answer it produced, if any
-private class Swipe(val photo: Photo, val verdict: Verdict, val compared: CompletableDeferred<String?>)
+private class Swipe(val photo: Photo, val verdict: Verdict, val boosted: Boolean, val compared: CompletableDeferred<String?>)
 
 /**
- * Port of modules/swipe: one photo at a time, swipe left to bin, right to keep, up to favourite.
+ * Port of modules/swipe: one photo at a time, swipe left to bin, right to keep, up to mark for
+ * rework. A quick keep adds a point of heat.
  * Cleanup and rating at once: every kept photo is recorded as hotter than the last binned one
  * (and vice versa), so swipes train the same taste model Rating does.
  */
@@ -112,6 +116,9 @@ fun SwipeScreen(onBack: () -> Unit) {
 
     val current = queue.firstOrNull()
     val next = queue.getOrNull(1)
+    // When the photo on top came up, to time the swipe on it
+    var shownAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(current?.id) { shownAt = System.currentTimeMillis() }
 
     // Warm the cache with the next photo so it appears instantly
     LaunchedEffect(next?.id) {
@@ -125,9 +132,19 @@ fun SwipeScreen(onBack: () -> Unit) {
     fun swipe(photo: Photo, verdict: Verdict) {
         queue.remove(photo)
         count++
-        val opponent = if (verdict == Verdict.Bin) lastKept else lastBinned
-        if (verdict == Verdict.Bin) lastBinned = photo else lastKept = photo
-        val entry = Swipe(photo, verdict, CompletableDeferred())
+        val boosted = verdict == Verdict.Keep && System.currentTimeMillis() - shownAt < QUICK_KEEP_MS
+        // Rework is not a verdict on taste, so no rating either way
+        val opponent = when (verdict) {
+            Verdict.Bin -> lastKept
+            Verdict.Rework -> null
+            else -> lastBinned
+        }
+        when (verdict) {
+            Verdict.Bin -> lastBinned = photo
+            Verdict.Rework -> Unit
+            else -> lastKept = photo
+        }
+        val entry = Swipe(photo, verdict, boosted, CompletableDeferred())
         history.add(entry)
         if (history.size > SWIPE_UNDO_LIMIT) history.removeAt(0)
         scope.launch {
@@ -135,10 +152,18 @@ fun SwipeScreen(onBack: () -> Unit) {
                 when (verdict) {
                     Verdict.Bin -> api.flagDeleted(listOf(photo.id), true)
                     Verdict.Favorite -> api.setFavorite(photo.id, true)
-                    Verdict.Keep -> Unit
+                    Verdict.Rework -> api.setRework(photo.id, true)
+                    Verdict.Keep -> if (boosted) api.boostHeat(photo.id).also { refresh() }
                 }
             } catch (_: Exception) {
-                toast.error(if (verdict == Verdict.Bin) "Failed to move to Bin" else "Failed to favourite")
+                toast.error(
+                    when (verdict) {
+                        Verdict.Bin -> "Failed to move to Bin"
+                        Verdict.Favorite -> "Failed to favourite"
+                        Verdict.Rework -> "Failed to mark for rework"
+                        Verdict.Keep -> "Failed to save the rating"
+                    },
+                )
             }
             if (opponent == null) {
                 entry.compared.complete(null)
@@ -168,7 +193,8 @@ fun SwipeScreen(onBack: () -> Unit) {
                 when (last.verdict) {
                     Verdict.Bin -> api.flagDeleted(listOf(last.photo.id), false)
                     Verdict.Favorite -> api.setFavorite(last.photo.id, false)
-                    Verdict.Keep -> Unit
+                    Verdict.Rework -> api.setRework(last.photo.id, false)
+                    Verdict.Keep -> if (last.boosted) api.boostHeat(last.photo.id, -1.0)
                 }
                 last.compared.await()?.let { api.undoCompare(it) }
                 refresh()
@@ -209,6 +235,7 @@ fun SwipeScreen(onBack: () -> Unit) {
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     VerdictButton(BsIcons.Trash, "Bin") { swipe(current, Verdict.Bin) }
+                    VerdictButton(BsIcons.Wrench, "Rework") { swipe(current, Verdict.Rework) }
                     VerdictButton(BsIcons.Heart, "Favourite") { swipe(current, Verdict.Favorite) }
                     VerdictButton(BsIcons.CheckBold, "Keep") { swipe(current, Verdict.Keep) }
                 }
@@ -232,7 +259,7 @@ private fun SwipeCard(photo: Photo, modifier: Modifier, onSwipe: ((Verdict) -> U
     val offset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     val threshold = with(LocalDensity.current) { THRESHOLD.toPx() }
     fun verdictOf(o: Offset) = when {
-        -o.y > threshold && -o.y > abs(o.x) -> Verdict.Favorite
+        -o.y > threshold && -o.y > abs(o.x) -> Verdict.Rework
         o.x > threshold -> Verdict.Keep
         o.x < -threshold -> Verdict.Bin
         else -> null

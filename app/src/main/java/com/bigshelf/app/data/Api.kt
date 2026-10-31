@@ -314,6 +314,9 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun setFavorite(id: String, favorite: Boolean) =
         send("PATCH", "/api/v1/photos/$id", Photo.serializer(), buildJsonObject { put("is_favorite", favorite) })
 
+    suspend fun setRework(id: String, rework: Boolean) =
+        send("PATCH", "/api/v1/photos/$id", Photo.serializer(), buildJsonObject { put("needs_rework", rework) })
+
     suspend fun markAi(id: String, isAi: Boolean) =
         send("PATCH", "/api/v1/photos/$id/ai", Photo.serializer(), params = mapOf("is_ai" to isAi))
 
@@ -610,6 +613,10 @@ class Api(context: Context, val baseUrl: String) {
     ).id
 
     suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/rating/compare/$id")
+
+    /** Adds [points] of heat on top of the taste model's (-1 takes a boost back). */
+    suspend fun boostHeat(id: String, points: Double = 1.0) =
+        sendUnit("POST", "/api/v1/rating/boost/$id", buildJsonObject { put("points", points) })
 
     suspend fun resetRating() = send("DELETE", "/api/v1/rating", ClearedResponse.serializer())
 
