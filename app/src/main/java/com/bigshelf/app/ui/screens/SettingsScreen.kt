@@ -6,6 +6,8 @@ import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -86,13 +88,18 @@ private fun Modifier.divider(show: Boolean) = drawBehind {
     if (show) drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx())
 }
 
-/** Label + hint on the left, control on the right (`px-4 py-3`). */
+/**
+ * Label + hint on the left, control on the right (`px-4 py-3`). The control drops below when the
+ * label's longest word wouldn't fit beside it, so neither breaks mid-word at big font scales.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SettingRow(label: String, hint: String?, modifier: Modifier = Modifier, control: @Composable () -> Unit) {
-    Row(
+    FlowRow(
         modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        itemVerticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
     ) {
         Column(Modifier.weight(1f)) {
             Text(label, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
@@ -389,8 +396,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                         variant = ButtonVariant.Secondary,
                         enabled = !regenerating,
                     ) {
-                        if (regenerating) Spinner(size = 16.dp) else BsIcon(BsIcons.ArrowsClockwise, size = 16.dp)
-                        Text("Regenerate")
+                        // Text only: with an icon the button squeezed "Thumbnails" into "Thumbn/ails"
+                        if (regenerating) Spinner(size = 16.dp) else Text("Regenerate")
                     }
                 }
                 if (Updater.supported()) AutoUpdateRow()

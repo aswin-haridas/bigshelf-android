@@ -18,6 +18,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,6 +39,23 @@ import com.bigshelf.app.ui.theme.MonoFamily
 import com.bigshelf.app.ui.theme.BsMotion
 
 data class TabItem<T>(val id: T, val label: String)
+
+/** One line of text that steps its font size down until it fits, instead of clipping or ellipsizing. */
+@Composable
+fun FitText(text: String, style: TextStyle, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val measurer = rememberTextMeasurer()
+        val max = constraints.maxWidth
+        val fitted = remember(text, style, max) {
+            var s = style
+            while (s.fontSize.value > 6f && measurer.measure(text, s, softWrap = false, maxLines = 1).size.width > max) {
+                s = s.copy(fontSize = s.fontSize * 0.92f, lineHeight = s.lineHeight * 0.92f)
+            }
+            s
+        }
+        BasicText(text, style = fitted, maxLines = 1, softWrap = false)
+    }
+}
 
 /** Segmented control: a borderless surface pill, the active tab a lighter pill inside it. */
 @Composable
@@ -61,13 +83,7 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
                     .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    tab.label,
-                    style = BsText.Xs.copy(fontWeight = BsWeight.Medium),
-                    color = if (selected) BsColors.Foreground else BsColors.Muted,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
+                FitText(tab.label, BsText.Xs.copy(fontWeight = BsWeight.Medium, color = if (selected) BsColors.Foreground else BsColors.Muted))
             }
         }
     }
