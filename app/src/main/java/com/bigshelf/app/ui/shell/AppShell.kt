@@ -1,7 +1,6 @@
 package com.bigshelf.app.ui.shell
 
 import androidx.compose.foundation.layout.fillMaxHeight
-import com.bigshelf.app.ui.components.FitText
 import com.bigshelf.app.ui.theme.BsWeight
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
@@ -190,8 +189,8 @@ fun AppShell() {
 val LocalBottomBarInset = staticCompositionLocalOf { 0.dp }
 
 /**
- * Docked nav below the page: Photos, Search, People, Library. Icon over a small label; the active
- * tab is just brighter with a filled icon. Labels shrink to fit rather than clip at big font scales.
+ * Docked icon nav below the page: Photos, Search, upload, People, Library. The active tab is just brighter
+ * with a filled icon; labels are for screen readers.
  */
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit) {
@@ -201,18 +200,26 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit) {
             .background(BsColors.Background)
             .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
             .navigationBarsPadding()
-            .height(60.dp),
+            .height(56.dp),
     ) {
-        TABS.forEach { tab ->
+        val upload = rememberUploadPicker()
+        TABS.forEachIndexed { i, tab ->
+            // Upload sits in the middle, a plus on a surface circle so it reads as an action, not a tab
+            if (i == TABS.size / 2) Box(
+                Modifier.weight(1f).fillMaxHeight().bsClickable(scale = 0.9f, onClick = upload),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(40.dp).background(BsColors.Surface, BsShapes.Full), contentAlignment = Alignment.Center) {
+                    BsIcon(BsIcons.Plus, size = 22.dp, tint = BsColors.Foreground, contentDescription = "Upload photos")
+                }
+            }
             val selected = tab.route == active
             val tint by animateColorAsState(if (selected) BsColors.Foreground else BsColors.Muted, BsMotion.fast(), label = "tabTint")
-            Column(
-                Modifier.weight(1f).fillMaxHeight().bsClickable(scale = 0.92f) { onSelect(tab.route) }.padding(horizontal = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            Box(
+                Modifier.weight(1f).fillMaxHeight().bsClickable(scale = 0.9f) { onSelect(tab.route) },
+                contentAlignment = Alignment.Center,
             ) {
-                BsIcon(if (selected) tab.activeIcon else tab.icon, size = 22.dp, tint = tint)
-                FitText(tab.label, BsText.Xs2.copy(color = tint, fontWeight = BsWeight.Medium))
+                BsIcon(if (selected) tab.activeIcon else tab.icon, size = 24.dp, tint = tint, contentDescription = tab.label)
             }
         }
     }
