@@ -13,10 +13,13 @@ import androidx.annotation.RequiresApi
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.bigshelf.app.BigShelfApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,10 +35,11 @@ import java.util.concurrent.TimeUnit
  * installs it through PackageInstaller without a prompt. Android allows that only on 12+ (an
  * app updating itself) and once "Install unknown apps" is on for BigShelf, a one-time switch
  * no app can flip for itself; until then the job does nothing. Installing restarts the app,
- * so it waits while BigShelf is on screen.
+ * so the periodic job waits while BigShelf is on screen; the check at launch installs right away.
  */
 object Updater {
     private const val WORK = "self-update"
+    const val NOW = "now"
     private const val LATEST = "https://api.github.com/repos/aswin-haridas/bigshelf-android/releases/latest"
 
     fun schedule(context: Context) {
@@ -43,7 +47,14 @@ object Updater {
         val request = PeriodicWorkRequestBuilder<UpdateWorker>(6, TimeUnit.HOURS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build())
             .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+        val launch = OneTimeWorkRequestBuilder<UpdateWorker>()
+            .setInputData(workDataOf(NOW to true))
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        WorkManager.getInstance(context).apply {
+            enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+            enqueueUniqueWork("$WORK-launch", ExistingWorkPolicy.KEEP, launch)
+        }
     }
 
     fun supported() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -74,8 +85,8 @@ object Updater {
         .importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
 
     @RequiresApi(Build.VERSION_CODES.S)
-    suspend fun run(context: Context) = withContext(Dispatchers.IO) {
-        if (!canInstall(context) || onScreen()) return@withContext
+    suspend fun run(context: Context, now: Boolean = false) = withContext(Dispatchers.IO) {
+        if (!canInstall(context) || (!now && onScreen())) return@withContext
         val client = BigShelfApp.api.bareClient
         val release = client.newCall(Request.Builder().url(LATEST).build()).execute().use {
             check(it.isSuccessful) { "releases ${it.code}" }
@@ -128,7 +139,7 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     override suspend fun doWork(): Result {
         // Failures (offline, GitHub rate limit) just wait for the next run
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            runCatching { Updater.run(applicationContext) }.onFailure { Log.w("Updater", "Update check failed", it) }
+            runCatching { Updater.run(applicationContext, inputData.getBoolean(Updater.NOW, false)) }.onFailure { Log.w("Updater", "Update check failed", it) }
         }
         return Result.success()
     }

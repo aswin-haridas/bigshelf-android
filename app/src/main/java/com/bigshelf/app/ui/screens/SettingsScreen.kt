@@ -131,7 +131,7 @@ private fun AutoUpdateRow() {
     }
     SettingRow(
         "Automatic updates",
-        if (allowed) "New versions install in the background on Wi-Fi" else "Allow installing updates once to turn on",
+        if (allowed) "New versions install at launch and in the background on Wi-Fi" else "Allow installing updates once to turn on",
         Modifier.divider(true),
     ) {
         if (!allowed) {
