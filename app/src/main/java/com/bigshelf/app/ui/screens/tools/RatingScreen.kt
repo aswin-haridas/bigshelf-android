@@ -47,9 +47,8 @@ import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
-// Pairs fetched per call; more are fetched once the queue runs this low (web useRating)
+// Pairs kept queued: every answer tops the queue back up, so later pairs use the new heat (web useRating)
 private const val WINDOW_SIZE = 10
-private const val REFILL_AT = 2
 // How many answers Undo can walk back
 private const val UNDO_LIMIT = 3
 
@@ -57,7 +56,7 @@ private const val UNDO_LIMIT = 3
 private class Answer(val pair: RatingPair, val done: CompletableDeferred<String?>)
 
 /**
- * Port of modules/rating: one random pair at a time, tap the hotter photo. Each answer
+ * Port of modules/rating: one pair of similar heat at a time, tap the hotter photo. Each answer
  * retrains the taste model on the server, which re-rates every photo's heat. The queue is
  * local so a refill never swaps the pair on screen.
  */
@@ -68,18 +67,25 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val context = LocalContext.current
     val queue = remember { mutableStateListOf<RatingPair>() }
     val history = remember { mutableStateListOf<Answer>() }
+    // Pairs answered here: the server may serve one again while its answer is still in flight
+    val answered = remember { mutableSetOf<String>() }
     var rated by remember { mutableStateOf<Int?>(null) }
     var loading by remember { mutableStateOf(true) }
     var resetting by remember { mutableStateOf(false) }
 
-    // Top the queue up; stops on its own when the library is too small (an empty fetch keeps it at 0)
-    LaunchedEffect(queue.size <= REFILL_AT) {
-        if (queue.size > REFILL_AT) return@LaunchedEffect
+    // Top the queue up to WINDOW_SIZE; stops on its own when there's nothing new to ask
+    // (a fetch that adds nothing keeps the size)
+    LaunchedEffect(queue.size) {
+        if (queue.size >= WINDOW_SIZE) return@LaunchedEffect
         try {
             val data = api.ratingPairs(WINDOW_SIZE)
             // Server count only once: later it may lag answers still in flight
             if (rated == null) rated = data.rated
-            queue.addAll(data.pairs.filter { p -> queue.none { it.id == p.id } })
+            queue.addAll(
+                data.pairs
+                    .filter { p -> p.id !in answered && queue.none { it.id == p.id } }
+                    .take(maxOf(WINDOW_SIZE - queue.size, 0))
+            )
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -106,6 +112,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     // The user found `winner` hotter: show the next pair at once, the server catches up
     fun pick(pair: RatingPair, winner: Photo) {
         val loser = pair.items.firstOrNull { it.id != winner.id } ?: return
+        answered.add(pair.id)
         queue.remove(pair)
         rated = (rated ?: 0) + 1
         val answer = Answer(pair, CompletableDeferred())
@@ -118,6 +125,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             } catch (_: Exception) {
                 answer.done.complete(null)
                 toast.error("Failed to save your pick")
+                answered.remove(pair.id)
                 rated = maxOf((rated ?: 1) - 1, 0)
                 history.remove(answer)
             }
@@ -127,6 +135,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     // Walk back the latest answer: the pair is asked again, then the server forgets it
     fun undo() {
         val last = history.removeLastOrNull() ?: return
+        answered.remove(last.pair.id)
         queue.add(0, last.pair)
         rated = maxOf((rated ?: 1) - 1, 0)
         scope.launch {
