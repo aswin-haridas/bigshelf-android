@@ -1,10 +1,10 @@
 package com.bigshelf.app.ui.screens
 
+import com.bigshelf.app.state.AuthStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,15 +70,14 @@ import kotlinx.coroutines.withContext
 
 private const val SYSTEM_STATS_POLL_MS = 3000L
 
-/** `rounded-xl border border-border bg-surface/30` card; rows draw the `divide-y` line themselves. */
+/** Same card as Library's groups: `rounded-xl bg-surface`; rows draw the `divide-y` line themselves. */
 @Composable
 private fun SettingsCard(content: @Composable () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
             .clip(BsShapes.Xl)
-            .background(BsColors.Surface.copy(alpha = 0.3f))
-            .border(1.dp, BsColors.Border, BsShapes.Xl),
+            .background(BsColors.Surface),
     ) { content() }
 }
 
@@ -113,7 +112,7 @@ private fun ToggleRow(label: String, hint: String?, checked: Boolean, onChange: 
 
 @Composable
 private fun SectionTitle(title: String) {
-    Text(title, style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+    Text(title, Modifier.padding(start = 4.dp), style = BsText.Xs.copy(fontWeight = BsWeight.Medium), color = BsColors.Muted)
 }
 
 /**
@@ -147,7 +146,7 @@ private fun AutoUpdateRow() {
 private fun Section(title: String, hint: String) {
     Column {
         SectionTitle(title)
-        Text(hint, style = BsText.Xs, color = BsColors.Muted)
+        Text(hint, Modifier.padding(start = 4.dp), style = BsText.Xs, color = BsColors.MutedFaint)
     }
 }
 
@@ -395,6 +394,21 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 if (Updater.supported()) AutoUpdateRow()
+            }
+        }
+        // Also at the bottom of Library; here because the Home avatar opens Settings
+        SettingsCard {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .bsClickable(scale = 1f) { scope.launch { AuthStore.logout() } }
+                    .heightIn(min = 56.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                BsIcon(BsIcons.SignOut, size = 20.dp, tint = BsColors.Danger)
+                Text("Log out", style = BsText.Sm, color = BsColors.Danger)
             }
         }
         Box(Modifier.height(8.dp))
