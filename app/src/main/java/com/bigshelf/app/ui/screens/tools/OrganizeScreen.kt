@@ -85,7 +85,7 @@ private val BUCKETS = listOf(
     "multi_face" to "Multi-face",
     "no_face" to "No faces",
     "person" to "Has people",
-    "non_person" to "Non-person",
+    "no_human" to "No humans",
     "non_34" to "Not 3:4",
     "low_res" to "Low resolution",
     "collage" to "Collages",

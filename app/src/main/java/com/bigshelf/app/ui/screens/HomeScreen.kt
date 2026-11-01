@@ -49,6 +49,7 @@ import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.photos.ImagesGrid
+import com.bigshelf.app.state.ViewerList
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
@@ -67,24 +68,34 @@ private const val MAX_SLIDES = 20
 
 private fun takenAt(photo: Photo) = photo.takenAt?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
 
+/** A feed post; [burst] when its photos are one burst (backend `/photos/bursts`). */
+internal class FeedPost(val photos: MutableList<Photo>, val burst: Boolean)
+
 /**
  * The feed's posts: the library (newest capture first) cut into runs of photos taken within
- * an hour of the run's first photo. Pages only ever append older photos, so a post's key
- * (its first photo) stays put as the feed grows.
+ * an hour of the run's first photo, except that each burst ([burstOf]: photo id -> burst id)
+ * gets a post of its own. Pages only ever append older photos, so a post's key (its first
+ * photo) stays put as the feed grows.
  */
-internal fun groupIntoPosts(photos: List<Photo>): List<List<Photo>> {
-    val posts = mutableListOf<MutableList<Photo>>()
+internal fun groupIntoPosts(photos: List<Photo>, burstOf: Map<String, String> = emptyMap()): List<FeedPost> {
+    val posts = mutableListOf<FeedPost>()
     var start: OffsetDateTime? = null
+    var startBurst: String? = null
     for (photo in photos) {
         val t = takenAt(photo)
+        val burst = burstOf[photo.id]
         val current = posts.lastOrNull()
-        if (current != null && current.size < MAX_SLIDES && t != null && start != null &&
-            Duration.between(t, start) <= POST_WINDOW
-        ) {
-            current += photo
+        val joins = current != null && current.photos.size < MAX_SLIDES && if (burst != null) {
+            burst == startBurst
         } else {
-            posts += mutableListOf(photo)
+            !current.burst && t != null && start != null && Duration.between(t, start) <= POST_WINDOW
+        }
+        if (joins) {
+            current!!.photos += photo
+        } else {
+            posts += FeedPost(mutableListOf(photo), burst != null)
             start = t
+            startBurst = burst
         }
     }
     return posts
@@ -110,6 +121,18 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
     val feed = rememberPagedPhotos("home", invalidatedBy = setOf("photos")) { page, cursor -> api.photos(page, cursor = cursor, people = true) }
     val textSearch = rememberQuery("search", q, invalidatedBy = setOf("photos")) {
         if (q.isEmpty()) emptyList() else api.searchPhotos(q)
+    }
+    // Burst membership comes from the server: its rule needs scene embeddings the app never loads.
+    // ponytail: pages the whole bursts list (30 a call, each a full server pass); add an ids-only endpoint if that gets slow
+    val bursts = rememberQuery("home-bursts", invalidatedBy = setOf("photos")) {
+        buildMap {
+            var offset = 0
+            do {
+                val page = api.bursts(offset = offset, limit = 30)
+                page.groups.forEach { g -> g.items.forEach { put(it.id, g.id) } }
+                offset += page.groups.size
+            } while (page.groups.isNotEmpty() && offset < page.total)
+        }
     }
     val filter: (List<Photo>) -> List<Photo> = { all -> if (showAi) all else all.filterNot { it.isAiImage } }
     val results = filter(textSearch.data.orEmpty())
@@ -148,7 +171,9 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                 explore = true,
             )
         } else {
-            val posts = remember(feed.photos, showAi) { groupIntoPosts(filter(feed.photos)) }
+            val posts = remember(feed.photos, showAi, bursts.data) {
+                groupIntoPosts(filter(feed.photos), bursts.data.orEmpty())
+            }
             val listState = rememberLazyListState()
             // Load the next page while the last couple of posts are still off screen
             LaunchedEffect(listState, posts.size) {
@@ -164,7 +189,7 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                     contentPadding = PaddingValues(bottom = LocalBottomBarInset.current + 16.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
-                    items(posts, key = { it.first().id }) { post -> Post(post, onOpenPhoto) }
+                    items(posts, key = { it.photos.first().id }) { post -> Post(post.photos, post.burst, onOpenPhoto) }
                 }
             }
         }
@@ -173,17 +198,21 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
 
 /** One post: people + date header, the photos as slides with a counter and dots shown while swiping. */
 @Composable
-private fun Post(photos: List<Photo>, onOpenPhoto: (String) -> Unit) {
+private fun Post(photos: List<Photo>, burst: Boolean, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
     val people = photos.flatMap { it.people.orEmpty() }.distinctBy { it.id }
     val pager = rememberPagerState { photos.size }
 
     Column {
-        PostHeader(people, photos.first())
+        PostHeader(people, photos.first(), if (burst) "Burst · ${photos.size} shots" else null)
         Box {
             HorizontalPager(pager, Modifier.fillMaxWidth().aspectRatio(3f / 4f), key = { photos[it].id }) { i ->
                 val photo = photos[i]
-                Box(Modifier.fillMaxSize().background(BsColors.Surface).bsClickable(scale = 1f) { onOpenPhoto(photo.id) }) {
+                Box(Modifier.fillMaxSize().background(BsColors.Surface).bsClickable(scale = 1f) {
+                    // A burst opens on its own shots, so the viewer swipes through just those
+                    if (burst) ViewerList.photos = photos
+                    onOpenPhoto(photo.id)
+                }) {
                     AsyncImage(
                         api.mediaUrl(photo.thumbnailUrl ?: photo.url ?: ""),
                         photo.title ?: photo.filename,
@@ -244,7 +273,7 @@ private fun Post(photos: List<Photo>, onOpenPhoto: (String) -> Unit) {
 
 /** Avatars and names of everyone tagged in the post (or the user's own name), then when. */
 @Composable
-private fun PostHeader(people: List<PhotoPersonTag>, first: Photo) {
+private fun PostHeader(people: List<PhotoPersonTag>, first: Photo, label: String? = null) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -269,8 +298,9 @@ private fun PostHeader(people: List<PhotoPersonTag>, first: Photo) {
                 overflow = TextOverflow.Ellipsis,
             )
             takenAt(first)?.let {
+                val time = it.atZoneSameInstant(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM yyyy · h:mm a"))
                 Text(
-                    it.atZoneSameInstant(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM yyyy · h:mm a")),
+                    listOfNotNull(time, label).joinToString(" · "),
                     style = BsText.Xs2,
                     color = BsColors.Muted,
                 )
