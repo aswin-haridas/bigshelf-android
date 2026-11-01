@@ -53,7 +53,6 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import kotlinx.coroutines.launch
 
-const val TRIPTYCH_ENDPOINT = "/api/v1/triptych"
 const val TRIPLETS_ENDPOINT = "/api/v1/triplets"
 
 /**
@@ -65,14 +64,9 @@ private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
     return when (endpoint) {
         TRIPLETS_ENDPOINT -> common + mapOf(
             "count" to s.tripletCount, "solo" to s.tripletSolo, "similar_faces" to s.tripletMatchFaces,
-            "similar_colors" to s.tripletMatchColors, "similar_pose" to s.tripletMatchPose,
+            "similar_outfit" to s.tripletOutfit, "similar_colors" to s.tripletMatchColors, "similar_pose" to s.tripletMatchPose,
             "similar_scene" to s.tripletMatchScene,
             "variety" to s.tripletVariety, "clear_lead" to s.tripletClearLead, "order" to s.tripletOrder,
-        )
-        TRIPTYCH_ENDPOINT -> common + mapOf(
-            // 0 = no limit
-            "min_size" to s.triptychMinSize, "max_size" to s.triptychMaxSize.takeIf { it > 0 },
-            "match_faces" to s.tripletMatchFaces, "order" to s.tripletOrder,
         )
         else -> common
     }
@@ -95,7 +89,7 @@ private val lastPerson = mutableMapOf<String, String?>()
 
 /**
  * Port of modules/triptych: one set of photos at a time with Download and Next. Triplets
- * shows every photo of one outfit (or, with Match outfit off, [count] photos of one person); Composer a clear
+ * shows [count] photos of one person; Composer a clear
  * face plus another outfit, with the image-model [prompt] to copy. Sets showing one person
  * can skip that person for good; a person filter limits sets to one person.
  */

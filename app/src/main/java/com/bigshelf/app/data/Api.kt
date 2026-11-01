@@ -435,7 +435,7 @@ class Api(context: Context, val baseUrl: String) {
     // ---------- Triptych, Triplets, Composer ----------
 
     /**
-     * One set from [endpoint] (`/api/v1/triptych`, `/triplets`, `/composer`), with the person it
+     * One set from [endpoint] (`/api/v1/triplets`, `/composer`), with the person it
      * shows from the X-Person-* headers. Each endpoint ignores the params it doesn't use.
      */
     suspend fun photoSet(endpoint: String, offset: Int, options: Map<String, Any?>): PhotoSet {
@@ -449,7 +449,7 @@ class Api(context: Context, val baseUrl: String) {
         )
     }
 
-    /** Never show this person in Triptych or Triplets again (undone from Settings). */
+    /** Never show this person in Triplets again (undone from Settings). */
     suspend fun skipPerson(personId: String) = sendUnit("POST", "/api/v1/triplets/skip/$personId")
 
     suspend fun unskipPerson(personId: String) = sendUnit("DELETE", "/api/v1/triplets/skip/$personId")

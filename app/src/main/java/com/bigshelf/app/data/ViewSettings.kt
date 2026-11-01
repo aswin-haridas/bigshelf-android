@@ -39,9 +39,8 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("autosplit", value).apply()
     }
 
-    // Triplets groups every photo of one outfit and scene (the old Triptych). On by default;
-    // off gives random sets of one person.
-    var tripletOutfit by mutableStateOf(prefs.getBoolean("tripletOutfit", true))
+    // Triplets fill the set with the clothes (garment, cut, pattern) most like the first photo's. Off by default.
+    var tripletOutfit by mutableStateOf(prefs.getBoolean("tripletOutfit", false))
         private set
 
     fun updateTripletOutfit(value: Boolean) {
@@ -49,28 +48,7 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("tripletOutfit", value).apply()
     }
 
-    // Outfit sets: leave out sets smaller than this (2-9); 2 shows every set. Replaces the old
-    // "Skip small sets" toggle, so a phone that had it on starts at 4.
-    var triptychMinSize by mutableStateOf(
-        prefs.getInt("triptychMinSize", if (prefs.getBoolean("triptychSkipSmall", false)) 4 else 2),
-    )
-        private set
-
-    fun updateTriptychMinSize(value: Int) {
-        triptychMinSize = value
-        prefs.edit().putInt("triptychMinSize", value).apply()
-    }
-
-    // Outfit sets: show at most this many photos of a set, its best-framed ones. 0 = no limit.
-    var triptychMaxSize by mutableStateOf(prefs.getInt("triptychMaxSize", 0))
-        private set
-
-    fun updateTriptychMaxSize(value: Int) {
-        triptychMaxSize = value
-        prefs.edit().putInt("triptychMaxSize", value).apply()
-    }
-
-    // Let Triplets (at most one per outfit set) and Composer pick AI images too
+    // Let Triplets and Composer pick AI images too
     var includeAi by mutableStateOf(prefs.getBoolean("includeAi", false))
         private set
 

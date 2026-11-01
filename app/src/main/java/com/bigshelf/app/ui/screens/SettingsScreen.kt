@@ -219,8 +219,6 @@ private fun SkippedPeople() {
 }
 
 /** Port of modules/settings/settings.tsx. */
-// Outfit sets' "Largest set" choices; 0 = no limit
-private val MAX_SIZES = listOf(TabItem(0, "Any")) + listOf(3, 4, 5, 6, 8, 10, 12).map { TabItem(it, "$it") }
 private val ORDERS = listOf(
     TabItem("newest", "Newest"), TabItem("oldest", "Oldest"), TabItem("best", "Best"), TabItem("random", "Shuffle"),
 )
@@ -245,61 +243,52 @@ private fun TabsRow(label: String, hint: String, content: @Composable () -> Unit
 fun TripletSettingsCard() {
     val settings = BigShelfApp.settings
     SettingsCard {
-        ToggleRow("AI images", "Let Triplets pick AI images, at most one per outfit set.", settings.includeAi, settings::updateIncludeAi)
         ToggleRow(
-            "Match outfit", "Group every photo of one outfit and scene. Off picks random photos.",
+            "AI images", "Let Triplets pick AI images too.",
+            settings.includeAi, settings::updateIncludeAi,
+        )
+        ToggleRow(
+            "Solo photos only", "Skip group photos with other tagged people.",
+            settings.tripletSolo, settings::updateTripletSolo, divider = true,
+        )
+        ToggleRow(
+            "Match faces", "Fill each set with photos where the face looks most like the first one.",
+            settings.tripletMatchFaces, settings::updateTripletMatchFaces, divider = true,
+        )
+        ToggleRow(
+            "Match outfit", "Fill each set with photos where the clothes look most like the first one's.",
             settings.tripletOutfit, settings::updateTripletOutfit, divider = true,
         )
         ToggleRow(
-            "Match faces",
-            if (settings.tripletOutfit) "Split a set when its photos show different people."
-            else "Fill each set with photos where the face looks most like the first one.",
-            settings.tripletMatchFaces, settings::updateTripletMatchFaces, divider = true,
+            "Match colors", "Fill each set with photos whose clothes colors look most like the first one's.",
+            settings.tripletMatchColors, settings::updateTripletMatchColors, divider = true,
         )
-        // Outfit sets and random sets each have their own options
-        if (settings.tripletOutfit) {
-            TabsRow("Smallest set", "Leave out sets with fewer photos than this.") {
-                BsTabs(SET_SIZES, settings.triptychMinSize, settings::updateTriptychMinSize)
-            }
-            TabsRow("Largest set", "Show only the best-framed photos of a bigger set.") {
-                BsTabs(MAX_SIZES, settings.triptychMaxSize, settings::updateTriptychMaxSize)
-            }
-        } else {
-            ToggleRow(
-                "Solo photos only", "Skip group photos with other tagged people.",
-                settings.tripletSolo, settings::updateTripletSolo, divider = true,
-            )
-            ToggleRow(
-                "Match colors", "Fill each set with photos whose clothes colors look most like the first one's.",
-                settings.tripletMatchColors, settings::updateTripletMatchColors, divider = true,
-            )
-            ToggleRow(
-                "Match pose", "Fill each set with photos where the person stands or sits most like in the first one.",
-                settings.tripletMatchPose, settings::updateTripletMatchPose, divider = true,
-            )
-            ToggleRow(
-                "Match scene", "Fill each set with photos whose place and background look most like the first one's.",
-                settings.tripletMatchScene, settings::updateTripletMatchScene, divider = true,
-            )
-            ToggleRow(
-                "Different scenes",
-                if (settings.tripletMatchScene) "Off while Match scene is on: a matched set shares one scene."
-                else "Spread each set across places and shoots. Off allows one scene's photos together.",
-                // Shown off while Match scene overrides it (the saved choice comes back after)
-                settings.tripletVariety && !settings.tripletMatchScene, settings::updateTripletVariety, divider = true,
-            )
-            ToggleRow(
-                "Clear face first", "Lead with a big, sharp, typical face. Off lays the whole set out in order.",
-                settings.tripletClearLead, settings::updateTripletClearLead, divider = true,
-            )
-            TabsRow("Photos per set", "People with fewer photos than this are left out.") {
-                BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
-            }
+        ToggleRow(
+            "Match pose", "Fill each set with photos where the person stands or sits most like in the first one.",
+            settings.tripletMatchPose, settings::updateTripletMatchPose, divider = true,
+        )
+        ToggleRow(
+            "Match scene", "Fill each set with photos whose place and background look most like the first one's.",
+            settings.tripletMatchScene, settings::updateTripletMatchScene, divider = true,
+        )
+        ToggleRow(
+            "Different scenes",
+            if (settings.tripletMatchScene) "Off while Match scene is on: a matched set shares one scene."
+            else "Spread each set across places and shoots. Off allows one scene's photos together.",
+            // Shown off while Match scene overrides it (the saved choice comes back after)
+            settings.tripletVariety && !settings.tripletMatchScene, settings::updateTripletVariety, divider = true,
+        )
+        ToggleRow(
+            "Clear face first", "Lead with a big, sharp, typical face. Off lays the whole set out in order.",
+            settings.tripletClearLead, settings::updateTripletClearLead, divider = true,
+        )
+        TabsRow("Photos per set", "People with fewer photos than this are left out.") {
+            BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
         }
         TabsRow(
             "Order",
-            if (settings.tripletOutfit || !settings.tripletClearLead) "How the photos of a set are laid out."
-            else "How the photos after the clear face are laid out.",
+            if (settings.tripletClearLead) "How the photos after the clear face are laid out."
+            else "How the photos of a set are laid out.",
         ) {
             BsTabs(ORDERS, settings.tripletOrder, settings::updateTripletOrder)
         }

@@ -31,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -79,7 +78,6 @@ import com.bigshelf.app.ui.screens.tools.SwipeScreen
 import com.bigshelf.app.ui.screens.tools.FramerScreen
 import com.bigshelf.app.ui.screens.tools.OUTFIT_SWAP_PROMPT
 import com.bigshelf.app.ui.screens.tools.TRIPLETS_ENDPOINT
-import com.bigshelf.app.ui.screens.tools.TRIPTYCH_ENDPOINT
 import com.bigshelf.app.ui.screens.tools.TriptychScreen
 import com.bigshelf.app.ui.screens.tools.OrganizeScreen
 import com.bigshelf.app.ui.screens.tools.PipelinesScreen
@@ -295,21 +293,17 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
             )
         }
         composable(Routes.TRIPLETS) {
-            // Match outfit (default) uses the triptych grouping; off, random photos of one person.
+            // Random photos of one person; the Match toggles fill the set with photos like the first.
             // Downloading moves the photos to Archive (when on in Settings)
             val settings = BigShelfApp.settings
-            // Outside the key below, so flipping Match outfit in it doesn't close the modal
             var editingSettings by remember { mutableStateOf(false) }
-            // Keyed so switching modes starts that endpoint's state fresh
-            key(settings.tripletOutfit) {
-                TriptychScreen(
-                    "Triplets",
-                    if (settings.tripletOutfit) "All similar photos of one outfit" else "${settings.tripletCount} photos of the same person",
-                    if (settings.tripletOutfit) TRIPTYCH_ENDPOINT else TRIPLETS_ENDPOINT,
-                    onBack = onBack, onOpenPhoto = openPhoto,
-                    onSettings = { editingSettings = true },
-                )
-            }
+            TriptychScreen(
+                "Triplets",
+                "${settings.tripletCount} photos of the same person",
+                TRIPLETS_ENDPOINT,
+                onBack = onBack, onOpenPhoto = openPhoto,
+                onSettings = { editingSettings = true },
+            )
             // The same options as the Triplets section of Settings
             if (editingSettings) {
                 BsModal(title = "Triplets settings", onClose = { editingSettings = false }) {
