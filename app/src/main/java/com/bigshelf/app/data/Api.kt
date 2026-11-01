@@ -324,6 +324,10 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun rotate(id: String) =
         send("POST", "/api/v1/photos/$id/rotate", Photo.serializer(), params = mapOf("degrees" to 90))
 
+    /** Blurs face [faceIndex] beyond recognition in the stored photo and forgets it. */
+    suspend fun blurFace(id: String, faceIndex: Int) =
+        send("POST", "/api/v1/photos/$id/faces/$faceIndex/blur", Photo.serializer())
+
     suspend fun deletePhoto(id: String) = sendUnit("DELETE", "/api/v1/photos/$id")
 
     suspend fun flagDeleted(photoIds: Collection<String>, deleted: Boolean) = sendUnit(

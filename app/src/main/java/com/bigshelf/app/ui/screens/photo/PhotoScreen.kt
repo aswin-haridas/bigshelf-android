@@ -931,6 +931,12 @@ private fun FaceTagModal(
                     contentColor = BsColors.Danger,
                     textStyle = BsText.Xs,
                 ) { Text("Forget face") }
+                BsButton(
+                    onClick = { run("Failed to blur face") { onChanged(api.blurFace(photo.id, faceIndex)); "Face blurred" } },
+                    variant = ButtonVariant.Secondary,
+                    enabled = !saving,
+                    textStyle = BsText.Xs,
+                ) { Text("Blur face") }
             }
             if (currentName != null) {
                 BsButton(
