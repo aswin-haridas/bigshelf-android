@@ -157,6 +157,8 @@ fun PhotoScreen(
     var zoomed by remember { mutableStateOf(false) }
     // Crop mode belongs to one photo; it takes over the screen until saved or cancelled
     var croppingId by remember { mutableStateOf<String?>(null) }
+    // Set by "Crop out" on a face: the crop that leaves that person out, shown to confirm
+    var cropOutBox by remember { mutableStateOf<CropBox?>(null) }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(
@@ -190,7 +192,10 @@ fun PhotoScreen(
                         current, open, close,
                         onChanged = { details[it.id] = it },
                         onDeleted = onBack,
-                        onCrop = { croppingId = current.id },
+                        onCrop = {
+                            cropOutBox = null
+                            croppingId = current.id
+                        },
                         // The original is in the Bin now, so the first new photo takes its place
                         onSplit = { id ->
                             onBack()
@@ -210,7 +215,7 @@ fun PhotoScreen(
                     onFramer = { onFramer(current.id) },
                 )
             }
-            if (cropping) CropOverlay(current, onClose = { croppingId = null })
+            if (cropping) CropOverlay(current, fixedBox = cropOutBox, onClose = { croppingId = null })
             if (showInfo) {
                 InfoSheet(
                     current, onPerson, onMap,
@@ -220,6 +225,11 @@ fun PhotoScreen(
                         onOpenPhoto(id)
                     },
                     onDismiss = { showInfo = false },
+                    onCropOut = { box ->
+                        showInfo = false
+                        cropOutBox = box
+                        croppingId = current.id
+                    },
                 )
             }
         }
@@ -670,6 +680,7 @@ private fun InfoSheet(
     onChanged: (Photo) -> Unit,
     onOpenPhoto: (String) -> Unit,
     onDismiss: () -> Unit,
+    onCropOut: (CropBox) -> Unit,
 ) {
     // Index of the face picked for tagging (WHOLE_PHOTO_FACE_INDEX: the photo itself)
     var tagging by remember { mutableStateOf<Int?>(null) }
@@ -777,6 +788,7 @@ private fun InfoSheet(
                 onPerson(id)
             },
             onClose = { tagging = null },
+            onCropOut = onCropOut,
         )
     }
 }
@@ -845,7 +857,14 @@ private fun cleanName(name: String) =
  * look like this face; the backend also tags close lookalikes elsewhere.
  */
 @Composable
-private fun FaceTagModal(photo: Photo, faceIndex: Int, onChanged: (Photo) -> Unit, onPerson: (String) -> Unit, onClose: () -> Unit) {
+private fun FaceTagModal(
+    photo: Photo,
+    faceIndex: Int,
+    onChanged: (Photo) -> Unit,
+    onPerson: (String) -> Unit,
+    onClose: () -> Unit,
+    onCropOut: (CropBox) -> Unit,
+) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val wholePhoto = faceIndex == WHOLE_PHOTO_FACE_INDEX
@@ -920,6 +939,19 @@ private fun FaceTagModal(photo: Photo, faceIndex: Int, onChanged: (Photo) -> Uni
                     enabled = !saving,
                     textStyle = BsText.Xs,
                 ) { Text("Remove tag") }
+            }
+            // Only on a group photo, and only when a crop can drop this person and keep everyone else
+            val faces = photo.faces.orEmpty()
+            val cropOut = if (!wholePhoto && faces.count { !it.isIgnored } > 1) {
+                CropBox.cropOut(photo.width ?: 0, photo.height ?: 0, faces, faceIndex)
+            } else null
+            cropOut?.let { box ->
+                BsButton(
+                    onClick = { onClose(); onCropOut(box) },
+                    variant = ButtonVariant.Secondary,
+                    enabled = !saving,
+                    textStyle = BsText.Xs,
+                ) { Text("Crop out") }
             }
             face?.personId?.let { id ->
                 BsButton(onClick = { onClose(); onPerson(id) }, variant = ButtonVariant.Secondary, textStyle = BsText.Xs) { Text("View") }
@@ -1009,15 +1041,20 @@ private fun SimilarPhotos(photoId: String, onOpenPhoto: (String) -> Unit) {
  * axis. Saving overwrites the original; the viewer reloads it under its new URL.
  */
 @Composable
-private fun CropOverlay(image: Photo, onClose: () -> Unit) {
+private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = null) {
     val w = image.width ?: return
     val h = image.height ?: return
     val scope = rememberCoroutineScope()
     var pos by remember(image.id) { mutableFloatStateOf(0.5f) }
     var saving by remember { mutableStateOf(false) }
-    val box = CropBox.portrait(w, h, pos)
+    // A fixed box (cropping a person out) is only confirmed, not dragged
+    val box = fixedBox ?: CropBox.portrait(w, h, pos)
     val sideways = box.width < w // wider than 3:4: the window slides left/right
-    val slack = if (sideways) w - box.width else h - box.height // image px the window can travel
+    val slack = when {
+        fixedBox != null -> 0
+        sideways -> w - box.width
+        else -> h - box.height
+    } // image px the window can travel
     // Back leaves crop mode, not the viewer
     BackHandler(onBack = onClose)
 
@@ -1062,7 +1099,7 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit) {
                         try {
                             BigShelfApp.api.crop(image.id, box)
                             PhotoEvents.invalidate("photo", "photos")
-                            toast.success("Cropped to 3:4")
+                            toast.success(if (fixedBox != null) "Cropped out" else "Cropped to 3:4")
                             onClose()
                         } catch (_: Exception) {
                             toast.error("Failed to crop photo")

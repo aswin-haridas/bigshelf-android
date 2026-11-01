@@ -115,6 +115,24 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("tripletMatchPose", value).apply()
     }
 
+    // Random Triplets fill the set with the clothes colours most like the first photo's. Off by default.
+    var tripletMatchColors by mutableStateOf(prefs.getBoolean("tripletMatchColors", false))
+        private set
+
+    fun updateTripletMatchColors(value: Boolean) {
+        tripletMatchColors = value
+        prefs.edit().putBoolean("tripletMatchColors", value).apply()
+    }
+
+    // Random Triplets fill the set with the settings most like the first photo's (overrides variety). Off by default.
+    var tripletMatchScene by mutableStateOf(prefs.getBoolean("tripletMatchScene", false))
+        private set
+
+    fun updateTripletMatchScene(value: Boolean) {
+        tripletMatchScene = value
+        prefs.edit().putBoolean("tripletMatchScene", value).apply()
+    }
+
     // Random Triplets spread each set across scenes. On by default; off allows one scene's photos together.
     var tripletVariety by mutableStateOf(prefs.getBoolean("tripletVariety", true))
         private set

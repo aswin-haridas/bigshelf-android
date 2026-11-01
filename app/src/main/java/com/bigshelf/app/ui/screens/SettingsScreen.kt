@@ -270,12 +270,23 @@ fun TripletSettingsCard() {
                 settings.tripletSolo, settings::updateTripletSolo, divider = true,
             )
             ToggleRow(
+                "Match colors", "Fill each set with photos whose clothes colors look most like the first one's.",
+                settings.tripletMatchColors, settings::updateTripletMatchColors, divider = true,
+            )
+            ToggleRow(
                 "Match pose", "Fill each set with photos where the person stands or sits most like in the first one.",
                 settings.tripletMatchPose, settings::updateTripletMatchPose, divider = true,
             )
             ToggleRow(
-                "Different scenes", "Spread each set across places and shoots. Off allows one scene's photos together.",
-                settings.tripletVariety, settings::updateTripletVariety, divider = true,
+                "Match scene", "Fill each set with photos whose place and background look most like the first one's.",
+                settings.tripletMatchScene, settings::updateTripletMatchScene, divider = true,
+            )
+            ToggleRow(
+                "Different scenes",
+                if (settings.tripletMatchScene) "Off while Match scene is on: a matched set shares one scene."
+                else "Spread each set across places and shoots. Off allows one scene's photos together.",
+                // Shown off while Match scene overrides it (the saved choice comes back after)
+                settings.tripletVariety && !settings.tripletMatchScene, settings::updateTripletVariety, divider = true,
             )
             ToggleRow(
                 "Clear face first", "Lead with a big, sharp, typical face. Off lays the whole set out in order.",

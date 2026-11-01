@@ -532,6 +532,30 @@ data class CropBox(val x: Int, val y: Int, val width: Int, val height: Int) {
             val h = minOf(height, width * 4 / 3)
             return CropBox(Math.round((width - w) * pos), Math.round((height - h) * pos), w, h)
         }
+
+        /**
+         * Web `cropOutFaceBox`: the largest crop that cuts the person at [faceIndex] out while
+         * keeping every other face whole - the part left of, right of, or above them. Their body
+         * is taken as a column ~2 face-widths wide running down from the head. null when no
+         * such crop keeps everyone else.
+         */
+        // ponytail: column guess, a leaning or lying person can leave a limb in
+        fun cropOut(width: Int, height: Int, faces: List<FaceBox>, faceIndex: Int): CropBox? {
+            val f = faces.getOrNull(faceIndex) ?: return null
+            val left = maxOf(0, Math.round(f.x - f.width / 2).toInt())
+            val right = minOf(width, Math.round(f.x + f.width * 1.5).toInt())
+            val top = maxOf(0, Math.round(f.y - f.height * 0.3).toInt())
+            val others = faces.filterIndexed { i, o -> i != faceIndex && !o.isIgnored }
+            fun CropBox.holds(o: FaceBox) =
+                o.x >= x && o.y >= y && o.x + o.width <= x + this.width && o.y + o.height <= y + this.height
+            return listOf(
+                CropBox(0, 0, left, height),
+                CropBox(right, 0, width - right, height),
+                CropBox(0, 0, width, top),
+            )
+                .filter { b -> b.width > 0 && b.height > 0 && others.all { b.holds(it) } }
+                .maxByOrNull { it.width.toLong() * it.height }
+        }
     }
 }
 

@@ -65,7 +65,8 @@ private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
     return when (endpoint) {
         TRIPLETS_ENDPOINT -> common + mapOf(
             "count" to s.tripletCount, "solo" to s.tripletSolo, "similar_faces" to s.tripletMatchFaces,
-            "similar_pose" to s.tripletMatchPose,
+            "similar_colors" to s.tripletMatchColors, "similar_pose" to s.tripletMatchPose,
+            "similar_scene" to s.tripletMatchScene,
             "variety" to s.tripletVariety, "clear_lead" to s.tripletClearLead, "order" to s.tripletOrder,
         )
         TRIPTYCH_ENDPOINT -> common + mapOf(
