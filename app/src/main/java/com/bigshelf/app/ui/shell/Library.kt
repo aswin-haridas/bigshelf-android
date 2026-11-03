@@ -129,6 +129,8 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
                 LibraryRow("Pipelines", BsIcons.FlowArrow, divider = true, onClick = { onNavigate(Routes.PIPELINES) })
                 LibraryRow("Organize", BsIcons.Funnel, divider = true, onClick = { onNavigate(Routes.ORGANIZE) })
                 LibraryRow("Rating", BsIcons.Fire, divider = true, onClick = { onNavigate(Routes.RATING) })
+                LibraryRow("Tier list", BsIcons.Star, divider = true, onClick = { onNavigate(Routes.TIERS) })
+                LibraryRow("Wardrobe", BsIcons.Images, divider = true, onClick = { onNavigate(Routes.WARDROBE) })
                 LibraryRow("Swipe", BsIcons.Heart, divider = true, onClick = { onNavigate(Routes.SWIPE) })
             }
             Group {

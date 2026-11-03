@@ -266,12 +266,12 @@ fun ColorScreen(color: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit
 
 /** Photos carrying one auto tag ("Things"), newest first. */
 @Composable
-fun TagScreen(tag: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
+fun TagScreen(tag: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit, title: String = tag.replaceFirstChar { it.uppercase() }) {
     val api = BigShelfApp.api
     val feed = rememberPagedPhotos("tag", tag, invalidatedBy = setOf("photos")) { page, _ -> api.photosByTag(tag, page) }
     Column(Modifier.fillMaxSize()) {
         PageHeader(
-            tag.replaceFirstChar { it.uppercase() },
+            title,
             count = feed.total?.let(::photoCount),
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
         )

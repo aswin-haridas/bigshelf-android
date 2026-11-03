@@ -1,7 +1,7 @@
 # BigShelf for Android
 
 Native Android client for BigShelf, written in Kotlin with Jetpack Compose. It talks to the
-same FastAPI backend as the React app in `../frontend`. Its components and Phosphor icons
+same Go API and private vision service as the React app in `../web/frontend`. Its components and Phosphor icons
 started as ports of the web ones, but the look is now its own: minimal, true black, set in Inter.
 
 ## Run it
@@ -93,7 +93,7 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
 - Framer: pick a video (or open one from the viewer), extract its best frames, select and
   save them to the library, or Quick extract to do both. Long-press a frame for its score
   breakdown and a rule-of-thirds grid.
-- Triptych, Triplets and Composer: one set at a time with Download and Next, a person filter,
+- Triplets and Composer: one set at a time with Download and Next, five prepared sets, a person filter,
   Skip person, and Composer's copyable outfit-swap prompt.
 - Live updates: screens refresh from the backend's server-sent events while the app is open,
   like the web. Manual uploads skip files already in the library.
@@ -129,3 +129,21 @@ app/src/main/java/com/bigshelf/app/
   ui/shell/  app shell: bottom nav, Library tab, selection bar, upload progress
   ui/screens/ pages
 ```
+
+## Web parity (through web commit `0cc7132`)
+
+- Library now includes Wardrobe (automatically fashion-tagged photos) and Tier list
+  (all library photos grouped by Heat, with a shortcut to Rating).
+- Detected Faces loads every page and offers Tag all: type or pick a profile, skip, forget,
+  and view the group's photos for context. Suggestions use both face and photo context.
+- Renaming a profile to an existing name follows the surviving merged profile. Merge search
+  focuses automatically, and deleting from a nested photo viewer returns to its source screen.
+- Triplets prepares the visible set plus four more sequentially, bounds its cache, offers
+  retry, and uses compact match controls and a readable photos-per-set picker. Sets may
+  contain faceless photos when face matching is off; the shared server handles top-ranked
+  selection, minimum set sizes, solo filtering and exposure balancing.
+- Organize hides the bottom navigation and keeps an explicit exit. Rotation and autosplit
+  improvements run on the shared server; no model weights are bundled in the APK.
+
+Validation: `./gradlew :app:assembleDebug :app:testDebugUnitTest`. A push to `main` runs
+release tests and publishes a versioned production APK through the existing release workflow.

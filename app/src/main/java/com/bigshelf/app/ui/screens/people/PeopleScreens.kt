@@ -25,6 +25,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,7 +72,7 @@ enum class PeopleTab { People, Faces, Untagged }
 
 // Shared by every People-section page so the tab bar stays identical (web PEOPLE_TABS)
 private val PEOPLE_TABS = listOf(
-    TabItem(PeopleTab.People, "People"),
+    TabItem(PeopleTab.People, "Profiles"),
     TabItem(PeopleTab.Faces, "Faces"),
     TabItem(PeopleTab.Untagged, "Untagged"),
 )
@@ -90,7 +92,7 @@ private fun FaceGrid(content: androidx.compose.foundation.lazy.grid.LazyGridScop
 /** "People" title over the shared tab bar, with 16dp gutters. */
 @Composable
 private fun PeopleHeader(active: PeopleTab, onTab: (PeopleTab) -> Unit, below: @Composable () -> Unit = {}) {
-    PageHeader("People")
+    PageHeader("Profiles")
     Column(
         Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -113,12 +115,12 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         PeopleHeader(PeopleTab.People, onTab) {
-            BsSearchBar(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "Search people")
+            BsSearchBar(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "Search profiles")
         }
         when {
             query.isLoading -> LoadingText()
             people.isEmpty() -> EmptyState(
-                if (search.isNotEmpty()) "No people matching \"$search\"" else "No people yet",
+                if (search.isNotEmpty()) "No profiles matching \"$search\"" else "No profiles yet",
             )
             else -> FaceGrid {
                 items(people, key = { it.id }) { person ->
@@ -134,11 +136,43 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
  * them to existing people; Select picks groups to merge (into the first picked) or forget.
  */
 @Composable
-fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
+fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val query = rememberQuery("faces", invalidatedBy = setOf("faces")) { api.faces() }
     val faces = query.data.orEmpty().filter { !it.isIgnored && it.faceName == null }
+    var taggingAll by remember { mutableStateOf(false) }
+    val visited = remember { mutableStateListOf<String>() }
+    var advancing by remember { mutableStateOf(false) }
+    val remaining = faces.filterNot { it.id in visited }
+    val next = remaining.firstOrNull()
+    LaunchedEffect(taggingAll, next, advancing) {
+        if (taggingAll && next == null && !advancing) {
+            taggingAll = false
+            toast.success("Face queue complete")
+        }
+    }
+    if (taggingAll && next != null && !advancing) key(next.id) {
+        TagFaceModal(
+            next,
+            onClose = { taggingAll = false },
+            onDone = {
+                advancing = true
+                scope.launch {
+                    try {
+                        query.data = api.faces()
+                        visited.add(next.id)
+                    } catch (_: Exception) {
+                        taggingAll = false
+                        toast.error("Couldn't load the next faces")
+                    } finally { advancing = false }
+                }
+            },
+            onOpenPhoto = onOpenPhoto,
+            remaining = remaining.size,
+            onSkip = { visited.add(next.id) },
+        )
+    }
     var clustering by remember { mutableStateOf(false) }
     var selecting by remember { mutableStateOf(false) }
     // Ordered: the first pick is the group the rest are merged into
@@ -196,6 +230,11 @@ fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         PeopleHeader(PeopleTab.Faces, onTab) {
+            BsButton(
+                onClick = { visited.clear(); selecting = false; selected.clear(); taggingAll = true },
+                enabled = faces.isNotEmpty() && !advancing && !clustering,
+                loading = advancing,
+            ) { Text("Tag all") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BsButton(
                     onClick = ::cluster,
@@ -304,7 +343,7 @@ fun UntaggedScreen(onOpenPhoto: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
  * Rename and Merge buttons, then their photos in the server's similarity order.
  */
 @Composable
-fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
+fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onMerged: (String) -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val query = rememberQuery("person", personId, invalidatedBy = setOf("people")) { api.personPhotos(personId) }
@@ -323,10 +362,13 @@ fun PersonScreen(personId: String, onBack: () -> Unit, onOpenPhoto: (String) -> 
         saving = true
         scope.launch {
             try {
-                api.renamePerson(personId, clean)
-                PhotoEvents.invalidate("people")
-                toast.success("Person renamed")
+                val renamed = api.renamePerson(personId, clean)
+                PhotoEvents.invalidate("people", "faces", "photos", "photo")
                 editing = false
+                if (renamed.id != personId) {
+                    toast.success("Merged into ${renamed.name}")
+                    onMerged(renamed.id)
+                } else toast.success("Profile renamed")
             } catch (_: Exception) {
                 toast.error("Failed to rename person")
             } finally {
@@ -453,7 +495,7 @@ fun FacePhotosScreen(faceId: String, onBack: () -> Unit, onOpenPhoto: (String) -
 
     data?.face?.let { face ->
         when (modal) {
-            "tag" -> TagFaceModal(face, onClose = { modal = null }, onDone = onBack)
+            "tag" -> TagFaceModal(face, onClose = { modal = null }, onDone = onBack, onOpenPhoto = onOpenPhoto)
             "merge" -> MergeFaceGroupModal(face, onClose = { modal = null }, onMerged = onBack)
         }
     }

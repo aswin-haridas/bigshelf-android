@@ -155,8 +155,8 @@ fun AppShell() {
     val selecting = SelectionStore.count > 0
     val inViewer = path.startsWith("photos/")
     // Landscape-locked Duplicates needs every bit of height, and Swipe keeps its actions where the
-    // thumb rests, so both drop the bottom bar
-    val fullScreen = inViewer || path == Routes.DUPLICATES || path == Routes.SWIPE
+    // thumb rests; Organize also keeps its exit and actions in focus, so these drop the bottom bar
+    val fullScreen = inViewer || path == Routes.DUPLICATES || path == Routes.SWIPE || path == Routes.ORGANIZE
     // Nav and selection bar both dock below the page; selection replaces the nav
     val showNav = !selecting && !fullScreen
     Column(Modifier.fillMaxSize().background(BsColors.Background)) {
@@ -248,11 +248,16 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
         composable(Routes.LIBRARY) { LibraryScreen(onNavigate = { nav.navigate(it) }) }
         searchGraph(nav, onBack = onBack, openPhoto = openPhoto)
         composable(Routes.PEOPLE) { PeopleScreen(onPerson = { nav.navigate(Routes.person(it)) }, onTab = peopleTab) }
-        composable(Routes.FACES) { FacesScreen(onFace = { nav.navigate(Routes.face(it)) }, onTab = peopleTab) }
+        composable(Routes.FACES) { FacesScreen(onFace = { nav.navigate(Routes.face(it)) }, onTab = peopleTab, onOpenPhoto = openPhoto) }
         composable(Routes.UNTAGGED) { UntaggedScreen(onOpenPhoto = openPhoto, onTab = peopleTab) }
         composable(Routes.PERSON, arguments = listOf(navArgument("personId") { type = NavType.StringType })) {
             PersonScreen(
                 personId = it.arguments?.getString("personId").orEmpty(),
+                onMerged = { id ->
+                    nav.navigate(Routes.person(id)) {
+                        popUpTo(Routes.PERSON) { inclusive = true }
+                    }
+                },
                 onBack = onBack,
                 onOpenPhoto = openPhoto,
             )
@@ -273,6 +278,12 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 onOpenPhoto = openPhoto,
             )
         }
+        composable(Routes.TIERS) {
+            com.bigshelf.app.ui.screens.tools.TierListScreen(onBack, openPhoto, onRate = { nav.navigate(Routes.RATING) })
+        }
+        composable(Routes.WARDROBE) {
+            com.bigshelf.app.ui.screens.explore.TagScreen("fashion", onBack, openPhoto, title = "Wardrobe")
+        }
         composable(Routes.SETTINGS) { SettingsScreen(onBack = onBack) }
         composable(Routes.BACKUP) { BackupScreen(onBack = onBack) }
         composable(Routes.SHARING) { SharingScreen(onBack = onBack, onNavigate = { nav.navigate(it) }) }
@@ -290,6 +301,7 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 onMap = { lat, lon -> nav.navigate(Routes.map(lat, lon)) },
                 onOpenPhoto = { id -> nav.navigate(Routes.photo(id)) },
                 onFramer = { id -> nav.navigate(Routes.framer(id)) },
+                onDeleted = { if (!nav.popBackStack(sectionFrom, inclusive = false)) onTopLevel(sectionFrom) },
             )
         }
         composable(Routes.TRIPLETS) {
@@ -299,7 +311,7 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
             var editingSettings by remember { mutableStateOf(false) }
             TriptychScreen(
                 "Triplets",
-                "${settings.tripletCount} photos of the same person",
+                "Up to ${settings.tripletCount} photos${if (settings.tripletMatchFaces) " of the same profile" else " per set"}",
                 TRIPLETS_ENDPOINT,
                 onBack = onBack, onOpenPhoto = openPhoto,
                 onSettings = { editingSettings = true },

@@ -33,7 +33,7 @@ jobs:
 
       - name: Build
         run: >
-          ./gradlew :app:assembleRelease
+          ./gradlew :app:testReleaseUnitTest :app:assembleRelease
           -Pbigshelf.apiUrl=https://bigshelf.aswinharidas.uk
           -Pbigshelf.versionCode=$CODE -Pbigshelf.versionName=$NAME
 

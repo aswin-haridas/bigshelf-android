@@ -59,7 +59,11 @@ private fun invalidateFaces() = PhotoEvents.invalidate("faces", "people", "photo
  * person (filtered as you type, lookalikes first). [onDone] runs once it's tagged.
  */
 @Composable
-fun TagFaceModal(face: FaceItem, onClose: () -> Unit, onDone: () -> Unit = {}) {
+fun TagFaceModal(
+    face: FaceItem, onClose: () -> Unit, onDone: () -> Unit = {},
+    onOpenPhoto: (String) -> Unit,
+    remaining: Int? = null, onSkip: (() -> Unit)? = null,
+) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -68,7 +72,7 @@ fun TagFaceModal(face: FaceItem, onClose: () -> Unit, onDone: () -> Unit = {}) {
     // Typed name filters server-side; the face id ranks lookalikes first. Debounced 250ms.
     LaunchedEffect(name) {
         delay(250)
-        people = runCatching { api.people(name.trim(), faceId = face.id).items }.getOrNull() ?: people
+        people = runCatching { api.people(name.trim(), faceId = face.id, photoId = face.photoId).items }.getOrNull() ?: people
     }
 
     fun tag(personId: String?, label: String) {
@@ -83,7 +87,7 @@ fun TagFaceModal(face: FaceItem, onClose: () -> Unit, onDone: () -> Unit = {}) {
                     if (result.autoTaggedCount > 0) "Tagged as $tagged & linked ${result.autoTaggedCount} matching faces"
                     else "Tagged as $tagged",
                 )
-                onClose()
+                if (remaining == null) onClose()
                 onDone()
             } catch (e: Exception) {
                 toast.error(e.userMessage("Failed to tag face"))
@@ -93,12 +97,34 @@ fun TagFaceModal(face: FaceItem, onClose: () -> Unit, onDone: () -> Unit = {}) {
         }
     }
 
+    val photos = rememberQuery("tag-context", face.id, invalidatedBy = emptySet()) { api.facePhotos(face.id).items.take(4) }
     val clean = name.trim()
+    fun save() {
+        val match = people.orEmpty().firstOrNull { it.name.equals(clean, ignoreCase = true) }
+        tag(match?.id, match?.name ?: clean)
+    }
+    fun forget() {
+        if (saving) return
+        saving = true
+        scope.launch {
+            try {
+                api.ignoreFace(face.id)
+                invalidateFaces()
+                if (remaining == null) onClose()
+                onDone()
+            } catch (e: Exception) {
+                toast.error(e.userMessage("Failed to forget face"))
+            } finally { saving = false }
+        }
+    }
     BsModal(
-        title = "Tag face",
+        title = remaining?.let { "Tag faces · $it left" } ?: "Tag face",
         onClose = onClose,
         footer = {
-            BsButton(onClick = { tag(null, clean) }, enabled = clean.isNotEmpty() && !saving, loading = saving, textStyle = BsText.Xs) {
+            BsButton(onClick = { onClose(); onOpenPhoto(face.photoId) }, variant = ButtonVariant.Ghost, enabled = !saving, textStyle = BsText.Xs) { Text("View photo") }
+            BsButton(onClick = ::forget, variant = ButtonVariant.Ghost, enabled = !saving, textStyle = BsText.Xs) { Text("Forget") }
+            if (onSkip != null) BsButton(onClick = onSkip, variant = ButtonVariant.Ghost, enabled = !saving, textStyle = BsText.Xs) { Text("Skip") }
+            BsButton(onClick = ::save, enabled = clean.isNotEmpty() && !saving, loading = saving, textStyle = BsText.Xs) {
                 Text("Save tag")
             }
         },
@@ -113,10 +139,15 @@ fun TagFaceModal(face: FaceItem, onClose: () -> Unit, onDone: () -> Unit = {}) {
                     autoFocus = true,
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (clean.isNotEmpty()) tag(null, clean) }),
+                    keyboardActions = KeyboardActions(onDone = { if (clean.isNotEmpty()) save() }),
                 )
             }
-            Text("Or select existing person", style = BsText.Xs, color = BsColors.Muted)
+            if (!photos.data.isNullOrEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                photos.data.orEmpty().forEach { photo ->
+                    FaceTile(photo.thumbnailUrl, photo.filename, null, onClick = { onClose(); onOpenPhoto(photo.id) }, modifier = Modifier.weight(1f))
+                }
+            }
+            Text("Or select existing profile", style = BsText.Xs, color = BsColors.Muted)
             PersonList(
                 people = people.orEmpty(),
                 enabled = !saving,
@@ -251,7 +282,7 @@ fun MergePersonModal(source: Person, onClose: () -> Unit, onMerged: () -> Unit) 
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Photos of ${source.name} move to the person you pick, then this entry is removed.", style = BsText.Xs, color = BsColors.Muted)
-            BsSearchBar(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "Search people")
+            BsInput(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "Search profiles", autoFocus = true)
             PersonList(
                 people = candidates,
                 selectedId = target?.id,

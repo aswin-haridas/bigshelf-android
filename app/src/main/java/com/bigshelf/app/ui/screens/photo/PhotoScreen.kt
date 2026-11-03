@@ -143,6 +143,7 @@ fun PhotoScreen(
     onMap: (Double, Double) -> Unit,
     onOpenPhoto: (String) -> Unit,
     onFramer: (String) -> Unit,
+    onDeleted: () -> Unit,
 ) {
     // The grid's list if it contains this photo, else just this one
     val list = remember(photoId) {
@@ -191,7 +192,7 @@ fun PhotoScreen(
                     PhotoOptionsMenu(
                         current, open, close,
                         onChanged = { details[it.id] = it },
-                        onDeleted = onBack,
+                        onDeleted = onDeleted,
                         onCrop = {
                             cropOutBox = null
                             croppingId = current.id
@@ -211,7 +212,7 @@ fun PhotoScreen(
                     current,
                     onInfo = { showInfo = true },
                     onChanged = { details[it.id] = it },
-                    onDeleted = onBack,
+                    onDeleted = onDeleted,
                     onFramer = { onFramer(current.id) },
                 )
             }
@@ -885,7 +886,7 @@ private fun FaceTagModal(
     LaunchedEffect(query) {
         delay(250)
         people = runCatching {
-            api.people(query.trim(), faceId = face?.faceId, photoId = if (wholePhoto) photo.id else null).items
+            api.people(query.trim(), faceId = face?.faceId, photoId = photo.id).items
         }.getOrNull() ?: people
     }
 

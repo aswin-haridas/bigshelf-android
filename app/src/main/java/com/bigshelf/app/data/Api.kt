@@ -361,7 +361,7 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun personPhotos(id: String) = get("/api/v1/people/$id/photos", PersonPhotos.serializer())
 
     suspend fun renamePerson(id: String, name: String) =
-        sendUnit("PATCH", "/api/v1/people/$id", buildJsonObject { put("name", name) })
+        send("PATCH", "/api/v1/people/$id", Person.serializer(), buildJsonObject { put("name", name) })
 
     suspend fun untagPhotos(personId: String, photoIds: Collection<String>) = send(
         "POST", "/api/v1/people/$personId/untag-photos", UntagResponse.serializer(),
@@ -370,7 +370,18 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun untaggedPhotos() = get("/api/v1/people/untagged-photos", PhotoPage.serializer())
 
-    suspend fun faces() = get("/api/v1/faces", FaceList.serializer()).faces
+    suspend fun faces(): List<FaceItem> {
+        val faces = mutableListOf<FaceItem>()
+        var page = 1
+        do {
+            val batch = get(
+                "/api/v1/faces", FaceList.serializer(), mapOf("page" to page, "size" to 100),
+            ).faces
+            faces.addAll(batch)
+            page++
+        } while (batch.size == 100)
+        return faces
+    }
 
     suspend fun facePhotos(id: String) = get("/api/v1/faces/$id/photos", FacePhotos.serializer())
 

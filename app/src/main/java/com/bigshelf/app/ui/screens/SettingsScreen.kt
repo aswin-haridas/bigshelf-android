@@ -43,6 +43,7 @@ import com.bigshelf.app.data.BackupWorker
 import com.bigshelf.app.data.SystemStats
 import com.bigshelf.app.data.Updater
 import com.bigshelf.app.state.rememberQuery
+import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.PageHeader
@@ -157,9 +158,6 @@ private fun Section(title: String, hint: String) {
     }
 }
 
-// Triplets set sizes, the web slider's range (2-9)
-private val SET_SIZES = (2..9).map { TabItem(it, "$it") }
-
 /** People hidden with Skip on Triplets, each with an Unskip to bring them back. */
 @Composable
 private fun SkippedPeople() {
@@ -242,55 +240,54 @@ private fun TabsRow(label: String, hint: String, content: @Composable () -> Unit
 @Composable
 fun TripletSettingsCard() {
     val settings = BigShelfApp.settings
+    var choosingSize by remember { mutableStateOf(false) }
     SettingsCard {
-        ToggleRow(
-            "AI images", "Let Triplets pick AI images too.",
-            settings.includeAi, settings::updateIncludeAi,
+        SettingRow("Match", "Choose what each set has in common.") {}
+        val matches = listOf(
+            Triple("Faces", settings.tripletMatchFaces, settings::updateTripletMatchFaces),
+            Triple("Outfit", settings.tripletOutfit, settings::updateTripletOutfit),
+            Triple("Colors", settings.tripletMatchColors, settings::updateTripletMatchColors),
+            Triple("Pose", settings.tripletMatchPose, settings::updateTripletMatchPose),
+            Triple("Scene", settings.tripletMatchScene, settings::updateTripletMatchScene),
+        )
+        matches.chunked(3).forEach { row ->
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (label, checked, change) ->
+                    BsButton(
+                        onClick = { change(!checked) }, modifier = Modifier.weight(1f),
+                        variant = if (checked) ButtonVariant.Primary else ButtonVariant.Secondary,
+                    ) { Text(label) }
+                }
+            }
+        }
+        ToggleRow("AI images", "Include AI images.", settings.includeAi, settings::updateIncludeAi, divider = true)
+        ToggleRow("Solo photos only", "Skip group photos.", settings.tripletSolo, settings::updateTripletSolo, divider = true)
+        if (!settings.tripletMatchScene) ToggleRow(
+            "Different scenes", "Spread a set across shoots.",
+            settings.tripletVariety, settings::updateTripletVariety, divider = true,
         )
         ToggleRow(
-            "Solo photos only", "Skip group photos with other tagged people.",
-            settings.tripletSolo, settings::updateTripletSolo, divider = true,
-        )
-        ToggleRow(
-            "Match faces", "Fill each set with photos where the face looks most like the first one.",
-            settings.tripletMatchFaces, settings::updateTripletMatchFaces, divider = true,
-        )
-        ToggleRow(
-            "Match outfit", "Fill each set with photos where the clothes look most like the first one's.",
-            settings.tripletOutfit, settings::updateTripletOutfit, divider = true,
-        )
-        ToggleRow(
-            "Match colors", "Fill each set with photos whose clothes colors look most like the first one's.",
-            settings.tripletMatchColors, settings::updateTripletMatchColors, divider = true,
-        )
-        ToggleRow(
-            "Match pose", "Fill each set with photos where the person stands or sits most like in the first one.",
-            settings.tripletMatchPose, settings::updateTripletMatchPose, divider = true,
-        )
-        ToggleRow(
-            "Match scene", "Fill each set with photos whose place and background look most like the first one's.",
-            settings.tripletMatchScene, settings::updateTripletMatchScene, divider = true,
-        )
-        ToggleRow(
-            "Different scenes",
-            if (settings.tripletMatchScene) "Off while Match scene is on: a matched set shares one scene."
-            else "Spread each set across places and shoots. Off allows one scene's photos together.",
-            // Shown off while Match scene overrides it (the saved choice comes back after)
-            settings.tripletVariety && !settings.tripletMatchScene, settings::updateTripletVariety, divider = true,
-        )
-        ToggleRow(
-            "Clear face first", "Lead with a big, sharp, typical face. Off lays the whole set out in order.",
+            "Clear face first", "Lead with a sharp, close face.",
             settings.tripletClearLead, settings::updateTripletClearLead, divider = true,
         )
-        TabsRow("Photos per set", "People with fewer photos than this are left out.") {
-            BsTabs(SET_SIZES, settings.tripletCount, settings::updateTripletCount)
+        SettingRow("Photos per set", "Strict matching may return fewer photos.") {
+            BsButton(onClick = { choosingSize = true }, variant = ButtonVariant.Secondary) {
+                Text("${settings.tripletCount} photos")
+            }
         }
-        TabsRow(
-            "Order",
-            if (settings.tripletClearLead) "How the photos after the clear face are laid out."
-            else "How the photos of a set are laid out.",
-        ) {
+        TabsRow("Order", "How the photos in a set are laid out.") {
             BsTabs(ORDERS, settings.tripletOrder, settings::updateTripletOrder)
+        }
+    }
+    if (choosingSize) BsModal(title = "Photos per set", onClose = { choosingSize = false }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            (2..9).forEach { count ->
+                BsButton(
+                    onClick = { settings.updateTripletCount(count); choosingSize = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = if (settings.tripletCount == count) ButtonVariant.Primary else ButtonVariant.Secondary,
+                ) { Text("$count photos") }
+            }
         }
     }
 }
@@ -344,7 +341,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Triplets", "How Triplets picks each set of one person's photos.")
+            Section("Triplets", "How Triplets picks and matches each set of photos.")
             TripletSettingsCard()
         }
 

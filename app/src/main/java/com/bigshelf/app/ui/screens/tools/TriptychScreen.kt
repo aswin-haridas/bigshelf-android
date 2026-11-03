@@ -52,6 +52,9 @@ import com.bigshelf.app.ui.screens.people.PersonList
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 
 const val TRIPLETS_ENDPOINT = "/api/v1/triplets"
 
@@ -89,7 +92,7 @@ private val lastPerson = mutableMapOf<String, String?>()
 
 /**
  * Port of modules/triptych: one set of photos at a time with Download and Next. Triplets
- * shows [count] photos of one person; Composer a clear
+ * shows up to the requested number of matching photos; Composer a clear
  * face plus another outfit, with the image-model [prompt] to copy. Sets showing one person
  * can skip that person for good; a person filter limits sets to one person.
  */
@@ -114,14 +117,15 @@ fun TriptychScreen(
     // The endpoint's query params from Settings, plus the person filter; a change starts fresh sets
     val options = setOptions(endpoint, settings) + ("person_id" to onlyPerson)
 
-    // Sets by offset for the current options: the visible one plus the prefetched next one
+    // Keep the visible set and four prepared sets; options changes get a fresh cache.
     val cache = remember(options) { mutableStateMapOf<Int, PhotoSet>() }
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf<String?>(null) }
     var picking by remember { mutableStateOf(false) }
     // Keep the last set on screen while the next one loads (keepPreviousData)
-    var shown by remember { mutableStateOf<PhotoSet?>(null) }
+    var shown by remember(options) { mutableStateOf<PhotoSet?>(null) }
+    var revision by remember { mutableStateOf(0) }
 
     suspend fun fetch(at: Int) = api.photoSet(endpoint, at, options)
 
@@ -130,48 +134,46 @@ fun TriptychScreen(
         lastOffset[endpoint] = next
     }
 
-    // Load the current set, then warm the next one (data and thumbnails) so Next is instant
-    LaunchedEffect(offset, options) {
+    // Prepare sequentially: each request consumes the server's seen queue.
+    LaunchedEffect(offset, options, revision) {
+        cache.keys.filter { it < offset || it >= offset + 5 }.forEach { cache.remove(it) }
         failed = false
-        val current = cache[offset] ?: run {
-            loading = true
-            try {
-                fetch(offset).also { cache[offset] = it }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                failed = true
-                null
-            } finally {
-                loading = false
+        loading = true
+        try {
+            val current = cache[offset] ?: fetch(offset).also {
+                coroutineContext.ensureActive()
+                cache[offset] = it
             }
-        }
-        shown = current
-        if (current != null && cache[offset + 1] == null) {
-            runCatching { fetch(offset + 1) }.getOrNull()?.let { next ->
-                cache[offset + 1] = next
+            shown = current
+            loading = false
+            if (current.photos.isEmpty()) return@LaunchedEffect
+            for (ahead in 1..4) {
+                val at = offset + ahead
+                val next = cache[at] ?: fetch(at).also {
+                    coroutineContext.ensureActive()
+                    cache[at] = it
+                }
+                if (next.photos.isEmpty()) break
                 val loader = SingletonImageLoader.get(context)
-                next.photos.forEach { p ->
-                    p.thumbnailUrl?.let { loader.enqueue(ImageRequest.Builder(context).data(api.mediaUrl(it)).build()) }
+                next.photos.forEach { photo ->
+                    photo.thumbnailUrl?.let {
+                        loader.enqueue(ImageRequest.Builder(context).data(api.mediaUrl(it)).build())
+                    }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Warm-up failures retry when reached; current-set failures offer Retry.
+            failed = shown == null || cache[offset] == null
+        } finally {
+            loading = false
         }
     }
 
-    // Archive/skip shift every later position down by one: drop them and reload this one
     fun refetchShifted() {
         cache.keys.filter { it >= offset }.forEach { cache.remove(it) }
-        val at = offset
-        scope.launch {
-            loading = true
-            try {
-                fetch(at).also { cache[at] = it; if (offset == at) shown = it }
-            } catch (_: Exception) {
-                failed = true
-            } finally {
-                loading = false
-            }
-        }
+        revision++
     }
 
     fun setPerson(id: String?) {
@@ -240,7 +242,10 @@ fun TriptychScreen(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 set == null && loading -> Spinner(Modifier.align(Alignment.Center), size = 20.dp, tint = BsColors.Muted)
-                set == null && failed -> EmptyState("Unable to load ${title.lowercase()}", Modifier.padding(horizontal = 24.dp))
+                failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Unable to load ${title.lowercase()}")
+                    BsButton(onClick = { revision++ }) { Text("Retry") }
+                }
                 photos.isEmpty() -> EmptyState("No ${title.lowercase()} are available yet", Modifier.padding(horizontal = 24.dp))
                 else -> LazyVerticalGrid(
                     // Two across for a few photos, three when the set is bigger
@@ -290,7 +295,7 @@ fun TriptychScreen(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BsButton(onClick = ::download, modifier = Modifier.weight(1f), enabled = busy == null, loading = busy == "download") {
+                    BsButton(onClick = ::download, modifier = Modifier.weight(1f), enabled = busy == null && !loading && !failed, loading = busy == "download") {
                         BsIcon(BsIcons.DownloadSimple, size = 16.dp)
                         Text("Download")
                     }
@@ -298,7 +303,7 @@ fun TriptychScreen(
                         onClick = { moveTo(offset + 1) },
                         modifier = Modifier.weight(1f),
                         variant = ButtonVariant.Secondary,
-                        enabled = busy == null,
+                        enabled = busy == null && !loading && !failed,
                         loading = loading,
                     ) {
                         BsIcon(BsIcons.ArrowRight, size = 16.dp)

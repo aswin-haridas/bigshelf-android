@@ -123,7 +123,7 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicat
         PageHeader(
             BUCKETS.firstOrNull { it.first == tab }?.second ?: "Organize",
             count = bucket?.let { photoCount(it.count) },
-            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = if (tab != null) closeBucket else onBack, tint = BsColors.Foreground) },
+            leading = { BsIconButton(BsIcons.ArrowLeft, if (tab == null) "Exit Organize" else "Back", onClick = if (tab != null) closeBucket else onBack, tint = BsColors.Foreground) },
         ) {
             if (items.isNotEmpty()) {
                 if (tab == "failed") {
