@@ -53,6 +53,8 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.MonoFamily
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.text.NumberFormat
 import java.time.Month
@@ -105,8 +107,8 @@ private fun exploreBlocks(photos: List<Photo>): List<List<Photo>> {
     return blocks
 }
 
-// About three screens of tiles at 3 columns
-private const val PREFETCH_AHEAD = 40
+// Keep speculative work close to the viewport.
+private const val PREFETCH_AHEAD = 12
 
 fun photoCount(n: Int) = "${NumberFormat.getIntegerInstance(Locale.US).format(n)} ${if (n == 1) "photo" else "photos"}"
 
@@ -165,22 +167,26 @@ fun ImagesGrid(
     // Memory cache is skipped: prefetches would evict what's on screen.
     val context = LocalContext.current
     val indexById = remember(photos) { photos.withIndex().associate { it.value.id to it.index } }
-    val prefetched = remember { HashSet<String>() }
     LaunchedEffect(state, indexById) {
         snapshotFlow {
             // Tiles are keyed by photo id; explore blocks by "block-" + their first photo's id
             state.layoutInfo.visibleItemsInfo.maxOfOrNull { indexById[(it.key as? String)?.removePrefix("block-")] ?: -1 } ?: -1
-        }.distinctUntilChanged().collect { last ->
+        }.distinctUntilChanged().collectLatest { last ->
             val loader = SingletonImageLoader.get(context)
-            for (photo in photos.subList(minOf(last + 1, photos.size), minOf(last + 1 + PREFETCH_AHEAD, photos.size))) {
-                val src = photo.thumbnailUrl ?: photo.imageSrc ?: continue
-                if (!prefetched.add(photo.id)) continue
+            val requests = photos.subList(minOf(last + 1, photos.size), minOf(last + 1 + PREFETCH_AHEAD, photos.size)).mapNotNull { photo ->
+                val src = photo.thumbnailUrl ?: photo.imageSrc ?: return@mapNotNull null
                 loader.enqueue(
                     ImageRequest.Builder(context)
                         .data(BigShelfApp.api.mediaUrl(src))
+                        .size(480)
                         .memoryCachePolicy(CachePolicy.DISABLED)
                         .build(),
                 )
+            }
+            try {
+                awaitCancellation()
+            } finally {
+                requests.forEach { it.dispose() }
             }
         }
     }
@@ -222,10 +228,10 @@ fun ImagesGrid(
                     item(key = "header-${group.key}", span = { GridItemSpan(maxLineSpan) }) {
                         DateHeader(group.label, group.photos.size, if (selectionActive) group.photos else null)
                     }
-                    items(group.photos, key = { it.id }) { photo -> Tile(photo, selectionActive, open) }
+                    items(group.photos, key = { it.id }, contentType = { "photo" }) { photo -> Tile(photo, selectionActive, open) }
                 }
             } else {
-                items(photos, key = { it.id }) { photo -> Tile(photo, selectionActive, open) }
+                items(photos, key = { it.id }, contentType = { "photo" }) { photo -> Tile(photo, selectionActive, open) }
             }
             item(key = "footer", span = { GridItemSpan(maxLineSpan) }) {
                 when {
@@ -327,14 +333,12 @@ private fun DateHeader(label: String, count: Int, selectable: List<Photo>?, modi
             }
         }
         Text(
-            label.uppercase(Locale.US),
+            label,
             Modifier.weight(1f),
             style = BsText.Xs.copy(
                 fontWeight = BsWeight.Semibold,
-                fontFamily = MonoFamily,
-                letterSpacing = BsText.TrackingWider,
             ),
-            color = BsColors.MutedSoft,
+            color = BsColors.Foreground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

@@ -1,15 +1,19 @@
 package com.bigshelf.app.ui.screens.tools
 
+import android.content.pm.ActivityInfo
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -22,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
@@ -37,7 +43,7 @@ import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
 import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.toast
-import com.bigshelf.app.ui.photos.ImageCard
+import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
@@ -62,6 +68,12 @@ private class Answer(val pair: RatingPair, val done: CompletableDeferred<String?
  */
 @Composable
 fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
+    val activity = LocalActivity.current
+    DisposableEffect(activity) {
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        // Keep the lock through the Activity recreation triggered by rotation.
+        onDispose { if (activity?.isChangingConfigurations == false) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -188,7 +200,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 description = "Photos can be rated once processing has finished",
             )
             else -> Column(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current),
+                Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current + 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -199,11 +211,16 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                         Text("Skip")
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     current.items.forEach { photo ->
-                        Box(Modifier.weight(1f).clip(BsShapes.Lg)) {
+                        Box(Modifier.weight(1f).fillMaxHeight().clip(BsShapes.Lg).background(BsColors.Surface).bsClickable { pick(current, photo) }) {
                             // A tap always picks; the corner arrow opens the photo
-                            ImageCard(photo = photo, selected = false, selectionActive = false, onClick = { pick(current, photo) }, onToggle = {})
+                            AsyncImage(
+                                api.mediaUrl(photo.thumbnailUrl ?: photo.imageSrc),
+                                photo.title ?: photo.filename,
+                                Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                            )
                             BsIconButton(
                                 BsIcons.ArrowUpRight, "Open ${photo.filename}",
                                 onClick = { onOpenPhoto(photo.id) },

@@ -1,6 +1,9 @@
 package com.bigshelf.app.ui.shell
 
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import com.bigshelf.app.ui.theme.BsWeight
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
@@ -106,7 +109,7 @@ private val TABS = listOf(
 )
 
 // Pages the Search tab owns: albums, places and the map, events, colours, bursts, smart filters
-private val SEARCH_PAGES = listOf("search", "albums", "places", "map", "events", "colors", "bursts", "filtered")
+private val SEARCH_PAGES = listOf("search", "albums", "places", "map", "events", "colors", "bursts", "filtered", "tags")
 
 /** Which tab owns [path]: Library holds everything that isn't Photos, Search or People. */
 private fun tabFor(path: String) = when {
@@ -141,11 +144,12 @@ fun AppShell() {
         from.value = path
     }
 
-    // Tabs replace the stack; pages inside a tab push onto it so Back returns to the tab
+    // Keep each tab's saved scroll and navigation state when switching sections.
     fun go(route: String) {
         nav.navigate(route) {
-            popUpTo(Routes.HOME)
+            popUpTo(Routes.HOME) { saveState = true }
             launchSingleTop = true
+            restoreState = true
         }
     }
     fun back() {
@@ -156,7 +160,7 @@ fun AppShell() {
     val inViewer = path.startsWith("photos/")
     // Landscape-locked Duplicates needs every bit of height, and Swipe keeps its actions where the
     // thumb rests; Organize also keeps its exit and actions in focus, so these drop the bottom bar
-    val fullScreen = inViewer || path == Routes.DUPLICATES || path == Routes.SWIPE || path == Routes.ORGANIZE
+    val fullScreen = inViewer || path == Routes.DUPLICATES || path == Routes.RATING || path == Routes.SWIPE || path == Routes.ORGANIZE
     // Nav and selection bar both dock below the page; selection replaces the nav
     val showNav = !selecting && !fullScreen
     Column(Modifier.fillMaxSize().background(BsColors.Background)) {
@@ -188,8 +192,7 @@ fun AppShell() {
 val LocalBottomBarInset = staticCompositionLocalOf { 0.dp }
 
 /**
- * Docked icon nav below the page: Photos, Search, upload, People, Library. The active tab is just brighter
- * with a filled icon; labels are for screen readers.
+ * Labeled destinations with a distinct upload action in the center.
  */
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit) {
@@ -199,26 +202,33 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit) {
             .background(BsColors.Background)
             .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
             .navigationBarsPadding()
-            .height(56.dp),
+            .height(64.dp)
+            .selectableGroup(),
     ) {
         val upload = rememberUploadPicker()
         TABS.forEachIndexed { i, tab ->
             // Upload sits in the middle, a plus on a surface circle so it reads as an action, not a tab
-            if (i == TABS.size / 2) Box(
+            if (i == TABS.size / 2) Column(
                 Modifier.weight(1f).fillMaxHeight().bsClickable(scale = 0.9f, onClick = upload),
-                contentAlignment = Alignment.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
             ) {
-                Box(Modifier.size(40.dp).background(BsColors.Surface, BsShapes.Full), contentAlignment = Alignment.Center) {
-                    BsIcon(BsIcons.Plus, size = 22.dp, tint = BsColors.Foreground, contentDescription = "Upload photos")
-                }
+                BsIcon(BsIcons.Plus, size = 24.dp, tint = BsColors.Foreground)
+                Text("Upload", style = BsText.Xs2, color = BsColors.Foreground)
             }
             val selected = tab.route == active
             val tint by animateColorAsState(if (selected) BsColors.Foreground else BsColors.Muted, BsMotion.fast(), label = "tabTint")
-            Box(
-                Modifier.weight(1f).fillMaxHeight().bsClickable(scale = 0.9f) { onSelect(tab.route) },
-                contentAlignment = Alignment.Center,
+            Column(
+                Modifier.weight(1f).fillMaxHeight().selectable(
+                    selected = selected,
+                    role = Role.Tab,
+                    onClick = { if (!selected) onSelect(tab.route) },
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
             ) {
-                BsIcon(if (selected) tab.activeIcon else tab.icon, size = 24.dp, tint = tint, contentDescription = tab.label)
+                BsIcon(if (selected) tab.activeIcon else tab.icon, size = 24.dp, tint = tint)
+                Text(tab.label, style = BsText.Xs2, color = tint)
             }
         }
     }

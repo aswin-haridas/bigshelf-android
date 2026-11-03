@@ -21,8 +21,9 @@ Requires JDK 17+. minSdk 26, targetSdk 35.
 
 The Android look deliberately differs from the web app: true-black background, near-monochrome
 greys with purple kept only as the accent, white primary buttons, borderless icon buttons and tabs,
-rounder corners, an icon-only bottom bar, and Inter (bundled in `res/font`) everywhere. The Photos
-tab is an Instagram Explore-style mosaic and each person opens as an Instagram-style profile.
+rounder corners, a labeled bottom bar, and Inter (bundled in `res/font`) everywhere. The Photos
+tab defaults to a date-grouped timeline with an optional Instagram-style burst feed; search results
+use an Explore-style mosaic and each person opens as an Instagram-style profile.
 Token names still follow the web's, so the tables below show where each piece came from.
 
 | Web | Android |
@@ -63,10 +64,11 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
 
 - Sign in / sign up, with the session kept across restarts through the `refresh_token`
   cookie, like the web.
-- Home timeline with month headers, infinite scroll, text search and the "show AI images"
+- Home timeline with month headers, a remembered All photos / Feed switch, infinite scroll, text search and the "show AI images"
   setting. Uploads go through the same presigned flow as the web, with the progress box.
-- Bottom navigation (Photos, Search, People, Library); Library holds upload,
-  Archive, Bin, the tools, Settings and Log out.
+- Labeled bottom navigation (Photos, Search, Upload, People, Library) saves section state when
+  switching tabs. Library groups albums, sharing, Archive and Bin first, then backup/import,
+  tidy-up tools, creation tools, advanced pipelines and account settings.
 - Search tab: albums with sub-albums, places (named by the phone's Geocoder) and a map of
   where photos were taken (OpenStreetMap via osmdroid, no API key), events and trips grouped
   by time and distance from home, colour chips, Best shots (bursts with the best frame marked,
@@ -109,6 +111,7 @@ Where the phone has no hover, a few hover-only details are adapted for touch:
   shared with you and your links, to share again or revoke. Links open on the web app at
   `/s/<token>`, so they point at `bigshelf.apiUrl` and only work where the web app is served
   from the same origin (as in production behind Caddy).
+- Rating rotates to landscape while open and fits both comparison photos within the available height.
 - A selection bar that takes the bottom nav's place while photos are selected: add to album
   (by full album path), untag, download, archive or unarchive, move to Bin; inside an album,
   move, copy or remove. Archive, Bin and Remove offer Undo, and while selecting, a month
@@ -147,3 +150,15 @@ app/src/main/java/com/bigshelf/app/
 
 Validation: `./gradlew :app:assembleDebug :app:testDebugUnitTest`. A push to `main` runs
 release tests and publishes a versioned production APK through the existing release workflow.
+
+## Browsing performance
+
+The default All photos view skips burst discovery; Feed loads burst membership only while open.
+Grid thumbnail prefetch is limited to the next 12 photos, decodes at 480px, and cancels requests
+when the viewport or screen changes. Paging deduplicates IDs with a set, and queries cancel their
+coroutine work when their keys or screens leave composition. Larger touch targets and selected-tab
+semantics apply to the shared segmented controls.
+
+Design references: [Google Photos collections](https://support.google.com/photos/thread/289829291/introducing-the-collections-view-find-what-you-need-faster?hl=en)
+for grouping library destinations, and [Pinterest discovery](https://help.pinterest.com/en/article/discover-ideas-on-pinterest)
+for keeping visual discovery near search. Existing swipeable posts and mosaic results remain in place.

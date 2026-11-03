@@ -1,6 +1,7 @@
 package com.bigshelf.app.state
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,8 @@ import com.bigshelf.app.data.PhotoPage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 
 /**
  * Minimal react-query stand-in: loads once, keeps the last data while refetching, and
@@ -26,6 +29,8 @@ class QueryState<T>(private val scope: CoroutineScope, private val fetch: suspen
         private set
     private var job: Job? = null
 
+    fun cancel() { job?.cancel() }
+
     fun refetch() {
         job?.cancel()
         job = scope.launch {
@@ -37,7 +42,7 @@ class QueryState<T>(private val scope: CoroutineScope, private val fetch: suspen
             } catch (e: Exception) {
                 isError = true
             } finally {
-                isLoading = false
+                if (currentCoroutineContext().isActive) isLoading = false
             }
         }
     }
@@ -47,6 +52,7 @@ class QueryState<T>(private val scope: CoroutineScope, private val fetch: suspen
 fun <T> rememberQuery(vararg keys: Any?, invalidatedBy: Set<String>, fetch: suspend () -> T): QueryState<T> {
     val scope = rememberCoroutineScope()
     val query = remember(*keys) { QueryState(scope, fetch) }
+    DisposableEffect(query) { onDispose { query.cancel() } }
     LaunchedEffect(query) {
         query.refetch()
         PhotoEvents.invalidations.collect { if (it.any(invalidatedBy::contains)) query.refetch() }
@@ -74,15 +80,17 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
     private var cursor: String? = null
     private var job: Job? = null
 
+    fun cancel() { job?.cancel() }
+
     private var retryNextPage = false
 
     /** Reloads from page 1 (an invalidation); the old photos stay up until it lands. */
     fun refresh() {
         retryNextPage = false
         job?.cancel()
+        isFetching = true
+        isError = false
         job = scope.launch {
-            isFetching = true
-            isError = false
             try {
                 val first = load(1, null)
                 photos = first.items
@@ -95,7 +103,7 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
             } catch (_: Exception) {
                 isError = true
             } finally {
-                isFetching = false
+                if (currentCoroutineContext().isActive) isFetching = false
             }
         }
     }
@@ -103,12 +111,13 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
     fun fetchNextPage() {
         if (isFetching || !hasNextPage) return
         retryNextPage = true
+        isFetching = true
+        isError = false
         job = scope.launch {
-            isFetching = true
-            isError = false
             try {
                 val next = load(page + 1, cursor)
-                photos = photos + next.items.filter { n -> photos.none { it.id == n.id } }
+                val seen = photos.mapTo(HashSet()) { it.id }
+                photos = photos + next.items.filter { seen.add(it.id) }
                 // Cursor pages aren't counted: keep the first page's total
                 if (next.nextCursor == null && cursor == null) total = next.total
                 hasNextPage = next.hasNext
@@ -119,7 +128,7 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
             } catch (_: Exception) {
                 isError = true
             } finally {
-                isFetching = false
+                if (currentCoroutineContext().isActive) isFetching = false
             }
         }
     }
@@ -138,6 +147,7 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
 fun rememberPagedPhotos(vararg keys: Any?, invalidatedBy: Set<String>, load: suspend (page: Int, cursor: String?) -> PhotoPage): PagedPhotos {
     val scope = rememberCoroutineScope()
     val paged = remember(*keys) { PagedPhotos(scope, load) }
+    DisposableEffect(paged) { onDispose { paged.cancel() } }
     LaunchedEffect(paged) {
         paged.refresh()
         PhotoEvents.invalidations.collect { if (it.any(invalidatedBy::contains)) paged.refresh() }

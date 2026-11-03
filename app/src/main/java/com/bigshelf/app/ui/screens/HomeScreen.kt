@@ -39,9 +39,12 @@ import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.data.PhotoPersonTag
 import com.bigshelf.app.state.AuthStore
+import com.bigshelf.app.state.PagedPhotos
 import com.bigshelf.app.state.rememberPagedPhotos
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsIcon
+import com.bigshelf.app.ui.components.BsTabs
+import com.bigshelf.app.ui.components.TabItem
 import com.bigshelf.app.ui.components.BsSearchBar
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
@@ -91,14 +94,13 @@ internal fun groupIntoPosts(photos: List<Photo>, burstOf: Map<String, String> = 
 }
 
 /**
- * Photos tab laid out like the Instagram home feed: search bar and profile badge on top,
- * then one post per person's burst - who's in it, when, and the photos as swipeable
- * slides. A text search swaps the feed for a grid of ranked results.
+ * Photo timeline with an optional swipeable burst feed and ranked search results.
  */
 @Composable
 fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
     val api = BigShelfApp.api
-    val showAi = BigShelfApp.settings.showAi
+    val settings = BigShelfApp.settings
+    val showAi = settings.showAi
     var search by rememberSaveable { mutableStateOf("") }
     var q by rememberSaveable { mutableStateOf("") }
     // Debounced 300ms, like the web search box
@@ -110,18 +112,6 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
     val feed = rememberPagedPhotos("home", invalidatedBy = setOf("photos")) { page, cursor -> api.photos(page, cursor = cursor, people = true) }
     val textSearch = rememberQuery("search", q, invalidatedBy = setOf("photos")) {
         if (q.isEmpty()) emptyList() else api.searchPhotos(q)
-    }
-    // Burst membership comes from the server: its rule needs scene embeddings the app never loads.
-    // ponytail: pages the whole bursts list (30 a call, each a full server pass); add an ids-only endpoint if that gets slow
-    val bursts = rememberQuery("home-bursts", invalidatedBy = setOf("photos")) {
-        buildMap {
-            var offset = 0
-            do {
-                val page = api.bursts(offset = offset, limit = 30)
-                page.groups.forEach { g -> g.items.forEach { put(it.id, g.id) } }
-                offset += page.groups.size
-            } while (page.groups.isNotEmpty() && offset < page.total)
-        }
     }
     val filter: (List<Photo>) -> List<Photo> = { all -> if (showAi) all else all.filterNot { it.isAiImage } }
     val results = filter(textSearch.data.orEmpty())
@@ -156,36 +146,77 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                 photos = results,
                 onOpen = { onOpenPhoto(it.id) },
                 isFetchingNextPage = textSearch.isLoading,
-        isError = textSearch.isError,
-        onRetry = textSearch::refetch,
+                isError = textSearch.isError,
+                onRetry = textSearch::refetch,
                 totalCount = if (textSearch.isLoading) null else results.size,
                 explore = true,
             )
         } else {
-            val posts = remember(feed.photos, showAi, bursts.data) {
-                groupIntoPosts(filter(feed.photos), bursts.data.orEmpty())
+            BsTabs(
+                listOf(TabItem(false, "All photos"), TabItem(true, "Feed")),
+                settings.photoFeed,
+                settings::updatePhotoFeed,
+                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+            )
+            if (settings.photoFeed) {
+                PhotoFeed(feed, showAi, onOpenPhoto)
+            } else {
+                val photos = remember(feed.photos, showAi) { filter(feed.photos) }
+                ImagesGrid(
+                    photos = photos,
+                    onOpen = { onOpenPhoto(it.id) },
+                    fetchNextPage = feed::fetchNextPage,
+                    hasNextPage = feed.hasNextPage,
+                    isFetchingNextPage = feed.isFetching,
+                    isError = feed.isError,
+                    onRetry = feed::retry,
+                    totalCount = if (showAi) feed.total else null,
+                )
             }
-            val listState = rememberLazyListState()
-            // Load the next page while the last couple of posts are still off screen
-            LaunchedEffect(listState, posts.size) {
-                snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
-                    .collect { if (it >= posts.size - 3) feed.fetchNextPage() }
+        }
+    }
+}
+
+/** Burst discovery is only needed in Feed mode, never for the photo timeline or search. */
+@Composable
+private fun PhotoFeed(feed: PagedPhotos, showAi: Boolean, onOpenPhoto: (String) -> Unit) {
+    val api = BigShelfApp.api
+    // Burst membership comes from the server: its rule needs scene embeddings the app never loads.
+    // shortcut: Feed pages all burst groups; use an ids-only endpoint if burst discovery becomes slow.
+    val bursts = rememberQuery("home-bursts", invalidatedBy = setOf("photos")) {
+        buildMap {
+            var offset = 0
+            do {
+                val page = api.bursts(offset = offset, limit = 30)
+                page.groups.forEach { g -> g.items.forEach { put(it.id, g.id) } }
+                offset += page.groups.size
+            } while (page.groups.isNotEmpty() && offset < page.total)
+        }
+    }
+    val posts = remember(feed.photos, showAi, bursts.data) {
+        val photos = if (showAi) feed.photos else feed.photos.filterNot { it.isAiImage }
+        groupIntoPosts(photos, bursts.data.orEmpty())
+    }
+    val listState = rememberLazyListState()
+    LaunchedEffect(listState, posts.size, feed.isFetching, feed.hasNextPage, feed.isError) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { if (!feed.isError && it >= posts.size - 3) feed.fetchNextPage() }
+    }
+    when {
+        posts.isEmpty() && feed.isFetching -> LoadingText()
+        posts.isEmpty() && feed.isError -> LoadError(feed::retry)
+        posts.isEmpty() -> EmptyState("No photos yet", description = "Tap Upload to add photos")
+        else -> LazyColumn(
+            Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(bottom = LocalBottomBarInset.current + 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            items(posts, key = { it.photos.first().id }, contentType = { "post" }) { post ->
+                Post(post.photos, post.burst, onOpenPhoto)
             }
-            when {
-                posts.isEmpty() && feed.isFetching -> LoadingText()
-                posts.isEmpty() && feed.isError -> LoadError(feed::refresh)
-                posts.isEmpty() -> EmptyState("No photos yet", description = "Upload some from Library")
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = LocalBottomBarInset.current + 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                ) {
-                    items(posts, key = { it.photos.first().id }) { post -> Post(post.photos, post.burst, onOpenPhoto) }
-                    if (feed.isError) item { LoadError(feed::retry) }
-                    else if (feed.isFetching) item { Text("Loading…", Modifier.padding(16.dp), style = BsText.Sm, color = BsColors.Muted) }
-                }
-            }
+            if (feed.isError) item { LoadError(feed::retry) }
+            else if (feed.isFetching) item { Text("Loading…", Modifier.padding(16.dp), style = BsText.Sm, color = BsColors.Muted) }
         }
     }
 }

@@ -4,9 +4,12 @@ import com.bigshelf.app.data.Photo
 import com.bigshelf.app.data.PhotoPage
 import com.bigshelf.app.data.PhotoPersonTag
 import com.bigshelf.app.state.PagedPhotos
+import com.bigshelf.app.state.QueryState
 import com.bigshelf.app.ui.screens.groupIntoPosts
 import com.bigshelf.app.ui.screens.tools.swipeHeatPoints
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.yield
 import org.junit.Assert.*
 import org.junit.Test
@@ -70,5 +73,54 @@ class FeedAndSwipeTest {
         fail = false
         feed.retry(); yield()
         assertEquals(listOf(1, 1, 2, 2, 1, 1), calls)
+    }
+
+    @Test fun overlappingPagesKeepPhotoIdsUniqueAndInOrder() = runBlocking {
+        var calls = 0
+        val feed = PagedPhotos(this) { page, _ ->
+            calls++
+            PhotoPage(
+                items = if (page == 1) listOf(photo("a"), photo("b"))
+                    else listOf(photo("b"), photo("c"), photo("c"), photo("d")),
+                nextCursor = if (page == 1) "next" else null,
+            )
+        }
+        feed.refresh(); yield()
+        feed.fetchNextPage(); feed.fetchNextPage(); yield()
+        assertEquals(2, calls)
+        assertEquals(listOf("a", "b", "c", "d"), feed.photos.map { it.id })
+        assertFalse(feed.hasNextPage)
+    }
+
+    @Test fun replacingARefreshKeepsLoadingUntilTheReplacementFinishes() = runBlocking {
+        var calls = 0
+        val replacement = CompletableDeferred<PhotoPage>()
+        val feed = PagedPhotos(this) { _, _ ->
+            if (++calls == 1) awaitCancellation() else replacement.await()
+        }
+        feed.refresh(); yield()
+        feed.refresh(); yield()
+        assertTrue(feed.isFetching)
+        replacement.complete(PhotoPage(items = listOf(photo("new"))))
+        yield()
+        assertFalse(feed.isFetching)
+        assertEquals(listOf("new"), feed.photos.map { it.id })
+    }
+
+    @Test fun queriesAndPagesCancelTheirRequestsWhenDisposed() = runBlocking {
+        var queryCancelled = false
+        var pageCancelled = false
+        val query = QueryState<String>(this) {
+            try { awaitCancellation() } finally { queryCancelled = true }
+        }
+        val feed = PagedPhotos(this) { _, _ ->
+            try { awaitCancellation() } finally { pageCancelled = true }
+        }
+        query.refetch(); feed.refresh(); yield()
+        query.cancel(); feed.cancel(); yield()
+        assertTrue(queryCancelled)
+        assertTrue(pageCancelled)
+        assertFalse(query.isError)
+        assertFalse(feed.isError)
     }
 }

@@ -107,31 +107,34 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("Library", count = storage.data?.let { "${formatBytes(it.usedBytes)} used" })
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current),
+            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current + 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Group {
-                LibraryRow("Upload photos", BsIcons.UploadSimple, caret = false, onClick = {
-                    upload()
-                })
-            }
-            Group {
-                LibraryRow("Backup & storage", BsIcons.CloudArrowUp, onClick = { onNavigate(Routes.BACKUP) })
+            Group("Your library") {
+                LibraryRow("Albums", BsIcons.Stack, onClick = { onNavigate(Routes.ALBUMS) })
                 LibraryRow("Sharing", BsIcons.ShareNetwork, divider = true, onClick = { onNavigate(Routes.SHARING) })
                 LibraryRow("Archive", BsIcons.Archive, divider = true, onClick = { onNavigate(Routes.ARCHIVE) })
                 LibraryRow("Bin", BsIcons.Trash, divider = true, onClick = { onNavigate(Routes.BIN) })
             }
-            // Same tools, same order as the web sidebar
-            Group("Tools") {
+            Group("Backup & import") {
+                LibraryRow("Backup & storage", BsIcons.CloudArrowUp, onClick = { onNavigate(Routes.BACKUP) })
+                LibraryRow("Upload photos", BsIcons.UploadSimple, divider = true, caret = false, onClick = upload)
+            }
+            Group("Tidy up") {
+                LibraryRow("Organize", BsIcons.Funnel, onClick = { onNavigate(Routes.ORGANIZE) })
+                LibraryRow("Duplicates", BsIcons.Images, divider = true, onClick = { onNavigate(Routes.DUPLICATES) })
+                LibraryRow("Swipe", BsIcons.Heart, divider = true, onClick = { onNavigate(Routes.SWIPE) })
+                LibraryRow("Rating", BsIcons.Fire, divider = true, onClick = { onNavigate(Routes.RATING) })
+                LibraryRow("Tier list", BsIcons.Star, divider = true, onClick = { onNavigate(Routes.TIERS) })
+            }
+            Group("Create & explore") {
                 LibraryRow("Framer", BsIcons.FilmStrip, onClick = { onNavigate(Routes.framer()) })
                 LibraryRow("Triplets", BsIcons.Users, divider = true, onClick = { onNavigate(Routes.TRIPLETS) })
                 LibraryRow("Composer", BsIcons.Sparkle, divider = true, onClick = { onNavigate(Routes.COMPOSER) })
-                LibraryRow("Pipelines", BsIcons.FlowArrow, divider = true, onClick = { onNavigate(Routes.PIPELINES) })
-                LibraryRow("Organize", BsIcons.Funnel, divider = true, onClick = { onNavigate(Routes.ORGANIZE) })
-                LibraryRow("Rating", BsIcons.Fire, divider = true, onClick = { onNavigate(Routes.RATING) })
-                LibraryRow("Tier list", BsIcons.Star, divider = true, onClick = { onNavigate(Routes.TIERS) })
                 LibraryRow("Wardrobe", BsIcons.Images, divider = true, onClick = { onNavigate(Routes.WARDROBE) })
-                LibraryRow("Swipe", BsIcons.Heart, divider = true, onClick = { onNavigate(Routes.SWIPE) })
+            }
+            Group("Advanced") {
+                LibraryRow("Pipelines", BsIcons.FlowArrow, onClick = { onNavigate(Routes.PIPELINES) })
             }
             Group {
                 LibraryRow("Settings", BsIcons.Gear, onClick = { onNavigate(Routes.SETTINGS) })

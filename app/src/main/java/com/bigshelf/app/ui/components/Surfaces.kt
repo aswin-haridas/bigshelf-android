@@ -4,6 +4,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -65,7 +67,8 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
     Row(
         modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(56.dp)
+            .selectableGroup()
             .clip(BsShapes.Full)
             .background(BsColors.Surface)
             .padding(4.dp),
@@ -81,7 +84,7 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
                     .fillMaxHeight()
                     .clip(BsShapes.Full)
                     .background(bg)
-                    .bsClickable(scale = 1f) { onChange(tab.id) }
+                    .selectable(selected = selected, role = Role.Tab, onClick = { onChange(tab.id) })
                     .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
