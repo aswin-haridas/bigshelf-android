@@ -1,7 +1,6 @@
 package com.bigshelf.app.ui.screens.tools
 
 import android.os.SystemClock
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.background
@@ -63,6 +62,8 @@ import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.CancellationException
 import com.bigshelf.app.ui.components.LoadError
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -88,7 +89,13 @@ internal fun swipeHeatPoints(elapsedMs: Long, rework: Boolean = false): Double =
     else -> 0.25
 }
 
-private class Swipe(val photo: Photo, val verdict: Verdict, val points: Double = 0.0, val previousRework: Boolean = false)
+// Filled in by its write once that lands; `saved` false means there's nothing to revert
+private class Swipe(var photo: Photo, val verdict: Verdict) {
+    var points = 0.0
+    var previousRework = false
+    var saved = false
+    var write: Job? = null
+}
 
 /** Lower-heat and unrated photos get more turns; swipes adjust their heat directly. */
 @Composable
@@ -103,9 +110,7 @@ fun SwipeScreen(onBack: () -> Unit) {
     var count by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
     var refill by remember { mutableStateOf(0) }
-    BackHandler(enabled = busy) {}
 
     // The seen set keeps refills from repeating photos, even after their heat changes.
     LaunchedEffect(queue.size, refill) {
@@ -139,51 +144,53 @@ fun SwipeScreen(onBack: () -> Unit) {
 
     fun refresh() = PhotoEvents.invalidate("photos", "photo", "bin-photos", "people")
 
+    // Optimistic: the card moves on at once and the write runs behind it. A failed write puts the
+    // photo back on top without a word. NonCancellable so leaving the screen doesn't drop a write.
     fun swipe(photo: Photo, verdict: Verdict) {
-        if (busy) return
         val points = when (verdict) {
             Verdict.Keep -> swipeHeatPoints(SystemClock.elapsedRealtime() - shownAt)
             Verdict.Rework -> swipeHeatPoints(0, rework = true)
             else -> 0.0
         }
-        busy = true
-        scope.launch {
+        val entry = Swipe(photo, verdict)
+        queue.remove(photo)
+        count++
+        history.add(entry)
+        if (history.size > SWIPE_UNDO_LIMIT) history.removeAt(0)
+        entry.write = scope.launch(NonCancellable) {
             try {
-                val entry = when (verdict) {
-                    Verdict.Bin -> {
-                        api.flagDeleted(listOf(photo.id), true)
-                        Swipe(photo, verdict)
-                    }
+                when (verdict) {
+                    Verdict.Bin -> api.flagDeleted(listOf(photo.id), true)
                     Verdict.Favorite -> {
-                        val original = api.photo(photo.id)
+                        entry.photo = api.photo(photo.id)
                         api.setFavorite(photo.id, true)
-                        Swipe(original, verdict)
                     }
                     Verdict.Keep, Verdict.Rework -> {
                         val adjustment = api.boostHeat(photo.id, points, rework = if (verdict == Verdict.Rework) true else null)
-                        Swipe(photo, verdict, adjustment.points, adjustment.previousRework)
+                        entry.points = adjustment.points
+                        entry.previousRework = adjustment.previousRework
                     }
                 }
-                queue.remove(photo)
-                count++
-                history.add(entry)
-                if (history.size > SWIPE_UNDO_LIMIT) history.removeAt(0)
+                entry.saved = true
                 refresh()
-            } catch (e: CancellationException) {
-                throw e
             } catch (_: Exception) {
-                toast.error("Couldn't save swipe. Try again.")
-            } finally {
-                busy = false
+                // Still in history, or aged out of it: bring it back. Undone already: it's back on top.
+                if (history.remove(entry) || queue.none { it.id == photo.id }) {
+                    queue.add(0, photo)
+                    count = maxOf(count - 1, 0)
+                }
             }
         }
     }
 
     fun undo() {
-        if (busy) return
-        val last = history.lastOrNull() ?: return
-        busy = true
-        scope.launch {
+        val last = history.removeLastOrNull() ?: return
+        queue.add(0, last.photo)
+        count = maxOf(count - 1, 0)
+        scope.launch(NonCancellable) {
+            // Let the swipe's own write land first, or the revert could be overtaken by it
+            last.write?.join()
+            if (!last.saved) return@launch
             try {
                 when (last.verdict) {
                     Verdict.Bin -> api.flagDeleted(listOf(last.photo.id), false)
@@ -191,16 +198,9 @@ fun SwipeScreen(onBack: () -> Unit) {
                     Verdict.Rework -> api.boostHeat(last.photo.id, -last.points, rework = last.previousRework)
                     Verdict.Keep -> api.boostHeat(last.photo.id, -last.points)
                 }
-                history.removeLast()
-                queue.add(0, last.photo)
-                count = maxOf(count - 1, 0)
                 refresh()
-            } catch (e: CancellationException) {
-                throw e
             } catch (_: Exception) {
                 toast.error("Couldn't undo swipe. Try again.")
-            } finally {
-                busy = false
             }
         }
     }
@@ -209,9 +209,9 @@ fun SwipeScreen(onBack: () -> Unit) {
         PageHeader(
             "Swipe",
             count = if (count > 0) "$count swiped" else null,
-            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, enabled = !busy, tint = BsColors.Foreground) },
+            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
         ) {
-            BsIconButton(BsIcons.ArrowUUpLeft, "Undo the last swipe", onClick = ::undo, enabled = history.isNotEmpty() && !busy)
+            BsIconButton(BsIcons.ArrowUUpLeft, "Undo the last swipe", onClick = ::undo, enabled = history.isNotEmpty())
         }
 
         when {
@@ -233,9 +233,8 @@ fun SwipeScreen(onBack: () -> Unit) {
                     val card = cardModifier.aspectRatio(3f / 4f, matchHeightConstraintsFirst = maxWidth / maxHeight >= 3f / 4f)
                     next?.let { key(it.id) { SwipeCard(it, card.graphicsLayer { scaleX = 0.95f; scaleY = 0.95f; alpha = 0.6f }, null) } }
                     // key remounts per photo so the drag offset starts at zero
-                    key(current.id) { SwipeCard(current, card, if (busy) null else { verdict -> swipe(current, verdict) }) }
+                    key(current.id) { SwipeCard(current, card) { verdict -> swipe(current, verdict) } }
                 }
-                if (busy) Text("Saving…", style = BsText.Xs, color = BsColors.Muted)
                 if (loadError) LoadError(onRetry = { refill++ })
                 // Left to right as the swipes go: Bin is a left swipe, Keep a right one
                 Row(Modifier.fillMaxWidth()) {
