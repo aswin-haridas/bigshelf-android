@@ -67,6 +67,7 @@ data class Photo(
     val heat: Double? = null,
     @SerialName("is_archived") val isArchived: Boolean = false,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
+    @SerialName("needs_rework") val needsRework: Boolean = false,
     @SerialName("is_video") val isVideo: Boolean = false,
     // Framer score within a group (duplicate pair, burst); the group's pick is marked best
     val quality: PhotoQuality? = null,
@@ -565,3 +566,6 @@ data class CropBox(val x: Int, val y: Int, val width: Int, val height: Int) {
 
 @Serializable
 data class SplitResult(@SerialName("created_photos") val createdPhotos: List<Photo> = emptyList())
+
+@Serializable
+data class HeatAdjustment(val points: Double, @SerialName("previous_rework") val previousRework: Boolean)

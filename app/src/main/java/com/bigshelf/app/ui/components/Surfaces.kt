@@ -3,6 +3,8 @@ package com.bigshelf.app.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -102,7 +104,7 @@ fun BsSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Mod
             .size(width = 48.dp, height = 28.dp)
             .clip(BsShapes.Full)
             .background(track)
-            .bsClickable(enabled = enabled, scale = 1f) { onCheckedChange(!checked) }
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(2.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -141,6 +143,14 @@ fun EmptyState(title: String, modifier: Modifier = Modifier, description: String
                 textAlign = TextAlign.Center,
             )
         }
+    }
+}
+
+@Composable
+fun LoadError(onRetry: (() -> Unit)?, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Couldn't load photos. Check your connection and try again.", style = BsText.Sm, color = BsColors.Muted, textAlign = TextAlign.Center)
+        if (onRetry != null) BsButton(onClick = onRetry, variant = ButtonVariant.Secondary) { Text("Retry") }
     }
 }
 

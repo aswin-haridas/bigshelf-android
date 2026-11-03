@@ -3,6 +3,8 @@ package com.bigshelf.app.ui.shell
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
@@ -71,6 +73,7 @@ private fun plural(n: Int) = "$n photo${if (n > 1) "s" else ""}"
  * Bin and Archive get restore / unarchive instead of the library actions; a person's page
  * adds Untag. Back clears the selection (the web's Escape).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifier = Modifier) {
     val count = SelectionStore.count
@@ -80,6 +83,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
     // "copy" (add to album) or "move" (out of this album into another)
     var albumPicker by remember { mutableStateOf<String?>(null) }
     var confirmPurge by remember { mutableStateOf(false) }
+    var more by remember { mutableStateOf(false) }
     val busy = pending != null
     val api = BigShelfApp.api
 
@@ -136,46 +140,24 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
     }
 
     @Composable
-    fun RowScope.Action(name: String, icon: ImageVector, label: String, danger: Boolean = false, onClick: () -> Unit) {
-        val tint = if (danger) BsColors.Danger else BsColors.Foreground
-        // Icon-only like the nav; [label] is for screen readers
-        Box(
-            Modifier.weight(1f).fillMaxHeight().bsClickable(enabled = !busy, scale = 0.94f, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (pending == name) Spinner(size = 24.dp, tint = tint) else BsIcon(icon, size = 24.dp, tint = tint, contentDescription = label)
-        }
-    }
-
-    // Docked where the bottom nav sits: count row, then a row of icon actions
-    Column(
-        modifier
-            .fillMaxWidth()
-            .background(BsColors.Background)
-            .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
-            .navigationBarsPadding(),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().height(48.dp).padding(start = 4.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(48.dp).clip(BsShapes.Full).bsClickable(enabled = !busy, onClick = SelectionStore::clear), contentAlignment = Alignment.Center) {
-                BsIcon(BsIcons.XBold, size = 20.dp, tint = BsColors.Foreground, contentDescription = "Clear selection")
-            }
-            Text("$count selected", Modifier.weight(1f), style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
-            if (unselected.isNotEmpty()) {
-                Text(
-                    "Select all",
-                    Modifier
-                        .clip(BsShapes.Md)
-                        .bsClickable(enabled = !busy, scale = 0.96f) { SelectionStore.selectMany(unselected) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    style = BsText.Sm.copy(fontWeight = BsWeight.Medium),
-                    color = Neutral.N300,
-                )
+    fun Actions(overflow: Boolean) {
+        @Composable
+        fun Action(name: String, icon: ImageVector, label: String, danger: Boolean = false, onClick: () -> Unit) {
+            val primary = name in setOf("album", "copy", "share", "download", "restore")
+            if (primary != overflow) {
+                val tint = if (danger) BsColors.Danger else BsColors.Foreground
+                BsButton(
+                    onClick = { more = false; onClick() },
+                    enabled = !busy,
+                    variant = ButtonVariant.Ghost,
+                    loading = pending == name,
+                    contentColor = tint,
+                ) {
+                    BsIcon(icon, size = 20.dp, tint = tint)
+                    Text(label)
+                }
             }
         }
-        Row(Modifier.fillMaxWidth().height(56.dp)) {
             if (mode == "bin") {
                 Action("restore", BsIcons.ArrowCounterClockwise, "Restore") {
                     runBulk("restore", { "${plural(it)} restored" }, "Failed to restore photos") { api.flagDeleted(it, false) }
@@ -256,7 +238,47 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                     ) { api.flagDeleted(it, true) }
                 }
             }
+    }
+
+    // Docked where the bottom nav sits: count row, then a row of icon actions
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(BsColors.Background)
+            .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
+            .navigationBarsPadding(),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(48.dp).padding(start = 4.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(48.dp).clip(BsShapes.Full).bsClickable(enabled = !busy, onClick = SelectionStore::clear), contentAlignment = Alignment.Center) {
+                BsIcon(BsIcons.XBold, size = 20.dp, tint = BsColors.Foreground, contentDescription = "Clear selection")
+            }
+            Text("$count selected", Modifier.weight(1f), style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+            if (unselected.isNotEmpty()) {
+                Text(
+                    "Select all",
+                    Modifier
+                        .clip(BsShapes.Md)
+                        .bsClickable(enabled = !busy, scale = 0.96f) { SelectionStore.selectMany(unselected) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = BsText.Sm.copy(fontWeight = BsWeight.Medium),
+                    color = Neutral.N300,
+                )
+            }
         }
+        FlowRow(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Actions(overflow = false)
+            BsButton(onClick = { more = true }, enabled = !busy, variant = ButtonVariant.Ghost) {
+                BsIcon(BsIcons.DotsThreeVertical, size = 20.dp)
+                Text("More")
+            }
+        }
+    }
+
+    if (more) BsModal(title = "Photo actions", onClose = { more = false }) {
+        Column(Modifier.fillMaxWidth()) { Actions(overflow = true) }
     }
 
     if (confirmPurge) {

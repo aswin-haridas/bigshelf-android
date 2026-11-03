@@ -1,7 +1,5 @@
 package com.bigshelf.app.ui.screens
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +45,7 @@ import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsSearchBar
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
+import com.bigshelf.app.ui.components.LoadError
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.photos.ImagesGrid
 import com.bigshelf.app.state.ViewerList
@@ -57,53 +56,43 @@ import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.delay
-import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-// A post holds the photos taken within this long of its first (newest) one, up to MAX_SLIDES
-private val POST_WINDOW: Duration = Duration.ofHours(1)
 private const val MAX_SLIDES = 20
 
 private fun takenAt(photo: Photo) = photo.takenAt?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
 
-/** A feed post; [burst] when its photos are one burst (backend `/photos/bursts`). */
 internal class FeedPost(val photos: MutableList<Photo>, val burst: Boolean)
 
-/**
- * The feed's posts: the library (newest capture first) cut into runs of photos taken within
- * an hour of the run's first photo, except that each burst ([burstOf]: photo id -> burst id)
- * gets a post of its own. Pages only ever append older photos, so a post's key (its first
- * photo) stays put as the feed grows.
- */
+/** Only the same tagged person within the same server burst shares a post. */
 internal fun groupIntoPosts(photos: List<Photo>, burstOf: Map<String, String> = emptyMap()): List<FeedPost> {
     val posts = mutableListOf<FeedPost>()
-    var start: OffsetDateTime? = null
     var startBurst: String? = null
+    var startPerson: String? = null
     for (photo in photos) {
-        val t = takenAt(photo)
         val burst = burstOf[photo.id]
+        val people = photo.people.orEmpty().distinctBy { it.id }
+        val person = people.singleOrNull()?.id
         val current = posts.lastOrNull()
-        val joins = current != null && current.photos.size < MAX_SLIDES && if (burst != null) {
-            burst == startBurst
-        } else {
-            !current.burst && t != null && start != null && Duration.between(t, start) <= POST_WINDOW
-        }
+        val joins = current != null && current.photos.size < MAX_SLIDES &&
+            burst != null && burst == startBurst && person == startPerson && people.size <= 1
         if (joins) {
             current!!.photos += photo
         } else {
             posts += FeedPost(mutableListOf(photo), burst != null)
-            start = t
-            startBurst = burst
         }
+        // Group photos remain standalone; the next portrait must start a fresh post too.
+        startBurst = if (people.size <= 1) burst else null
+        startPerson = person
     }
     return posts
 }
 
 /**
  * Photos tab laid out like the Instagram home feed: search bar and profile badge on top,
- * then one post per hour of photos - who's in them, when, and the photos as swipeable
+ * then one post per person's burst - who's in it, when, and the photos as swipeable
  * slides. A text search swaps the feed for a grid of ranked results.
  */
 @Composable
@@ -167,6 +156,8 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                 photos = results,
                 onOpen = { onOpenPhoto(it.id) },
                 isFetchingNextPage = textSearch.isLoading,
+        isError = textSearch.isError,
+        onRetry = textSearch::refetch,
                 totalCount = if (textSearch.isLoading) null else results.size,
                 explore = true,
             )
@@ -182,6 +173,7 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
             }
             when {
                 posts.isEmpty() && feed.isFetching -> LoadingText()
+                posts.isEmpty() && feed.isError -> LoadError(feed::refresh)
                 posts.isEmpty() -> EmptyState("No photos yet", description = "Upload some from Library")
                 else -> LazyColumn(
                     Modifier.fillMaxSize(),
@@ -190,6 +182,8 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     items(posts, key = { it.photos.first().id }) { post -> Post(post.photos, post.burst, onOpenPhoto) }
+                    if (feed.isError) item { LoadError(feed::retry) }
+                    else if (feed.isFetching) item { Text("Loading…", Modifier.padding(16.dp), style = BsText.Sm, color = BsColors.Muted) }
                 }
             }
         }
@@ -204,13 +198,13 @@ private fun Post(photos: List<Photo>, burst: Boolean, onOpenPhoto: (String) -> U
     val pager = rememberPagerState { photos.size }
 
     Column {
-        PostHeader(people, photos.first(), if (burst) "Burst · ${photos.size} shots" else null)
+        PostHeader(people, photos.first(), if (burst && photos.size > 1) "Burst · ${photos.size} shots" else null)
         Box {
             HorizontalPager(pager, Modifier.fillMaxWidth().aspectRatio(3f / 4f), key = { photos[it].id }) { i ->
                 val photo = photos[i]
                 Box(Modifier.fillMaxSize().background(BsColors.Surface).bsClickable(scale = 1f) {
-                    // A burst opens on its own shots, so the viewer swipes through just those
-                    if (burst) ViewerList.photos = photos
+                    // The viewer always follows the post that was opened
+                    ViewerList.photos = photos
                     onOpenPhoto(photo.id)
                 }) {
                     AsyncImage(
@@ -225,21 +219,10 @@ private fun Post(photos: List<Photo>, burst: Boolean, onOpenPhoto: (String) -> U
                 }
             }
             if (photos.size > 1) {
-                // Counter and dots sit on the photo and only show while swiping, fading out after
-                var showDots by remember { mutableStateOf(false) }
-                LaunchedEffect(pager.isScrollInProgress, pager.currentPage) {
-                    if (pager.isScrollInProgress) showDots = true
-                    else {
-                        delay(1500)
-                        showDots = false
-                    }
-                }
-                val dotsAlpha by animateFloatAsState(if (showDots) 1f else 0f, label = "dots")
                 Text(
                     "${pager.currentPage + 1}/${photos.size}",
                     Modifier
                         .align(Alignment.TopEnd)
-                        .graphicsLayer { alpha = dotsAlpha }
                         .padding(12.dp)
                         .clip(BsShapes.Full)
                         .background(BsColors.Background.copy(alpha = 0.6f))
@@ -250,7 +233,6 @@ private fun Post(photos: List<Photo>, burst: Boolean, onOpenPhoto: (String) -> U
                 Row(
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .graphicsLayer { alpha = dotsAlpha }
                         .padding(12.dp)
                         .clip(BsShapes.Full)
                         .background(BsColors.Background.copy(alpha = 0.6f))

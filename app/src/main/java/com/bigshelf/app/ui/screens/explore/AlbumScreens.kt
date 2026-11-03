@@ -202,6 +202,8 @@ fun AlbumScreen(albumId: String, onBack: () -> Unit, onNavigate: (String) -> Uni
             fetchNextPage = feed::fetchNextPage,
             hasNextPage = feed.hasNextPage,
             isFetchingNextPage = feed.isFetching,
+            isError = feed.isError,
+            onRetry = feed::retry,
             totalCount = feed.total,
             // Albums keep the backend's order (similar shots together), not a timeline
             groupByDate = false,

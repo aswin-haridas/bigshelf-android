@@ -259,6 +259,8 @@ private fun Results(q: String, onNavigate: (String) -> Unit, onOpenPhoto: (Strin
         photos = results,
         onOpen = { onOpenPhoto(it.id) },
         isFetchingNextPage = photos.isLoading,
+        isError = photos.isError,
+        onRetry = photos::refetch,
         totalCount = if (photos.isLoading) null else results.size,
         groupByDate = false,
         header = {
@@ -291,6 +293,8 @@ private fun ImageResults(image: Uri, onClear: () -> Unit, onOpenPhoto: (String) 
         photos = results,
         onOpen = { onOpenPhoto(it.id) },
         isFetchingNextPage = matches.isLoading,
+        isError = matches.isError,
+        onRetry = matches::refetch,
         totalCount = if (matches.isLoading) null else results.size,
         // Ranked by similarity, so no date grouping
         groupByDate = false,

@@ -620,6 +620,14 @@ class Api(context: Context, val baseUrl: String) {
 
     // ---------- Rating ----------
 
+    suspend fun swipePhotos(exclude: Set<String>, limit: Int) = send(
+        "POST", "/api/v1/rating/swipe", ListSerializer(Photo.serializer()),
+        buildJsonObject {
+            put("exclude", JsonArray(exclude.map(::JsonPrimitive)))
+            put("limit", limit)
+        },
+    )
+
     suspend fun ratingPairs(limit: Int) = get("/api/v1/rating", RatingResponse.serializer(), mapOf("limit" to limit))
 
     /** [winnerId] is hotter than [loserId]; returns the stored answer's id for Undo. */
@@ -634,8 +642,11 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/rating/compare/$id")
 
     /** Adds [points] of heat on top of the taste model's (-1 takes a boost back). */
-    suspend fun boostHeat(id: String, points: Double = 1.0) =
-        sendUnit("POST", "/api/v1/rating/boost/$id", buildJsonObject { put("points", points) })
+    suspend fun boostHeat(id: String, points: Double = 1.0, rework: Boolean? = null) =
+        send("POST", "/api/v1/rating/boost/$id?return_points=true", HeatAdjustment.serializer(), buildJsonObject {
+            put("points", points)
+            if (rework != null) put("needs_rework", rework)
+        })
 
     suspend fun resetRating() = send("DELETE", "/api/v1/rating", ClearedResponse.serializer())
 

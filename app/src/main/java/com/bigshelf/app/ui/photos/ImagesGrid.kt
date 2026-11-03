@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.bigshelf.app.ui.components.LoadError
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.theme.BsIcons
@@ -128,6 +129,8 @@ fun ImagesGrid(
     groupByDate: Boolean = true,
     // Square mosaic with tall tiles (Instagram Explore) instead of 3:4 tiles; never date-grouped
     explore: Boolean = false,
+    isError: Boolean = false,
+    onRetry: (() -> Unit)? = null,
     // Full-width content above the photos (search matches, sub-albums), scrolling with them
     header: (@Composable () -> Unit)? = null,
 ) {
@@ -140,7 +143,7 @@ fun ImagesGrid(
     val blocks = remember(photos, explore) { if (explore) exploreBlocks(photos) else emptyList() }
     val state = rememberLazyGridState()
     val loadMore by rememberUpdatedState(fetchNextPage)
-    val canLoad by rememberUpdatedState(hasNextPage && !isFetchingNextPage)
+    val canLoad by rememberUpdatedState(hasNextPage && !isFetchingNextPage && !isError)
 
     // Fetch the next page when the last few rows come into view (rootMargin: 400px)
     LaunchedEffect(state) {
@@ -151,7 +154,7 @@ fun ImagesGrid(
         }.distinctUntilChanged().collect { nearEnd -> if (nearEnd && canLoad) loadMore?.invoke() }
     }
     // A page that didn't fill the screen still needs the next one
-    LaunchedEffect(photos.size, hasNextPage, isFetchingNextPage) {
+    LaunchedEffect(photos.size, hasNextPage, isFetchingNextPage, isError) {
         val info = state.layoutInfo
         val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
         if (canLoad && info.totalItemsCount > 0 && last >= info.totalItemsCount - 12) loadMore?.invoke()
@@ -227,6 +230,7 @@ fun ImagesGrid(
             item(key = "footer", span = { GridItemSpan(maxLineSpan) }) {
                 when {
                     isFetchingNextPage -> FooterText("Loading…", 16.dp)
+                    isError -> LoadError(onRetry = onRetry)
                     photos.isEmpty() -> FooterText("No photos found", 64.dp)
                     !hasNextPage && totalCount != null -> FooterText(photoCount(totalCount), 24.dp, BsText.Xs)
                 }

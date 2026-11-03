@@ -68,15 +68,21 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
         private set
     var isFetching by mutableStateOf(true)
         private set
+    var isError by mutableStateOf(false)
+        private set
     private var page = 0
     private var cursor: String? = null
     private var job: Job? = null
 
+    private var retryNextPage = false
+
     /** Reloads from page 1 (an invalidation); the old photos stay up until it lands. */
     fun refresh() {
+        retryNextPage = false
         job?.cancel()
         job = scope.launch {
             isFetching = true
+            isError = false
             try {
                 val first = load(1, null)
                 photos = first.items
@@ -87,6 +93,7 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (_: Exception) {
+                isError = true
             } finally {
                 isFetching = false
             }
@@ -95,8 +102,10 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
 
     fun fetchNextPage() {
         if (isFetching || !hasNextPage) return
+        retryNextPage = true
         job = scope.launch {
             isFetching = true
+            isError = false
             try {
                 val next = load(page + 1, cursor)
                 photos = photos + next.items.filter { n -> photos.none { it.id == n.id } }
@@ -108,10 +117,15 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (_: Exception) {
+                isError = true
             } finally {
                 isFetching = false
             }
         }
+    }
+
+    fun retry() {
+        if (retryNextPage) fetchNextPage() else refresh()
     }
 
     /** Optimistic removal after a bulk action (web `dropFromCachedLists`). */

@@ -86,6 +86,8 @@ fun BinScreen(onOpenPhoto: (String) -> Unit, onBack: () -> Unit) {
             fetchNextPage = feed::fetchNextPage,
             hasNextPage = feed.hasNextPage,
             isFetchingNextPage = feed.isFetching,
+            isError = feed.isError,
+            onRetry = feed::retry,
         )
     }
 
@@ -291,6 +293,8 @@ fun ArchiveFolderScreen(folder: String, onBack: () -> Unit, onOpenPhoto: (String
             fetchNextPage = feed::fetchNextPage,
             hasNextPage = feed.hasNextPage,
             isFetchingNextPage = feed.isFetching,
+            isError = feed.isError,
+            onRetry = feed::retry,
             groupByDate = false,
         )
     }

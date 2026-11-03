@@ -175,8 +175,6 @@ fun LoginScreen(onRegister: () -> Unit) {
 
 @Composable
 fun RegisterScreen(onLogin: () -> Unit) {
-    var firstName by rememberSaveable { mutableStateOf("") }
-    var lastName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var username by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -185,7 +183,7 @@ fun RegisterScreen(onLogin: () -> Unit) {
     // Sign up, then sign straight in - same as the web Register page
     val submit = {
         if (loading) Unit
-        else if (listOf(firstName, lastName, email, username).any { it.isBlank() }) AuthStore.error = "Fill in all fields."
+        else if (listOf(email, username).any { it.isBlank() }) AuthStore.error = "Fill in all fields."
         else if (password.length < 8) AuthStore.error = "Password must be at least 8 characters."
         else scope.launch {
             if (AuthStore.register(email.trim(), username.trim(), password)) AuthStore.login(email.trim(), password)
@@ -194,10 +192,6 @@ fun RegisterScreen(onLogin: () -> Unit) {
 
     AuthHeader("Sign up")
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BsField("First Name", firstName, { firstName = it }, Modifier.weight(1f))
-            BsField("Last Name", lastName, { lastName = it }, Modifier.weight(1f))
-        }
         BsField("Email", email, { email = it }, keyboardType = KeyboardType.Email)
         BsField("Username", username, { username = it })
         BsField(

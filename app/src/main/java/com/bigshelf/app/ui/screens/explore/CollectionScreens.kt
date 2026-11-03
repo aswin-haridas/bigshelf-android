@@ -226,6 +226,8 @@ fun FilteredPhotosScreen(title: String, filter: PhotoFilter, onBack: () -> Unit,
             fetchNextPage = feed::fetchNextPage,
             hasNextPage = feed.hasNextPage,
             isFetchingNextPage = feed.isFetching,
+            isError = feed.isError,
+            onRetry = feed::retry,
             totalCount = feed.total,
         )
     }
@@ -257,6 +259,8 @@ fun ColorScreen(color: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit
             fetchNextPage = feed::fetchNextPage,
             hasNextPage = feed.hasNextPage,
             isFetchingNextPage = feed.isFetching,
+            isError = feed.isError,
+            onRetry = feed::retry,
             totalCount = feed.total,
             // Ranked by how much of the colour, not by date
             groupByDate = false,
@@ -281,6 +285,8 @@ fun TagScreen(tag: String, onBack: () -> Unit, onOpenPhoto: (String) -> Unit, ti
             fetchNextPage = feed::fetchNextPage,
             hasNextPage = feed.hasNextPage,
             isFetchingNextPage = feed.isFetching,
+            isError = feed.isError,
+            onRetry = feed::retry,
             totalCount = feed.total,
         )
     }

@@ -1,6 +1,9 @@
 package com.bigshelf.app.ui.screens
 
 import com.bigshelf.app.state.AuthStore
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.activity.compose.rememberLauncherForActivityResult
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.activity.result.contract.ActivityResultContracts
@@ -113,8 +116,8 @@ private fun SettingRow(label: String, hint: String?, modifier: Modifier = Modifi
 @Composable
 private fun ToggleRow(label: String, hint: String?, checked: Boolean, onChange: (Boolean) -> Unit, divider: Boolean = false) {
     // The whole row toggles, like the web's wrapping <label>
-    SettingRow(label, hint, Modifier.divider(divider).bsClickable(scale = 1f) { onChange(!checked) }) {
-        BsSwitch(checked, onChange)
+    SettingRow(label, hint, Modifier.divider(divider).toggleable(value = checked, role = Role.Switch, onValueChange = onChange)) {
+        BsSwitch(checked, onChange, Modifier.clearAndSetSemantics {})
     }
 }
 
