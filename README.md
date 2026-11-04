@@ -135,8 +135,7 @@ app/src/main/java/com/bigshelf/app/
 
 ## Web parity (through web commit `0cc7132`)
 
-- Library now includes Wardrobe (automatically fashion-tagged photos) and Tier list
-  (all library photos grouped by Heat, with a shortcut to Rating).
+- Library now includes Wardrobe (automatically fashion-tagged photos).
 - Detected Faces loads every page and offers Tag all: type or pick a profile, skip, forget,
   and view the group's photos for context. Suggestions use both face and photo context.
 - Renaming a profile to an existing name follows the surviving merged profile. Merge search

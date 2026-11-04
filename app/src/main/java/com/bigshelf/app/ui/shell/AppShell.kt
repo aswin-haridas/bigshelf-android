@@ -288,9 +288,6 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
                 onOpenPhoto = openPhoto,
             )
         }
-        composable(Routes.TIERS) {
-            com.bigshelf.app.ui.screens.tools.TierListScreen(onBack, openPhoto, onRate = { nav.navigate(Routes.RATING) })
-        }
         composable(Routes.WARDROBE) {
             com.bigshelf.app.ui.screens.explore.TagScreen("fashion", onBack, openPhoto, title = "Wardrobe")
         }

@@ -125,7 +125,6 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
                 LibraryRow("Duplicates", BsIcons.Images, divider = true, onClick = { onNavigate(Routes.DUPLICATES) })
                 LibraryRow("Swipe", BsIcons.Heart, divider = true, onClick = { onNavigate(Routes.SWIPE) })
                 LibraryRow("Rating", BsIcons.Fire, divider = true, onClick = { onNavigate(Routes.RATING) })
-                LibraryRow("Tier list", BsIcons.Star, divider = true, onClick = { onNavigate(Routes.TIERS) })
             }
             Group("Create & explore") {
                 LibraryRow("Framer", BsIcons.FilmStrip, onClick = { onNavigate(Routes.framer()) })

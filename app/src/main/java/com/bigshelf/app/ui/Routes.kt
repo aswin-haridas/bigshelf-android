@@ -25,7 +25,6 @@ object Routes {
     const val TRIPLETS = "triplets"
     const val COMPOSER = "composer"
     const val RATING = "rating"
-    const val TIERS = "tiers"
     const val WARDROBE = "wardrobe"
     const val SWIPE = "swipe"
     // ?photo=<id>: open a library video (from the photo viewer)
