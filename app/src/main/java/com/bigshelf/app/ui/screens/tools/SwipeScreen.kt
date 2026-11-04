@@ -137,7 +137,7 @@ fun SwipeScreen(onBack: () -> Unit) {
 
     // Warm the cache with the next photo so it appears instantly
     LaunchedEffect(next?.id) {
-        next?.imageSrc?.let {
+        (next?.thumbnailUrl ?: next?.imageSrc)?.let {
             SingletonImageLoader.get(context).enqueue(ImageRequest.Builder(context).data(api.mediaUrl(it)).build())
         }
     }
@@ -302,7 +302,7 @@ private fun SwipeCard(photo: Photo, modifier: Modifier, onSwipe: ((Verdict) -> U
             ),
     ) {
         AsyncImage(
-            model = BigShelfApp.api.mediaUrl(photo.imageSrc),
+            model = BigShelfApp.api.mediaUrl(photo.thumbnailUrl ?: photo.imageSrc),
             contentDescription = photo.title ?: photo.filename,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
