@@ -642,10 +642,11 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/rating/compare/$id")
 
     /** Adds [points] of heat on top of the taste model's (-1 takes a boost back). */
-    suspend fun boostHeat(id: String, points: Double = 1.0, rework: Boolean? = null) =
+    suspend fun boostHeat(id: String, points: Double = 1.0, rework: Boolean? = null, kept: Boolean? = null) =
         send("POST", "/api/v1/rating/boost/$id?return_points=true", HeatAdjustment.serializer(), buildJsonObject {
             put("points", points)
             if (rework != null) put("needs_rework", rework)
+            if (kept != null) put("is_kept", kept)
         })
 
     suspend fun resetRating() = send("DELETE", "/api/v1/rating", ClearedResponse.serializer())

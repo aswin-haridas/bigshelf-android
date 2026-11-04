@@ -568,4 +568,4 @@ data class CropBox(val x: Int, val y: Int, val width: Int, val height: Int) {
 data class SplitResult(@SerialName("created_photos") val createdPhotos: List<Photo> = emptyList())
 
 @Serializable
-data class HeatAdjustment(val points: Double, @SerialName("previous_rework") val previousRework: Boolean)
+data class HeatAdjustment(val points: Double, @SerialName("previous_rework") val previousRework: Boolean, @SerialName("previous_kept") val previousKept: Boolean = false)

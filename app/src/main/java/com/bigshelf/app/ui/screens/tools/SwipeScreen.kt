@@ -67,8 +67,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-// Pairs fetched per call (2 photos each); more are fetched once the queue runs this low (web useSwipe)
-private const val SWIPE_WINDOW = 10
+// Photos fetched per call; more are fetched once the queue runs this low
+private const val SWIPE_WINDOW = 20
 private const val SWIPE_REFILL_AT = 3
 private const val SWIPE_UNDO_LIMIT = 3
 // A keep this soon (ms) after the photo came up is a gut "yes": it gets a point of heat
@@ -92,12 +92,13 @@ internal fun swipeHeatPoints(elapsedMs: Long, rework: Boolean = false): Double =
 // Filled in by its write once that lands; `saved` false means there's nothing to revert
 private class Swipe(var photo: Photo, val verdict: Verdict) {
     var points = 0.0
+    var previousKept = false
     var previousRework = false
     var saved = false
     var write: Job? = null
 }
 
-/** Lower-heat and unrated photos get more turns; swipes adjust their heat directly. */
+/** Unreviewed photos only; swipes adjust their heat directly. */
 @Composable
 fun SwipeScreen(onBack: () -> Unit) {
     val api = BigShelfApp.api
@@ -118,7 +119,7 @@ fun SwipeScreen(onBack: () -> Unit) {
         loading = true
         loadError = false
         try {
-            val fresh = api.swipePhotos(seen, SWIPE_WINDOW * 2).filter { seen.add(it.id) }
+            val fresh = api.swipePhotos(seen, SWIPE_WINDOW).filter { seen.add(it.id) }
             queue.addAll(fresh)
         } catch (e: CancellationException) {
             throw e
@@ -166,9 +167,10 @@ fun SwipeScreen(onBack: () -> Unit) {
                         api.setFavorite(photo.id, true)
                     }
                     Verdict.Keep, Verdict.Rework -> {
-                        val adjustment = api.boostHeat(photo.id, points, rework = if (verdict == Verdict.Rework) true else null)
+                        val adjustment = api.boostHeat(photo.id, points, rework = if (verdict == Verdict.Rework) true else null, kept = if (verdict == Verdict.Keep) true else null)
                         entry.points = adjustment.points
                         entry.previousRework = adjustment.previousRework
+                        entry.previousKept = adjustment.previousKept
                     }
                 }
                 entry.saved = true
@@ -196,7 +198,7 @@ fun SwipeScreen(onBack: () -> Unit) {
                     Verdict.Bin -> api.flagDeleted(listOf(last.photo.id), false)
                     Verdict.Favorite -> api.setFavorite(last.photo.id, last.photo.isFavorite)
                     Verdict.Rework -> api.boostHeat(last.photo.id, -last.points, rework = last.previousRework)
-                    Verdict.Keep -> api.boostHeat(last.photo.id, -last.points)
+                    Verdict.Keep -> api.boostHeat(last.photo.id, -last.points, kept = last.previousKept)
                 }
                 refresh()
             } catch (_: Exception) {
