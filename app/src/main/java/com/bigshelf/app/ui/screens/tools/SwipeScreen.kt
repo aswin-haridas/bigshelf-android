@@ -71,7 +71,7 @@ import kotlin.math.abs
 private const val SWIPE_WINDOW = 20
 private const val SWIPE_REFILL_AT = 3
 private const val SWIPE_UNDO_LIMIT = 3
-// A keep this soon (ms) after the photo came up is a gut "yes": it gets a point of heat
+// A keep this soon (ms) after the photo came up is a gut "yes": it gets two points of heat
 private const val QUICK_KEEP_MS = 1500L
 // How far a drag must travel to count as a swipe
 private val THRESHOLD = 100.dp
@@ -85,7 +85,7 @@ private enum class Verdict(val label: String, val color: Color) {
 
 internal fun swipeHeatPoints(elapsedMs: Long, rework: Boolean = false): Double = when {
     rework -> -1.0
-    elapsedMs < QUICK_KEEP_MS -> 1.0
+    elapsedMs < QUICK_KEEP_MS -> 2.0
     else -> 0.25
 }
 

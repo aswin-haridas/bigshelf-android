@@ -40,7 +40,7 @@ class FeedAndSwipeTest {
     }
 
     @Test fun quickKeepsGainMoreHeatAndReworkLosesHeat() {
-        assertEquals(1.0, swipeHeatPoints(1499), 0.0)
+        assertEquals(2.0, swipeHeatPoints(1499), 0.0)
         assertEquals(0.25, swipeHeatPoints(1500), 0.0)
         assertEquals(0.25, swipeHeatPoints(10000), 0.0)
         assertEquals(-1.0, swipeHeatPoints(0, rework = true), 0.0)
