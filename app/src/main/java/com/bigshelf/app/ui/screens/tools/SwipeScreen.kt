@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +66,7 @@ import com.bigshelf.app.ui.components.LoadError
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filter
 import kotlin.math.abs
 
 // Photos fetched per call; more are fetched once the queue runs this low
@@ -114,19 +116,23 @@ fun SwipeScreen(onBack: () -> Unit) {
     var refill by remember { mutableStateOf(0) }
 
     // The seen set keeps refills from repeating photos, even after their heat changes.
-    LaunchedEffect(queue.size, refill) {
-        if (queue.size > SWIPE_REFILL_AT) return@LaunchedEffect
-        loading = true
-        loadError = false
-        try {
-            val fresh = api.swipePhotos(seen, SWIPE_WINDOW).filter { seen.add(it.id) }
-            queue.addAll(fresh)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            loadError = true
-        } finally {
-            loading = false
+    // Watches the queue size instead of keying on it: keying restarted the effect on every swipe,
+    // cancelling the fetch in flight, and its loading = false flashed "Nothing left to swipe"
+    // until the restarted fetch landed. A fetch now runs to the end while swipes continue.
+    LaunchedEffect(refill) {
+        snapshotFlow { queue.size }.filter { it <= SWIPE_REFILL_AT }.collect {
+            loading = true
+            loadError = false
+            try {
+                val fresh = api.swipePhotos(seen, SWIPE_WINDOW).filter { seen.add(it.id) }
+                queue.addAll(fresh)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                loadError = true
+            } finally {
+                loading = false
+            }
         }
     }
 
