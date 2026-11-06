@@ -110,6 +110,12 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
             Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current + 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
+            Group("Tidy up") {
+                LibraryRow("Swipe", BsIcons.Heart, onClick = { onNavigate(Routes.SWIPE) })
+                LibraryRow("Organize", BsIcons.Funnel, divider = true, onClick = { onNavigate(Routes.ORGANIZE) })
+                LibraryRow("Duplicates", BsIcons.Images, divider = true, onClick = { onNavigate(Routes.DUPLICATES) })
+                LibraryRow("Rating", BsIcons.Fire, divider = true, onClick = { onNavigate(Routes.RATING) })
+            }
             Group("Your library") {
                 LibraryRow("Albums", BsIcons.Stack, onClick = { onNavigate(Routes.ALBUMS) })
                 LibraryRow("Sharing", BsIcons.ShareNetwork, divider = true, onClick = { onNavigate(Routes.SHARING) })
@@ -119,12 +125,6 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
             Group("Backup & import") {
                 LibraryRow("Backup & storage", BsIcons.CloudArrowUp, onClick = { onNavigate(Routes.BACKUP) })
                 LibraryRow("Upload photos", BsIcons.UploadSimple, divider = true, caret = false, onClick = upload)
-            }
-            Group("Tidy up") {
-                LibraryRow("Organize", BsIcons.Funnel, onClick = { onNavigate(Routes.ORGANIZE) })
-                LibraryRow("Duplicates", BsIcons.Images, divider = true, onClick = { onNavigate(Routes.DUPLICATES) })
-                LibraryRow("Swipe", BsIcons.Heart, divider = true, onClick = { onNavigate(Routes.SWIPE) })
-                LibraryRow("Rating", BsIcons.Fire, divider = true, onClick = { onNavigate(Routes.RATING) })
             }
             Group("Create & explore") {
                 LibraryRow("Framer", BsIcons.FilmStrip, onClick = { onNavigate(Routes.framer()) })
