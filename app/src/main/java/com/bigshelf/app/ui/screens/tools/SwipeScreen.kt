@@ -73,7 +73,7 @@ import kotlin.math.abs
 private const val SWIPE_WINDOW = 20
 private const val SWIPE_REFILL_AT = 3
 private const val SWIPE_UNDO_LIMIT = 3
-// A keep this soon (ms) after the photo came up is a gut "yes": it gets two points of heat
+// A keep this soon (ms) after the photo came up is a gut "yes": it gets two points of taste score
 private const val QUICK_KEEP_MS = 1500L
 // How far a drag must travel to count as a swipe
 private val THRESHOLD = 100.dp
@@ -85,7 +85,7 @@ private enum class Verdict(val label: String, val color: Color) {
     Rework("Rework", Color(0xFFFBBF24)),
 }
 
-internal fun swipeHeatPoints(elapsedMs: Long, rework: Boolean = false): Double = when {
+internal fun swipeTastePoints(elapsedMs: Long, rework: Boolean = false): Double = when {
     rework -> -1.0
     elapsedMs < QUICK_KEEP_MS -> 2.0
     else -> 0.25
@@ -100,7 +100,7 @@ private class Swipe(var photo: Photo, val verdict: Verdict) {
     var write: Job? = null
 }
 
-/** Unreviewed photos only; swipes adjust their heat directly. */
+/** Unreviewed photos only; swipes adjust their taste score directly. */
 @Composable
 fun SwipeScreen(onBack: () -> Unit) {
     val api = BigShelfApp.api
@@ -115,7 +115,7 @@ fun SwipeScreen(onBack: () -> Unit) {
     var loadError by remember { mutableStateOf(false) }
     var refill by remember { mutableStateOf(0) }
 
-    // The seen set keeps refills from repeating photos, even after their heat changes.
+    // The seen set keeps refills from repeating photos, even after their taste scores change.
     // Watches the queue size instead of keying on it: keying restarted the effect on every swipe,
     // cancelling the fetch in flight, and its loading = false flashed "Nothing left to swipe"
     // until the restarted fetch landed. A fetch now runs to the end while swipes continue.
@@ -155,8 +155,8 @@ fun SwipeScreen(onBack: () -> Unit) {
     // photo back on top without a word. NonCancellable so leaving the screen doesn't drop a write.
     fun swipe(photo: Photo, verdict: Verdict) {
         val points = when (verdict) {
-            Verdict.Keep -> swipeHeatPoints(SystemClock.elapsedRealtime() - shownAt)
-            Verdict.Rework -> swipeHeatPoints(0, rework = true)
+            Verdict.Keep -> swipeTastePoints(SystemClock.elapsedRealtime() - shownAt)
+            Verdict.Rework -> swipeTastePoints(0, rework = true)
             else -> 0.0
         }
         val entry = Swipe(photo, verdict)
@@ -173,7 +173,7 @@ fun SwipeScreen(onBack: () -> Unit) {
                         api.setFavorite(photo.id, true)
                     }
                     Verdict.Keep, Verdict.Rework -> {
-                        val adjustment = api.boostHeat(photo.id, points, rework = if (verdict == Verdict.Rework) true else null, kept = if (verdict == Verdict.Keep) true else null)
+                        val adjustment = api.boostTaste(photo.id, points, rework = if (verdict == Verdict.Rework) true else null, kept = if (verdict == Verdict.Keep) true else null)
                         entry.points = adjustment.points
                         entry.previousRework = adjustment.previousRework
                         entry.previousKept = adjustment.previousKept
@@ -203,8 +203,8 @@ fun SwipeScreen(onBack: () -> Unit) {
                 when (last.verdict) {
                     Verdict.Bin -> api.flagDeleted(listOf(last.photo.id), false)
                     Verdict.Favorite -> api.setFavorite(last.photo.id, last.photo.isFavorite)
-                    Verdict.Rework -> api.boostHeat(last.photo.id, -last.points, rework = last.previousRework)
-                    Verdict.Keep -> api.boostHeat(last.photo.id, -last.points, kept = last.previousKept)
+                    Verdict.Rework -> api.boostTaste(last.photo.id, -last.points, rework = last.previousRework)
+                    Verdict.Keep -> api.boostTaste(last.photo.id, -last.points, kept = last.previousKept)
                 }
                 refresh()
             } catch (_: Exception) {

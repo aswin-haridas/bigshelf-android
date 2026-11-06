@@ -701,8 +701,8 @@ private fun InfoSheet(
             formatDate(image.takenAt ?: image.createdAt)?.let { date ->
                 InfoField(if (image.takenAt != null) "Taken" else "Uploaded") { Text(date, style = BsText.Sm, color = BsColors.MutedSoft) }
             }
-            image.heat?.let { heat ->
-                InfoField("Heat") { Text(String.format(Locale.US, "%.1f / 10", heat), style = BsText.Sm, color = BsColors.MutedSoft) }
+            image.tasteScore?.let { score ->
+                InfoField("Taste score") { Text(String.format(Locale.US, "%.1f / 10", score), style = BsText.Sm, color = BsColors.MutedSoft) }
             }
             image.aiScore?.let { score ->
                 InfoField("AI likelihood") { Text("${Math.round(score * 100)}%", style = BsText.Sm, color = BsColors.MutedSoft) }

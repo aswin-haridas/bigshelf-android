@@ -53,7 +53,7 @@ import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
-// Pairs kept queued: every answer tops the queue back up, so later pairs use the new heat (web useRating)
+// Pairs kept queued: every answer tops the queue back up, so later pairs use the new taste scores (web useRating)
 private const val WINDOW_SIZE = 10
 // How many answers Undo can walk back
 private const val UNDO_LIMIT = 3
@@ -62,8 +62,8 @@ private const val UNDO_LIMIT = 3
 private class Answer(val pair: RatingPair, val done: CompletableDeferred<String?>)
 
 /**
- * Port of modules/rating: one pair of similar heat at a time, tap the hotter photo. Each answer
- * retrains the taste model on the server, which re-rates every photo's heat. The queue is
+ * Port of modules/rating: one pair of similar taste score at a time, tap the photo you like more. Each answer
+ * retrains the taste model on the server, which re-scores every photo. The queue is
  * local so a refill never swaps the pair on screen.
  */
 @Composable
@@ -118,10 +118,10 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
         }
     }
 
-    // Heat lives on the photo detail; refresh it so it shows the new rating
+    // Taste score lives on the photo detail; refresh it so it shows the new rating
     fun refresh() = PhotoEvents.invalidate("photo")
 
-    // The user found `winner` hotter: show the next pair at once, the server catches up
+    // The user likes `winner` more: show the next pair at once, the server catches up
     fun pick(pair: RatingPair, winner: Photo) {
         val loser = pair.items.firstOrNull { it.id != winner.id } ?: return
         answered.add(pair.id)
@@ -204,7 +204,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Which is hotter?", Modifier.weight(1f), style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
+                    Text("Which do you like more?", Modifier.weight(1f), style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
                     // Can't decide: move on without teaching the model anything
                     BsButton(onClick = { queue.remove(current) }, variant = ButtonVariant.Ghost) {
                         BsIcon(BsIcons.Shuffle, size = 14.dp)

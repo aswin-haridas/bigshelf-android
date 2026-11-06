@@ -111,7 +111,7 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     // the stable sort keeps unrated people in the server's name order at the end.
     val people = query.data?.items.orEmpty().filter {
         it.photoCount > 0 && it.name.lowercase().contains(search.trim().lowercase())
-    }.sortedByDescending { it.heat ?: -1.0 }
+    }.sortedByDescending { it.tasteScore ?: -1.0 }
 
     Column(Modifier.fillMaxSize()) {
         PeopleHeader(PeopleTab.People, onTab) {

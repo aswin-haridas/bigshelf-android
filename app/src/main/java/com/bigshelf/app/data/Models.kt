@@ -63,8 +63,8 @@ data class Photo(
     @SerialName("ai_source") val aiSource: String? = null,
     // Detail-only: 0-1 chance the AI detector gives that it is AI; null until it has run
     @SerialName("ai_score") val aiScore: Double? = null,
-    // Heat out of 10 from the Rating taste model (detail only); null until trained
-    val heat: Double? = null,
+    // Taste score out of 10 (how much you like it) from the taste model (detail only); null until trained
+    @SerialName("taste_score") val tasteScore: Double? = null,
     @SerialName("is_archived") val isArchived: Boolean = false,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
     @SerialName("needs_rework") val needsRework: Boolean = false,
@@ -105,7 +105,7 @@ const val USER_MARKED_AI = "Marked by user"
 /** Mirrors backend AI_MODEL_SOURCE: flagged by the AI detector pipeline, also clearable. */
 const val AI_MODEL_SOURCE = "Detected by model"
 
-/** Two random photos to ask "which is hotter?" (Rating). */
+/** Two random photos to ask "which do you like more?" (Rating). */
 @Serializable
 data class RatingPair(val id: String, val items: List<Photo>)
 
@@ -142,8 +142,8 @@ data class Person(
     @SerialName("photo_count") val photoCount: Int = 0,
     val cover: FaceCover? = null,
     @SerialName("is_skipped") val isSkipped: Boolean = false,
-    // Average Rating heat of their photos (out of 10); null until any is rated
-    val heat: Double? = null,
+    // Average taste score of their photos (out of 10); null until any is rated
+    @SerialName("taste_score") val tasteScore: Double? = null,
 )
 
 @Serializable
@@ -568,4 +568,4 @@ data class CropBox(val x: Int, val y: Int, val width: Int, val height: Int) {
 data class SplitResult(@SerialName("created_photos") val createdPhotos: List<Photo> = emptyList())
 
 @Serializable
-data class HeatAdjustment(val points: Double, @SerialName("previous_rework") val previousRework: Boolean, @SerialName("previous_kept") val previousKept: Boolean = false)
+data class TasteAdjustment(val points: Double, @SerialName("previous_rework") val previousRework: Boolean, @SerialName("previous_kept") val previousKept: Boolean = false)

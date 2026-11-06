@@ -630,7 +630,7 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun ratingPairs(limit: Int) = get("/api/v1/rating", RatingResponse.serializer(), mapOf("limit" to limit))
 
-    /** [winnerId] is hotter than [loserId]; returns the stored answer's id for Undo. */
+    /** [winnerId] is liked more than [loserId]; returns the stored answer's id for Undo. */
     suspend fun compare(winnerId: String, loserId: String) = send(
         "POST", "/api/v1/rating/compare", CompareResponse.serializer(),
         buildJsonObject {
@@ -641,9 +641,9 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/rating/compare/$id")
 
-    /** Adds [points] of heat on top of the taste model's (-1 takes a boost back). */
-    suspend fun boostHeat(id: String, points: Double = 1.0, rework: Boolean? = null, kept: Boolean? = null) =
-        send("POST", "/api/v1/rating/boost/$id?return_points=true", HeatAdjustment.serializer(), buildJsonObject {
+    /** Adds [points] of taste score on top of the taste model's (-1 takes a boost back). */
+    suspend fun boostTaste(id: String, points: Double = 1.0, rework: Boolean? = null, kept: Boolean? = null) =
+        send("POST", "/api/v1/rating/boost/$id?return_points=true", TasteAdjustment.serializer(), buildJsonObject {
             put("points", points)
             if (rework != null) put("needs_rework", rework)
             if (kept != null) put("is_kept", kept)
