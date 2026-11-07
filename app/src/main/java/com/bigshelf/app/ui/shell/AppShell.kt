@@ -305,7 +305,7 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
             RunScreen(runId = it.arguments?.getString("runId").orEmpty(), onBack = onBack)
         }
         composable(Routes.DUPLICATES) { DuplicatesScreen(onBack = onBack, onOpenPhoto = openPhoto) }
-        composable(Routes.ORGANIZE) { OrganizeScreen(onBack = onBack, onOpenPhoto = openPhoto, onDuplicates = { nav.navigate(Routes.DUPLICATES) }) }
+        composable(Routes.ORGANIZE) { OrganizeScreen(onBack = onBack, onOpenPhoto = openPhoto) }
         composable(Routes.PHOTO, arguments = listOf(navArgument("photoId") { type = NavType.StringType })) {
             PhotoScreen(
                 photoId = it.arguments?.getString("photoId").orEmpty(),

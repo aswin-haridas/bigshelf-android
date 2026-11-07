@@ -1,11 +1,7 @@
 package com.bigshelf.app.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,42 +10,37 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
-import com.bigshelf.app.ui.theme.BsMotion
+import kotlinx.coroutines.launch
 
 /**
- * Port of components/CustomModal.tsx: `bg-black/50` backdrop, `bg-background rounded-xl
- * max-w-md` dialog, `text-sm font-semibold` title with an X button, optional bordered footer.
- * Fades/scales in over 200ms like the web's `starting:opacity-0 starting:scale-95`.
+ * Port of components/CustomModal.tsx as a bottom sheet: slides up from the bottom over a
+ * `bg-black/50` scrim, drag down or tap outside to close. Title with an X button, scrolling
+ * body, optional bordered footer that stays pinned under it.
  */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BsModal(
     title: String,
@@ -57,78 +48,60 @@ fun BsModal(
     footer: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        // The window's own dim would stack on our bg-black/50 scrim
-        (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
-        val enter = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { enter.animateTo(1f, BsMotion.spec()) }
-
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = enter.value }
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClose)
-                .imePadding()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                Modifier
-                    .widthIn(max = 448.dp)
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        val s = 0.95f + 0.05f * enter.value
-                        scaleX = s
-                        scaleY = s
-                    }
-                    .shadow(24.dp, BsShapes.Xl)
-                    .clip(BsShapes.Xl)
-                    .background(BsColors.Background)
-                    // Swallow taps so they don't reach the backdrop
-                    .clickable(remember { MutableInteractionSource() }, indication = null) {},
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    // The X slides the sheet down before it leaves, like a drag or a tap outside
+    val close: () -> Unit = { scope.launch { state.hide() }.invokeOnCompletion { onClose() } }
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = state,
+        containerColor = BsColors.Background,
+        contentColor = BsColors.Foreground,
+        scrimColor = Color.Black.copy(alpha = 0.5f),
+        shape = BsShapes.Xl.copy(bottomStart = CornerSize(0.dp), bottomEnd = CornerSize(0.dp)),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = BsColors.BorderFocus) },
+    ) {
+        Column(Modifier.fillMaxWidth().imePadding()) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    // Titles carry names ("Share \"…\"", "Edit: …"): never push the X off the dialog
-                    Text(
-                        title,
-                        Modifier.weight(1f).padding(end = 8.dp),
-                        style = BsText.Sm.copy(fontWeight = BsWeight.Semibold),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Box(
-                        Modifier
-                            .bsClickable(onClick = onClose)
-                            .clip(BsShapes.Md)
-                            .padding(8.dp),
-                    ) {
-                        BsIcon(BsIcons.XBold, size = 16.dp, tint = BsColors.Muted, contentDescription = "Close")
-                    }
-                }
-                // Tall content scrolls between a fixed header and footer, so the buttons stay reachable
+                // Titles carry names ("Share \"…\"", "Edit: …"): never push the X off the sheet
+                Text(
+                    title,
+                    Modifier.weight(1f).padding(end = 8.dp),
+                    style = BsText.Base.copy(fontWeight = BsWeight.Semibold),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Box(
                     Modifier
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                ) { content() }
-                if (footer != null) {
-                    // Wraps onto a second line when the buttons don't fit (long names, big text)
-                    FlowRow(
-                        Modifier
-                            .fillMaxWidth()
-                            .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        itemVerticalAlignment = Alignment.CenterVertically,
-                    ) { footer() }
+                        .bsClickable(onClick = close)
+                        .clip(BsShapes.Md)
+                        .padding(8.dp),
+                ) {
+                    BsIcon(BsIcons.XBold, size = 16.dp, tint = BsColors.Muted, contentDescription = "Close")
                 }
+            }
+            // Tall content scrolls between a fixed header and footer, so the buttons stay reachable
+            Box(
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            ) { content() }
+            if (footer != null) {
+                // Wraps onto a second line when the buttons don't fit (long names, big text)
+                FlowRow(
+                    Modifier
+                        .fillMaxWidth()
+                        .drawBehind { drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) { footer() }
             }
         }
     }

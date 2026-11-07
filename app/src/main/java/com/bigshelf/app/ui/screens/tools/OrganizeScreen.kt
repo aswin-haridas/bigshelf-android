@@ -8,19 +8,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +34,6 @@ import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.data.userMessage
 import com.bigshelf.app.state.PhotoEvents
-import com.bigshelf.app.state.SelectionStore
 import com.bigshelf.app.state.ViewerList
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
@@ -44,12 +41,12 @@ import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
-import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
+import com.bigshelf.app.ui.theme.MonoFamily
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -209,31 +206,32 @@ private class OrganizeReviewModel : ViewModel() {
         }
 }
 
+/** Organize is the human feedback loop: one question at a time about the pipeline's guesses. */
 @Composable
-fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicates: () -> Unit) {
+fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val review = viewModel { OrganizeReviewModel() }
-    var sections by rememberSaveable { mutableStateOf(false) }
-    val closeSections = {
-        SelectionStore.clear()
-        sections = false
-    }
-    BackHandler(sections, closeSections)
     BackHandler(review.saving) {}
-    if (sections) {
-        OrganizeSections(closeSections, onOpenPhoto, onDuplicates)
-        return
-    }
 
     val prompt = review.prompt
+    // One slim toolbar row so the photos get nearly the whole screen
     Column(Modifier.fillMaxSize()) {
-        PageHeader(
-            "Organize",
-            leading = {
-                BsIconButton(BsIcons.ArrowLeft, "Exit Organize", onBack, enabled = !review.saving)
-            },
-        ) {
-            BsButton({ sections = true }, variant = ButtonVariant.Ghost, enabled = !review.saving) {
-                Text("Sections")
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            BsIconButton(BsIcons.ArrowLeft, "Exit Organize", onBack, enabled = !review.saving, tint = BsColors.Foreground)
+            Text(
+                if (prompt != null) {
+                    val prefix = if (review.round.kind.isMatch) "Pair " else ""
+                    "${prefix}${review.round.count + 1} of $ROUND_SIZE"
+                } else "Organize",
+                Modifier.weight(1f).padding(start = 4.dp),
+                style = BsText.Xs.copy(fontFamily = MonoFamily),
+                color = BsColors.Muted,
+                maxLines = 1,
+            )
+            if (prompt != null) {
+                BsButton(review::nextKind, variant = ButtonVariant.Ghost, enabled = !review.saving) {
+                    Text("Next question")
+                    BsIcon(BsIcons.ArrowRight, size = 16.dp)
+                }
             }
         }
 
@@ -257,82 +255,80 @@ fun OrganizeScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit, onDuplicat
 @Composable
 private fun OrganizePrompt(prompt: ReviewPrompt, review: OrganizeReviewModel, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val imageHeight = (maxHeight * 0.58f).coerceAtMost(480.dp)
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                prompt.images.forEachIndexed { index, image ->
-                    val photo = prompt.photos.getOrNull(index)
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        val tile = Modifier.fillMaxWidth().height(imageHeight)
-                            .clip(BsShapes.Lg).background(BsColors.Surface)
-                        Box(
-                            if (photo == null) tile else tile.clickable(
-                                enabled = !review.saving,
-                                onClickLabel = "Open full photo",
-                            ) {
-                                ViewerList.photos = prompt.photos
-                                onOpenPhoto(photo.id)
-                            },
-                        ) {
-                            AsyncImage(
-                                api.mediaUrl(image.source),
-                                image.description,
-                                Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit,
-                            )
-                            if (photo != null) {
-                                BsIcon(
-                                    BsIcons.ArrowUpRight,
-                                    Modifier.align(Alignment.TopEnd).padding(6.dp)
-                                        .background(BsColors.Background, BsShapes.Full).padding(6.dp),
-                                    size = 16.dp,
-                                )
-                            }
-                        }
-                        image.caption?.let {
-                            Text(it, Modifier.padding(top = 4.dp), style = BsText.Sm, color = BsColors.Muted)
-                        }
+    Column(
+        Modifier.fillMaxSize().padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            // Two photos split along the long side: stacked when tall, side by side when wide
+            val tall = maxHeight >= maxWidth
+            val gap = 4.dp
+            @Composable
+            fun Tile(index: Int, modifier: Modifier) {
+                val image = prompt.images[index]
+                val photo = prompt.photos.getOrNull(index)
+                val tile = modifier.clip(BsShapes.Lg).background(BsColors.Surface)
+                Box(
+                    if (photo == null) tile else tile.clickable(
+                        enabled = !review.saving,
+                        onClickLabel = "Open full photo",
+                    ) {
+                        ViewerList.photos = prompt.photos
+                        onOpenPhoto(photo.id)
+                    },
+                ) {
+                    AsyncImage(
+                        api.mediaUrl(image.source),
+                        image.description,
+                        Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                    if (photo != null) {
+                        BsIcon(
+                            BsIcons.ArrowUpRight,
+                            Modifier.align(Alignment.TopEnd).padding(6.dp)
+                                .background(BsColors.Background, BsShapes.Full).padding(6.dp),
+                            size = 16.dp,
+                        )
+                    }
+                    image.caption?.let {
+                        Text(
+                            it,
+                            Modifier.align(Alignment.BottomStart).padding(6.dp)
+                                .background(BsColors.Background.copy(alpha = 0.8f), BsShapes.Md)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = BsText.Xs, color = BsColors.MutedSoft,
+                        )
                     }
                 }
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val prefix = if (review.round.kind.isMatch) "Pair " else ""
-                Text("${prefix}${review.round.count + 1} of $ROUND_SIZE", style = BsText.Sm, color = BsColors.Muted)
-                Text(prompt.question, style = BsText.Lg, textAlign = TextAlign.Center)
+            val count = prompt.images.size
+            if (count <= 1 || !tall) Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                repeat(count) { Tile(it, Modifier.weight(1f).fillMaxHeight()) }
+            } else Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                repeat(count) { Tile(it, Modifier.weight(1f).fillMaxWidth()) }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BsButton(
-                    { review.answer(true) }, Modifier.weight(1f).heightIn(min = 52.dp),
-                    variant = ButtonVariant.Secondary, enabled = !review.saving,
-                ) {
-                    BsIcon(BsIcons.CheckCircleFill, size = 16.dp, tint = BsColors.Success)
-                    Text("Yes")
-                }
-                BsButton(
-                    { review.answer(false) }, Modifier.weight(1f).heightIn(min = 52.dp),
-                    variant = ButtonVariant.Secondary, enabled = !review.saving,
-                ) {
-                    BsIcon(BsIcons.X, size = 16.dp, tint = BsColors.Danger)
-                    Text("No")
-                }
-                BsButton(
-                    { review.answer(null) }, Modifier.weight(1f).heightIn(min = 52.dp),
-                    variant = ButtonVariant.Ghost, enabled = !review.saving, loading = review.saving,
-                ) { Text("Not sure", textAlign = TextAlign.Center) }
-            }
-            HorizontalDivider(color = BsColors.Border)
+        }
+        Text(prompt.question, Modifier.fillMaxWidth().padding(horizontal = 8.dp), style = BsText.Base, textAlign = TextAlign.Center)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BsButton(
-                review::nextKind, Modifier.align(Alignment.End),
-                variant = ButtonVariant.Ghost, enabled = !review.saving,
+                { review.answer(true) }, Modifier.weight(1f).heightIn(min = 48.dp),
+                variant = ButtonVariant.Secondary, enabled = !review.saving,
             ) {
-                Text("Next question")
-                BsIcon(BsIcons.ArrowRight, size = 16.dp)
+                BsIcon(BsIcons.CheckCircleFill, size = 16.dp, tint = BsColors.Success)
+                Text("Yes")
             }
+            BsButton(
+                { review.answer(false) }, Modifier.weight(1f).heightIn(min = 48.dp),
+                variant = ButtonVariant.Secondary, enabled = !review.saving,
+            ) {
+                BsIcon(BsIcons.X, size = 16.dp, tint = BsColors.Danger)
+                Text("No")
+            }
+            BsButton(
+                { review.answer(null) }, Modifier.weight(1f).heightIn(min = 48.dp),
+                variant = ButtonVariant.Ghost, enabled = !review.saving, loading = review.saving,
+            ) { Text("Not sure", textAlign = TextAlign.Center) }
         }
     }
 }
