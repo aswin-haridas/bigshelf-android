@@ -211,7 +211,7 @@ fun TriptychScreen(
             try {
                 api.skipPerson(personId)
                 PhotoEvents.invalidate("people")
-                toast.success("${set.personName ?: "This person"} won't appear in Triplets again")
+                toast.success("${set.personName ?: "This person"} won't appear in Matches again")
                 // Filtered to them: they have no sets left, so go back to everyone
                 if (onlyPerson == personId) setPerson(null) else refetchShifted()
             } catch (_: Exception) {

@@ -132,7 +132,7 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
             }
             Group("Create & explore") {
                 LibraryRow("Framer", BsIcons.FilmStrip, onClick = { onNavigate(Routes.framer()) })
-                LibraryRow("Triplets", BsIcons.Users, divider = true, onClick = { onNavigate(Routes.TRIPLETS) })
+                LibraryRow("Matches", BsIcons.Users, divider = true, onClick = { onNavigate(Routes.TRIPLETS) })
                 LibraryRow("Composer", BsIcons.Sparkle, divider = true, onClick = { onNavigate(Routes.COMPOSER) })
                 LibraryRow("Wardrobe", BsIcons.Images, divider = true, onClick = { onNavigate(Routes.WARDROBE) })
             }

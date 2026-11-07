@@ -323,7 +323,7 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
             val settings = BigShelfApp.settings
             var editingSettings by remember { mutableStateOf(false) }
             TriptychScreen(
-                "Triplets",
+                "Matches",
                 "Up to ${settings.tripletCount} photos${if (settings.tripletMatchFaces) " of the same profile" else " per set"}",
                 TRIPLETS_ENDPOINT,
                 onBack = onBack, onOpenPhoto = openPhoto,
@@ -331,7 +331,7 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
             )
             // The same options as the Triplets section of Settings
             if (editingSettings) {
-                BsModal(title = "Triplets settings", onClose = { editingSettings = false }) {
+                BsModal(title = "Matches settings", onClose = { editingSettings = false }) {
                     TripletSettingsCard()
                 }
             }

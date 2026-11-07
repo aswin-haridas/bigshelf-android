@@ -171,7 +171,7 @@ private fun SkippedPeople() {
     var pending by remember { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Section("Skipped people", "Skipped people never appear in Triplets.")
+        Section("Skipped people", "Skipped people never appear in Matches.")
         SettingsCard {
             when {
                 people.isLoading -> Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
@@ -198,7 +198,7 @@ private fun SkippedPeople() {
                                     try {
                                         api.unskipPerson(person.id)
                                         PhotoEvents.invalidate("people")
-                                        toast.success("${person.name} will appear in Triplets again")
+                                        toast.success("${person.name} will appear in Matches again")
                                     } catch (_: Exception) {
                                         toast.error("Couldn't unskip this person")
                                     } finally {
@@ -339,7 +339,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Triplets", "How Triplets picks and matches each set of photos.")
+            Section("Matches", "How Matches picks and matches each set of photos.")
             TripletSettingsCard()
         }
 
