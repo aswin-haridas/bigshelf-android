@@ -246,14 +246,16 @@ class Api(context: Context, val baseUrl: String) {
 
     // ---------- Photos ----------
 
-    // A [cursor] (PhotoPage.nextCursor) takes over from [page] on Home, Bin and Archive
+    // A [cursor] (PhotoPage.nextCursor) takes over from [page] on Home, Bin and Archive.
+    // [sort] "uploaded" lists newest uploads first (Home); default is capture date.
     suspend fun photos(
         page: Int, favorite: Boolean? = null, size: Int = PAGE_SIZE, filter: PhotoFilter? = null, cursor: String? = null,
         people: Boolean? = null,
+        sort: String? = null,
     ) =
         get(
             "/api/v1/photos", PhotoPage.serializer(),
-            mapOf("page" to page, "size" to size, "favorite" to favorite, "cursor" to cursor, "people" to people) + filterParams(filter),
+            mapOf("page" to page, "size" to size, "favorite" to favorite, "cursor" to cursor, "people" to people, "sort" to sort) + filterParams(filter),
         )
 
     private fun filterParams(filter: PhotoFilter?): Map<String, Any?> = mapOf(
