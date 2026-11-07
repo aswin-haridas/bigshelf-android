@@ -66,10 +66,10 @@ private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
     val common = mapOf<String, Any?>("include_ai" to s.includeAi)
     return when (endpoint) {
         TRIPLETS_ENDPOINT -> common + mapOf(
-            "count" to s.tripletCount, "solo" to s.tripletSolo, "similar_faces" to s.tripletMatchFaces,
+            "count" to s.tripletCount, "similar_faces" to s.tripletMatchFaces,
             "similar_outfit" to s.tripletOutfit, "similar_colors" to s.tripletMatchColors, "similar_pose" to s.tripletMatchPose,
             "similar_scene" to s.tripletMatchScene,
-            "variety" to s.tripletVariety, "clear_lead" to s.tripletClearLead, "order" to s.tripletOrder,
+            "clear_lead" to s.tripletClearLead, "order" to s.tripletOrder,
         )
         else -> common
     }

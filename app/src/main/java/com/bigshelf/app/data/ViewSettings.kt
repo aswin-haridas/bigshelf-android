@@ -74,15 +74,6 @@ class ViewSettings(context: Context) {
         prefs.edit().putInt("tripletCount", value).apply()
     }
 
-    // Triplets only uses photos with no other tagged person in them
-    var tripletSolo by mutableStateOf(prefs.getBoolean("tripletSolo", false))
-        private set
-
-    fun updateTripletSolo(value: Boolean) {
-        tripletSolo = value
-        prefs.edit().putBoolean("tripletSolo", value).apply()
-    }
-
     // Random Triplets fill the set with the faces most like the first photo's. Off by default.
     var tripletMatchFaces by mutableStateOf(prefs.getBoolean("tripletMatchFaces", false))
         private set
@@ -110,22 +101,13 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("tripletMatchColors", value).apply()
     }
 
-    // Random Triplets fill the set with the settings most like the first photo's (overrides variety). Off by default.
+    // Random Triplets fill the set with the settings most like the first photo's. Off by default.
     var tripletMatchScene by mutableStateOf(prefs.getBoolean("tripletMatchScene", false))
         private set
 
     fun updateTripletMatchScene(value: Boolean) {
         tripletMatchScene = value
         prefs.edit().putBoolean("tripletMatchScene", value).apply()
-    }
-
-    // Random Triplets spread each set across scenes. On by default; off allows one scene's photos together.
-    var tripletVariety by mutableStateOf(prefs.getBoolean("tripletVariety", true))
-        private set
-
-    fun updateTripletVariety(value: Boolean) {
-        tripletVariety = value
-        prefs.edit().putBoolean("tripletVariety", value).apply()
     }
 
     // Random Triplets lead with a clear face (big, sharp, typical). On by default; off orders the whole set.

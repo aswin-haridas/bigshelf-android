@@ -264,11 +264,6 @@ fun TripletSettingsCard() {
             }
         }
         ToggleRow("AI images", "Include AI images.", settings.includeAi, settings::updateIncludeAi, divider = true)
-        ToggleRow("Solo photos only", "Skip group photos.", settings.tripletSolo, settings::updateTripletSolo, divider = true)
-        if (!settings.tripletMatchScene) ToggleRow(
-            "Different scenes", "Spread a set across shoots.",
-            settings.tripletVariety, settings::updateTripletVariety, divider = true,
-        )
         ToggleRow(
             "Clear face first", "Lead with a sharp, close face.",
             settings.tripletClearLead, settings::updateTripletClearLead, divider = true,
