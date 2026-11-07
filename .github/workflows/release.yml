@@ -55,6 +55,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # Through env, not inlined: a commit message with quotes would break the shell
           NOTES: ${{ github.event.head_commit.message || 'Manual release' }}
-        run: >
-          gh release create "v$NAME" "bigshelf-$NAME.apk"
-          --title "BigShelf v$NAME" --notes "$NOTES"
+        # Also attached as bigshelf.apk, so .../releases/latest/download/bigshelf.apk is a
+        # permanent link to the newest build (the web app's Settings links there).
+        run: |
+          cp "bigshelf-$NAME.apk" bigshelf.apk
+          gh release create "v$NAME" "bigshelf-$NAME.apk" bigshelf.apk \
+            --title "BigShelf v$NAME" --notes "$NOTES"
