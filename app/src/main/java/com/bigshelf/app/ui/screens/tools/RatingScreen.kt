@@ -1,10 +1,9 @@
 package com.bigshelf.app.ui.screens.tools
 
-import android.content.pm.ActivityInfo
-import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -35,13 +33,9 @@ import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.RatingPair
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.state.PhotoEvents
-import com.bigshelf.app.ui.components.BsButton
-import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsIconButton
-import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
-import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
@@ -49,7 +43,7 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
-import com.bigshelf.app.ui.theme.BsWeight
+import com.bigshelf.app.ui.theme.MonoFamily
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
@@ -68,12 +62,6 @@ private class Answer(val pair: RatingPair, val done: CompletableDeferred<String?
  */
 @Composable
 fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
-    val activity = LocalActivity.current
-    DisposableEffect(activity) {
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        // Keep the lock through the Activity recreation triggered by rotation.
-        onDispose { if (activity?.isChangingConfigurations == false) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
-    }
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -179,12 +167,22 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
         }
     }
 
+    // One slim toolbar row so the photos get nearly the whole screen
     Column(Modifier.fillMaxSize()) {
-        PageHeader(
-            "Rating",
-            count = rated?.let { "$it rated" },
-            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground)
+            Text(
+                rated?.let { "$it rated" } ?: "Rating",
+                Modifier.weight(1f).padding(start = 4.dp),
+                style = BsText.Xs.copy(fontFamily = MonoFamily),
+                color = BsColors.Muted,
+                maxLines = 1,
+            )
+            // Can't decide: move on without teaching the model anything
+            if (current != null) BsIconButton(BsIcons.Shuffle, "Skip this pair", onClick = { queue.remove(current) })
             BsIconButton(BsIcons.ArrowUUpLeft, "Undo the last answer", onClick = ::undo, enabled = history.isNotEmpty())
             BsIconButton(
                 BsIcons.ArrowCounterClockwise, "Forget every answer",
@@ -199,37 +197,35 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 Modifier.padding(horizontal = 24.dp),
                 description = "Photos can be rated once processing has finished",
             )
-            else -> Column(
-                Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current + 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            else -> BoxWithConstraints(
+                Modifier.fillMaxSize().padding(horizontal = 4.dp).padding(bottom = LocalBottomBarInset.current + 4.dp),
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Which do you like more?", Modifier.weight(1f), style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
-                    // Can't decide: move on without teaching the model anything
-                    BsButton(onClick = { queue.remove(current) }, variant = ButtonVariant.Ghost) {
-                        BsIcon(BsIcons.Shuffle, size = 14.dp)
-                        Text("Skip")
+                // Split along the long side: stacked when tall, side by side when wide
+                val tall = maxHeight >= maxWidth
+                val gap = 4.dp
+                @Composable
+                fun Card(photo: Photo, modifier: Modifier) {
+                    Box(modifier.clip(BsShapes.Lg).background(BsColors.Surface).bsClickable { pick(current, photo) }) {
+                        // A tap always picks; the corner arrow opens the photo
+                        AsyncImage(
+                            api.mediaUrl(photo.thumbnailUrl ?: photo.imageSrc),
+                            photo.title ?: photo.filename,
+                            Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                        BsIconButton(
+                            BsIcons.ArrowUpRight, "Open ${photo.filename}",
+                            onClick = { onOpenPhoto(photo.id) },
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).clip(BsShapes.Full)
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            tint = BsColors.Foreground,
+                        )
                     }
                 }
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    current.items.forEach { photo ->
-                        Box(Modifier.weight(1f).fillMaxHeight().clip(BsShapes.Lg).background(BsColors.Surface).bsClickable { pick(current, photo) }) {
-                            // A tap always picks; the corner arrow opens the photo
-                            AsyncImage(
-                                api.mediaUrl(photo.thumbnailUrl ?: photo.imageSrc),
-                                photo.title ?: photo.filename,
-                                Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit,
-                            )
-                            BsIconButton(
-                                BsIcons.ArrowUpRight, "Open ${photo.filename}",
-                                onClick = { onOpenPhoto(photo.id) },
-                                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).clip(BsShapes.Full)
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                tint = BsColors.Foreground,
-                            )
-                        }
-                    }
+                if (tall) Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                    current.items.forEach { Card(it, Modifier.weight(1f).fillMaxWidth()) }
+                } else Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    current.items.forEach { Card(it, Modifier.weight(1f).fillMaxHeight()) }
                 }
             }
         }
