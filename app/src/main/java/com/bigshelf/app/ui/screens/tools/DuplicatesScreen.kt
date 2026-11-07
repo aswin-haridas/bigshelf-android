@@ -1,27 +1,22 @@
 package com.bigshelf.app.ui.screens.tools
 
 import com.bigshelf.app.ui.components.ShinyText
-import android.content.pm.ActivityInfo
-import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,12 +40,9 @@ import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.SelectionStore
 import com.bigshelf.app.state.ViewerList
 import com.bigshelf.app.state.rememberQuery
-import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsIconButton
-import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.EmptyState
-import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.InfinityLoader
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
@@ -74,17 +66,11 @@ private class Decision(val group: DuplicateGroup, val binned: List<Photo>, var j
 
 /**
  * Port of modules/duplicates: one near-duplicate pair at a time. Tap the photo to keep (the
- * other goes to Bin), Keep both, or Pick the best. Locked to landscape so the pair gets full width. Every decision applies at once and the
+ * other goes to Bin), Keep both, or Pick the best. Every decision applies at once and the
  * request runs behind it; Undo walks back the last three.
  */
 @Composable
 fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
-    val activity = LocalActivity.current
-    DisposableEffect(activity) {
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        // Skip the restore while rotating, or the recreated screen would flip back to portrait first
-        onDispose { if (activity?.isChangingConfigurations == false) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
-    }
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
     val query = rememberQuery("duplicates", invalidatedBy = setOf("duplicates")) { api.duplicates(WINDOW_SIZE, DEFAULT_THRESHOLD) }
@@ -142,12 +128,27 @@ fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
         }
     }
 
+    val relaxedTo = data?.thresholdUsed?.takeIf { it < DEFAULT_THRESHOLD }
+    val best = current?.items?.firstOrNull { it.quality?.best == true }
+
+    // One slim toolbar row so the pair gets nearly the whole screen
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))) {
-        PageHeader(
-            "Duplicates",
-            count = if (current != null && pairsLeft > 0) "$pairsLeft left" else null,
-            leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
-        ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground)
+            Column(Modifier.weight(1f).padding(start = 4.dp)) {
+                if (current != null) {
+                    Text(
+                        "${(current.similarity * 100).toInt()}% match" + if (pairsLeft > 0) " · $pairsLeft left" else "",
+                        style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.MutedSoft, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    // No pairs at the standard match %, so the backend lowered the bar to show one
+                    if (relaxedTo != null) Text("Relaxed to ${(relaxedTo * 100).toInt()}%", style = BsText.Xs2, color = BsColors.Warning, maxLines = 1)
+                } else Text("Duplicates", style = BsText.Sm.copy(fontWeight = BsWeight.Medium), maxLines = 1)
+            }
+            if (current != null) {
+                BsIconButton(BsIcons.CheckBold, "Keep both", onClick = { decide(current, null) }, tint = BsColors.Foreground)
+                if (best != null) BsIconButton(BsIcons.Star, "Pick the best", onClick = { decide(current, best) }, tint = BsColors.Success)
+            }
             BsIconButton(BsIcons.ArrowUUpLeft, "Undo", onClick = ::undo, enabled = history.isNotEmpty(), tint = if (history.isNotEmpty()) BsColors.Foreground else null)
             // Forget every Keep both so those pairs come up again
             BsIconButton(
@@ -190,7 +191,6 @@ fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             else -> key(current.key) {
                 PairReview(
                     group = current,
-                    relaxedTo = data?.thresholdUsed?.takeIf { it < DEFAULT_THRESHOLD },
                     onKeep = { decide(current, it) },
                     onOpen = { photo ->
                         ViewerList.photos = current.items
@@ -202,79 +202,59 @@ fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     }
 }
 
-/** Port of duplicate-group.tsx, laid out for landscape: the pair side by side, actions on the right. */
+/** Port of duplicate-group.tsx: the pair splits the screen along its long side; tap the one to keep. */
 @Composable
-private fun PairReview(group: DuplicateGroup, relaxedTo: Double?, onKeep: (Photo?) -> Unit, onOpen: (Photo) -> Unit) {
-    val best = group.items.firstOrNull { it.quality?.best == true }
-    Row(
-        Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        group.items.take(2).forEach { photo ->
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun PairReview(group: DuplicateGroup, onKeep: (Photo?) -> Unit, onOpen: (Photo) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(start = 4.dp, end = 4.dp, bottom = 4.dp)) {
+        // Stacked when tall, side by side when wide
+        val tall = maxHeight >= maxWidth
+        val gap = 4.dp
+        @Composable
+        fun Card(photo: Photo, modifier: Modifier) {
+            Box(
+                modifier
+                    .clip(BsShapes.Lg)
+                    .background(BsColors.Surface)
+                    .bsClickable(scale = 0.97f) { onKeep(photo) },
+            ) {
+                // Fit, not Crop: comparing needs the whole frame
+                AsyncImage(
+                    BigShelfApp.api.mediaUrl(photo.thumbnailUrl ?: photo.imageSrc ?: ""),
+                    photo.filename,
+                    Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+                ScoreBadge(photo, Modifier.align(Alignment.BottomStart).padding(6.dp))
+                // Opening is its own target, so it never keeps
                 Box(
                     Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(BsShapes.Lg)
-                        .background(BsColors.Surface)
-                        .bsClickable(scale = 0.97f) { onKeep(photo) },
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(36.dp)
+                        .clip(BsShapes.Full)
+                        .background(BsColors.Background.copy(alpha = 0.7f))
+                        .bsClickable { onOpen(photo) },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    // Fit, not Crop: comparing needs the whole frame
-                    AsyncImage(
-                        BigShelfApp.api.mediaUrl(photo.thumbnailUrl ?: photo.imageSrc ?: ""),
-                        photo.filename,
-                        Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                    photo.quality?.let { q -> ScoreBadge(q.score, q.best, Modifier.align(Alignment.BottomStart).padding(6.dp)) }
-                    // Opening is its own target, so it never keeps
-                    Box(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(36.dp)
-                            .clip(BsShapes.Full)
-                            .background(BsColors.Background.copy(alpha = 0.7f))
-                            .bsClickable { onOpen(photo) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        BsIcon(BsIcons.ArrowUpRight, size = 16.dp, tint = BsColors.Foreground, contentDescription = "Open ${photo.filename}")
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(photo.filename, Modifier.weight(1f), style = BsText.Xs, color = BsColors.MutedSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (photo.width != null && photo.height != null) {
-                        Text("${photo.width} × ${photo.height}", style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint)
-                    }
+                    BsIcon(BsIcons.ArrowUpRight, size = 16.dp, tint = BsColors.Foreground, contentDescription = "Open ${photo.filename}")
                 }
             }
         }
-        Column(
-            Modifier.width(192.dp).fillMaxHeight().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        ) {
-            Text("${(group.similarity * 100).toInt()}% match", style = BsText.Base.copy(fontWeight = BsWeight.Medium))
-            // No pairs at the standard match %, so the backend lowered the bar to show one
-            if (relaxedTo != null) Text("Relaxed to ${(relaxedTo * 100).toInt()}%", style = BsText.Xs, color = BsColors.Warning)
-            Text("Tap the one to keep", style = BsText.Xs, color = BsColors.Muted)
-            BsButton(onClick = { onKeep(null) }, Modifier.fillMaxWidth(), variant = ButtonVariant.Secondary) {
-                BsIcon(BsIcons.CheckBold, size = 18.dp)
-                Text("Keep both")
-            }
-            if (best != null) {
-                BsButton(onClick = { onKeep(best) }, Modifier.fillMaxWidth()) {
-                    BsIcon(BsIcons.Star, size = 18.dp)
-                    Text("Pick the best")
-                }
-            }
+        val pair = group.items.take(2)
+        if (tall) Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
+            pair.forEach { Card(it, Modifier.weight(1f).fillMaxWidth()) }
+        } else Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+            pair.forEach { Card(it, Modifier.weight(1f).fillMaxHeight()) }
         }
     }
 }
 
-/** Port of score-badge.tsx: the group's pick reads "Best" in success green. */
+/** Port of score-badge.tsx, plus the size: the group's pick reads "Best" in success green. */
 @Composable
-private fun ScoreBadge(score: Double, best: Boolean, modifier: Modifier = Modifier) {
+private fun ScoreBadge(photo: Photo, modifier: Modifier = Modifier) {
+    val q = photo.quality
+    val size = if (photo.width != null && photo.height != null) "${photo.width} × ${photo.height}" else null
+    if (q == null && size == null) return
     Row(
         modifier
             .clip(BsShapes.Md)
@@ -283,10 +263,13 @@ private fun ScoreBadge(score: Double, best: Boolean, modifier: Modifier = Modifi
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (best) {
-            BsIcon(BsIcons.StarFill, size = 12.dp, tint = BsColors.Success)
-            Text("Best", style = BsText.Xs2.copy(fontWeight = BsWeight.Medium), color = BsColors.Success)
+        if (q != null) {
+            if (q.best) {
+                BsIcon(BsIcons.StarFill, size = 12.dp, tint = BsColors.Success)
+                Text("Best", style = BsText.Xs2.copy(fontWeight = BsWeight.Medium), color = BsColors.Success)
+            }
+            Text("${q.score.toInt()}", style = BsText.Xs2.copy(fontFamily = MonoFamily), color = if (q.best) BsColors.Success else BsColors.Muted)
         }
-        Text("${score.toInt()}", style = BsText.Xs2.copy(fontFamily = MonoFamily), color = if (best) BsColors.Success else BsColors.Muted)
+        if (size != null) Text(size, style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint)
     }
 }
