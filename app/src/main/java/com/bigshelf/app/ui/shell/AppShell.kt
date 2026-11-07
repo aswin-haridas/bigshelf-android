@@ -50,6 +50,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.bigshelf.app.state.EventStream
 import com.bigshelf.app.state.SelectionStore
+import com.bigshelf.app.state.rememberQuery
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -173,7 +174,7 @@ fun AppShell() {
                 .then(if (fullScreen) Modifier else Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)))
                 .then(if (selecting || showNav) Modifier else Modifier.navigationBarsPadding()),
         ) {
-            AppNavHost(nav, onTopLevel = ::go, onBack = ::back, sectionFrom = from.value)
+            AppNavHost(nav, path, onTopLevel = ::go, onBack = ::back, sectionFrom = from.value)
             UploadProgressModal(Modifier.align(Alignment.BottomCenter))
         }
         if (showNav) BottomBar(active = tabFor(path), onSelect = ::go)
@@ -235,8 +236,13 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onBack: () -> Unit, sectionFrom: String) {
+private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String) -> Unit, onBack: () -> Unit, sectionFrom: String) {
     val openPhoto: (String) -> Unit = { nav.navigate(Routes.photo(it)) }
+    // Keep People tab data above the destinations, which leave composition when switching tabs.
+    val api = BigShelfApp.api
+    val people = rememberQuery("people", invalidatedBy = setOf("people"), active = path == Routes.PEOPLE) { api.people() }
+    val faces = rememberQuery("faces", invalidatedBy = setOf("faces"), active = path == Routes.FACES) { api.faces() }
+    val untagged = rememberQuery("untagged", invalidatedBy = setOf("people"), active = path == Routes.UNTAGGED) { api.untaggedPhotos() }
     val peopleTab: (PeopleTab) -> Unit = { tab ->
         onTopLevel(
             when (tab) {
@@ -257,9 +263,9 @@ private fun AppNavHost(nav: NavHostController, onTopLevel: (String) -> Unit, onB
         composable(Routes.HOME) { HomeScreen(onOpenPhoto = openPhoto, onProfile = { nav.navigate(Routes.SETTINGS) }) }
         composable(Routes.LIBRARY) { LibraryScreen(onNavigate = { nav.navigate(it) }) }
         searchGraph(nav, onBack = onBack, openPhoto = openPhoto)
-        composable(Routes.PEOPLE) { PeopleScreen(onPerson = { nav.navigate(Routes.person(it)) }, onTab = peopleTab) }
-        composable(Routes.FACES) { FacesScreen(onFace = { nav.navigate(Routes.face(it)) }, onTab = peopleTab, onOpenPhoto = openPhoto) }
-        composable(Routes.UNTAGGED) { UntaggedScreen(onOpenPhoto = openPhoto, onTab = peopleTab) }
+        composable(Routes.PEOPLE) { PeopleScreen(people, onPerson = { nav.navigate(Routes.person(it)) }, onTab = peopleTab) }
+        composable(Routes.FACES) { FacesScreen(faces, onFace = { nav.navigate(Routes.face(it)) }, onTab = peopleTab, onOpenPhoto = openPhoto) }
+        composable(Routes.UNTAGGED) { UntaggedScreen(untagged, onOpenPhoto = openPhoto, onTab = peopleTab) }
         composable(Routes.PERSON, arguments = listOf(navArgument("personId") { type = NavType.StringType })) {
             PersonScreen(
                 personId = it.arguments?.getString("personId").orEmpty(),

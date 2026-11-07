@@ -34,6 +34,7 @@ import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
+import com.bigshelf.app.ui.theme.MonoFamily
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.launch
 import kotlin.math.floor
@@ -105,7 +106,10 @@ fun LibraryScreen(onNavigate: (String) -> Unit) {
     val upload = rememberUploadPicker()
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Library", count = storage.data?.let { "${formatBytes(it.usedBytes)} used" })
+        // Storage used sits top right, on the same row as the title
+        PageHeader("Library") {
+            storage.data?.let { Text("${formatBytes(it.usedBytes)} used", style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted) }
+        }
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = LocalBottomBarInset.current + 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),

@@ -39,8 +39,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
+import com.bigshelf.app.data.FaceItem
+import com.bigshelf.app.data.PersonList
 import com.bigshelf.app.data.Photo
+import com.bigshelf.app.data.PhotoPage
 import com.bigshelf.app.state.PhotoEvents
+import com.bigshelf.app.state.QueryState
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
@@ -104,9 +108,8 @@ private fun PeopleHeader(active: PeopleTab, onTab: (PeopleTab) -> Unit, below: @
 
 /** Port of people-grid.tsx: tabs, people search, named people with photos. */
 @Composable
-fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
+fun PeopleScreen(query: QueryState<PersonList>, onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     var search by rememberSaveable { mutableStateOf("") }
-    val query = rememberQuery("people", invalidatedBy = setOf("people")) { BigShelfApp.api.people() }
     // Hide people with no photos left (e.g. all their photos were binned). Hottest first;
     // the stable sort keeps unrated people in the server's name order at the end.
     val people = query.data?.items.orEmpty().filter {
@@ -136,10 +139,9 @@ fun PeopleScreen(onPerson: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
  * them to existing people; Select picks groups to merge (into the first picked) or forget.
  */
 @Composable
-fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit, onOpenPhoto: (String) -> Unit) {
+fun FacesScreen(query: QueryState<List<FaceItem>>, onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
-    val query = rememberQuery("faces", invalidatedBy = setOf("faces")) { api.faces() }
     val faces = query.data.orEmpty().filter { !it.isIgnored && it.faceName == null }
     var taggingAll by remember { mutableStateOf(false) }
     val visited = remember { mutableStateListOf<String>() }
@@ -324,8 +326,7 @@ fun FacesScreen(onFace: (String) -> Unit, onTab: (PeopleTab) -> Unit, onOpenPhot
 
 /** Untagged Photos tab: photos nobody is tagged in. */
 @Composable
-fun UntaggedScreen(onOpenPhoto: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
-    val query = rememberQuery("untagged", invalidatedBy = setOf("people")) { BigShelfApp.api.untaggedPhotos() }
+fun UntaggedScreen(query: QueryState<PhotoPage>, onOpenPhoto: (String) -> Unit, onTab: (PeopleTab) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PeopleHeader(PeopleTab.Untagged, onTab)
         if (query.isLoading) LoadingText()

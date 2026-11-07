@@ -7,18 +7,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import com.bigshelf.app.data.Photo
 import com.bigshelf.app.data.PhotoPage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
 /**
  * Minimal react-query stand-in: loads once, keeps the last data while refetching, and
- * refetches whenever one of [keys] is invalidated through [PhotoEvents].
+ * refetches whenever one of its keys is invalidated through [PhotoEvents].
  */
 class QueryState<T>(private val scope: CoroutineScope, private val fetch: suspend () -> T) {
     /** Settable so a mutation's response can stand in for a refetch (web `setQueryData`). */
@@ -49,13 +52,30 @@ class QueryState<T>(private val scope: CoroutineScope, private val fetch: suspen
 }
 
 @Composable
-fun <T> rememberQuery(vararg keys: Any?, invalidatedBy: Set<String>, fetch: suspend () -> T): QueryState<T> {
+fun <T> rememberQuery(
+    vararg keys: Any?,
+    invalidatedBy: Set<String>,
+    active: Boolean = true,
+    fetch: suspend () -> T,
+): QueryState<T> {
     val scope = rememberCoroutineScope()
     val query = remember(*keys) { QueryState(scope, fetch) }
+    val isActive by rememberUpdatedState(active)
     DisposableEffect(query) { onDispose { query.cancel() } }
     LaunchedEffect(query) {
-        query.refetch()
-        PhotoEvents.invalidations.collect { if (it.any(invalidatedBy::contains)) query.refetch() }
+        var stale = true
+        launch {
+            snapshotFlow { isActive }.filter { it }.collect {
+                if (stale || query.isError) {
+                    stale = false
+                    query.refetch()
+                }
+            }
+        }
+        PhotoEvents.invalidations.filter { it.any(invalidatedBy::contains) }.collect {
+            stale = !isActive
+            if (!stale) query.refetch()
+        }
     }
     return query
 }
