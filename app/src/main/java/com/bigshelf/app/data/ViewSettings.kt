@@ -12,14 +12,6 @@ import androidx.compose.runtime.setValue
 class ViewSettings(context: Context) {
     private val prefs = context.getSharedPreferences("bigshelf-view-settings", Context.MODE_PRIVATE)
 
-    var photoFeed by mutableStateOf(prefs.getBoolean("photoFeed", false))
-        private set
-
-    fun updatePhotoFeed(value: Boolean) {
-        photoFeed = value
-        prefs.edit().putBoolean("photoFeed", value).apply()
-    }
-
     // Show AI (ChatGPT) images on the Home page
     var showAi by mutableStateOf(prefs.getBoolean("showAi", true))
         private set

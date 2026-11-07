@@ -17,6 +17,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -76,7 +77,7 @@ class Api(context: Context, val baseUrl: String) {
 
     private val _sessionExpired = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
-    /** Fires when a refresh fails mid-session, so the UI can return to Login. */
+    /** Fires when the server rejects the refresh cookie. */
     val sessionExpired: SharedFlow<Unit> = _sessionExpired
 
     // No auth header: refresh calls and presigned S3 URLs (our header would break the signature)
@@ -102,15 +103,12 @@ class Api(context: Context, val baseUrl: String) {
             val request = response.request
             val path = request.url.encodedPath
             // Only our API, never login/signup/refresh themselves, and only one retry
-            val authCall = path.startsWith("/api/v1/auth/") && !path.endsWith("/me")
+            val authCall = path == "/api/v1/auth/login" || path == "/api/v1/auth/signup" ||
+                path == "/api/v1/auth/refresh" || path == "/api/v1/auth/logout"
             if (request.url.host != apiHost || authCall || response.priorResponse != null) {
                 return@authenticator null
             }
-            val token = refreshBlocking(request.header("Authorization")) ?: run {
-                accessToken = null
-                _sessionExpired.tryEmit(Unit)
-                return@authenticator null
-            }
+            val token = refreshBlocking(request.header("Authorization")) ?: return@authenticator null
             request.newBuilder().header("Authorization", "Bearer $token").build()
         }
         .build()
@@ -122,14 +120,22 @@ class Api(context: Context, val baseUrl: String) {
         if (current != null && failedAuthHeader != "Bearer $current") return current
         val request = Request.Builder()
             .url(url("/api/v1/auth/refresh"))
+            .header("X-BigShelf-Client", "android")
             .post(ByteArray(0).toRequestBody(null))
             .build()
-        return runCatching {
-            bareClient.newCall(request).execute().use { res ->
-                if (!res.isSuccessful) return null
-                json.decodeFromString(TokenResponse.serializer(), res.body!!.string()).accessToken
+        return bareClient.newCall(request).execute().use { res ->
+            if (res.code == 401) {
+                accessToken = null
+                _sessionExpired.tryEmit(Unit)
+                return null
             }
-        }.getOrNull()?.also { accessToken = it }
+            if (!res.isSuccessful) throw ApiException(res.code, "Could not restore your session")
+            try {
+                json.decodeFromString(TokenResponse.serializer(), res.body?.string().orEmpty()).accessToken
+            } catch (e: IllegalArgumentException) {
+                throw IOException("Invalid session response", e)
+            }
+        }.also { accessToken = it }
     }
 
     /** Absolute URL for an API path or a relative media URL (e.g. `/api/v1/faces/{id}/thumbnail`). */
@@ -157,7 +163,9 @@ class Api(context: Context, val baseUrl: String) {
             params.forEach { (k, v) -> if (v != null) addQueryParameter(k, v.toString()) }
         }.build()
         val requestBody = body ?: if (method == "GET" || method == "DELETE") null else ByteArray(0).toRequestBody(null)
-        val request = Request.Builder().url(httpUrl).method(method, requestBody).build()
+        val request = Request.Builder().url(httpUrl).method(method, requestBody).apply {
+            if (path == "/api/v1/auth/login") header("X-BigShelf-Client", "android")
+        }.build()
         client.newCall(request).execute().use { res ->
             val text = res.body?.string().orEmpty()
             if (!res.isSuccessful) throw ApiException(res.code, errorDetail(text) ?: "Request failed")
@@ -390,12 +398,18 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun faceReview() = get("/api/v1/faces/confirmations", FaceReview.serializer())
 
     /** Submit one grid screen; the response is the next one. */
-    suspend fun resolveFaceReview(personId: String, confirmed: Collection<String>, rejected: Collection<String>) = send(
+    suspend fun resolveFaceReview(
+        personId: String,
+        confirmed: Collection<String>,
+        rejected: Collection<String>,
+        unsure: Collection<String> = emptyList(),
+    ) = send(
         "POST", "/api/v1/faces/confirmations", FaceReview.serializer(),
         buildJsonObject {
             put("person_id", personId)
             put("confirmed_face_ids", ids(confirmed))
             put("rejected_face_ids", ids(rejected))
+            if (unsure.isNotEmpty()) put("unsure_face_ids", ids(unsure))
         },
     )
 
@@ -608,6 +622,31 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun organize(limit: Int) =
         get("/api/v1/photos/organize", MapSerializer(String.serializer(), Bucket.serializer()), mapOf("limit" to limit))
+
+    suspend fun matchFeedbackPair(signal: String, skip: String?) =
+        get("/api/v1/match-feedback", ListSerializer(Photo.serializer()), mapOf("signal" to signal, "skip" to skip))
+
+    suspend fun saveMatchFeedback(photoIds: List<String>, signal: String, answer: Boolean) = sendUnit(
+        "POST", "/api/v1/match-feedback",
+        buildJsonObject {
+            put("photo_ids", ids(photoIds))
+            put(signal, answer)
+        },
+    )
+
+    suspend fun reviewQuestion(kind: String, skip: String?) =
+        get("/api/v1/review", PhotoReviewQuestion.serializer().nullable, mapOf("kind" to kind, "skip" to skip))
+
+    suspend fun saveReviewAnswer(question: PhotoReviewQuestion, answer: Boolean) = sendUnit(
+        "POST", "/api/v1/review",
+        buildJsonObject {
+            put("kind", question.kind)
+            put("photo_ids", ids(question.photos.map { it.id }))
+            put("detail", question.detail)
+            put("score", question.score)
+            put("answer", answer)
+        },
+    )
 
     /** Predicted capture dates the backend isn't sure of (Organize > Dates). */
     suspend fun photoDates() = get("/api/v1/photos/organize/dates", DatesPage.serializer())

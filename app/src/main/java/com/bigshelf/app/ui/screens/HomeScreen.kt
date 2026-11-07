@@ -29,6 +29,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,8 +47,6 @@ import com.bigshelf.app.state.PagedPhotos
 import com.bigshelf.app.state.rememberPagedPhotos
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsIcon
-import com.bigshelf.app.ui.components.BsTabs
-import com.bigshelf.app.ui.components.TabItem
 import com.bigshelf.app.ui.components.BsSearchBar
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
@@ -93,6 +95,28 @@ internal fun groupIntoPosts(photos: List<Photo>, burstOf: Map<String, String> = 
     return posts
 }
 
+/** Two-finger spread past 1.3x calls onPinch(true), squeeze below 0.77x onPinch(false). Observes only, so scrolling is untouched. */
+private fun Modifier.pinchToggle(onPinch: (Boolean) -> Unit) = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var start = 0f
+        while (true) {
+            val pressed = awaitPointerEvent(PointerEventPass.Initial).changes.filter { it.pressed }
+            if (pressed.isEmpty()) break
+            if (pressed.size < 2) { start = 0f; continue }
+            val dist = (pressed[0].position - pressed[1].position).getDistance()
+            if (start == 0f) { start = dist; continue }
+            val ratio = dist / start
+            if (ratio > 1.3f || ratio < 0.77f) {
+                onPinch(ratio > 1f)
+                // One switch per gesture
+                do { val e = awaitPointerEvent(PointerEventPass.Initial) } while (e.changes.any { it.pressed })
+                break
+            }
+        }
+    }
+}
+
 /**
  * Photo timeline with an optional swipeable burst feed and ranked search results.
  */
@@ -103,6 +127,7 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
     val showAi = settings.showAi
     var search by rememberSaveable { mutableStateOf("") }
     var q by rememberSaveable { mutableStateOf("") }
+    var feedView by rememberSaveable { mutableStateOf(false) }
     // Debounced 300ms, like the web search box
     LaunchedEffect(search) {
         delay(300)
@@ -152,13 +177,9 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                 explore = true,
             )
         } else {
-            BsTabs(
-                listOf(TabItem(false, "All photos"), TabItem(true, "Feed")),
-                settings.photoFeed,
-                settings::updatePhotoFeed,
-                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-            )
-            if (settings.photoFeed) {
+            // Pinch out on All photos opens the Feed; pinch in goes back
+            Box(Modifier.fillMaxSize().pinchToggle { feedView = it }) {
+            if (feedView) {
                 PhotoFeed(feed, showAi, onOpenPhoto)
             } else {
                 val photos = remember(feed.photos, showAi) { filter(feed.photos) }
@@ -172,6 +193,7 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                     onRetry = feed::retry,
                     totalCount = if (showAi) feed.total else null,
                 )
+            }
             }
         }
     }

@@ -7,9 +7,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 /**
- * Cookie jar persisted to SharedPreferences. The web app keeps its session in the
- * `refresh_token` HTTP-only cookie (7 days, path /api/v1/auth); persisting it here gives
- * the app the same "stay signed in" behaviour across restarts.
+ * Persists the HttpOnly refresh cookie so Android stays signed in across restarts.
  */
 class PersistentCookieJar(context: Context, private val baseUrl: String) : CookieJar {
     private val prefs = context.getSharedPreferences("bigshelf-cookies", Context.MODE_PRIVATE)

@@ -1,50 +1,92 @@
 package com.bigshelf.app.ui
 
+import android.app.KeyguardManager
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.state.AuthStore
 import com.bigshelf.app.ui.auth.AuthLayout
 import com.bigshelf.app.ui.auth.LoginScreen
 import com.bigshelf.app.ui.auth.RegisterScreen
+import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.LoadingText
 import com.bigshelf.app.ui.components.Toaster
 import com.bigshelf.app.ui.shell.AppShell
 import com.bigshelf.app.ui.theme.BsColors
+import com.bigshelf.app.ui.theme.BsText
 
 /**
  * Root: restores the session (web `_app` beforeLoad -> fetchMe), then shows either the
  * auth pages or the app shell. Toasts sit above everything, like sonner's Toaster.
  */
 @Composable
-fun BigShelfRoot() {
-    var checked by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
+fun BigShelfRoot(locked: Boolean, unlockError: String?, onUnlock: () -> Unit, onReady: () -> Unit) {
+    var checked by remember { mutableStateOf(AuthStore.status == AuthStore.Status.Authenticated) }
+    LaunchedEffect(checked) {
         if (!checked) {
             AuthStore.fetchMe()
             checked = true
         }
     }
-    // A refresh that fails mid-session drops back to Login (web: redirect to /login)
     LaunchedEffect(Unit) { BigShelfApp.api.sessionExpired.collect { AuthStore.onSessionEnded() } }
 
     Box(Modifier.fillMaxSize().background(BsColors.Background)) {
         when {
             !checked -> LoadingText(Modifier.align(Alignment.Center))
-            AuthStore.status == AuthStore.Status.Authenticated -> AppShell()
+            AuthStore.status == AuthStore.Status.RestoreFailed -> AuthLayout {
+                Text("Couldn’t connect to BigShelf.", style = BsText.Sm, color = BsColors.Foreground)
+                BsButton(onClick = { checked = false }) { Text("Retry") }
+            }
+            AuthStore.status == AuthStore.Status.Authenticated -> {
+                val shellState = rememberSaveableStateHolder()
+                if (locked) {
+                    LockScreen(unlockError, onUnlock)
+                } else {
+                    LaunchedEffect(Unit) { onReady() }
+                    shellState.SaveableStateProvider("app") { AppShell() }
+                }
+            }
             else -> AuthFlow()
         }
         Toaster(Modifier.align(Alignment.TopCenter))
+    }
+}
+
+@Composable
+private fun LockScreen(error: String?, onUnlock: () -> Unit) {
+    val context = LocalContext.current
+    val hasScreenLock = context.getSystemService(KeyguardManager::class.java).isDeviceSecure
+    LifecycleResumeEffect(Unit) {
+        onUnlock()
+        onPauseOrDispose {}
+    }
+    AuthLayout {
+        Text("BigShelf is locked", style = BsText.Xl, color = BsColors.Foreground)
+        if (error != null) Text(error, style = BsText.Sm, color = BsColors.Muted)
+        if (hasScreenLock) {
+            BsButton(onClick = onUnlock) { Text("Unlock") }
+        } else {
+            BsButton(onClick = { context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }) {
+                Text("Set up screen lock")
+            }
+        }
     }
 }
 

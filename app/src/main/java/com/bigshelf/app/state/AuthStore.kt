@@ -4,12 +4,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bigshelf.app.BigShelfApp
+import com.bigshelf.app.data.ApiException
 import com.bigshelf.app.data.User
 import com.bigshelf.app.data.userMessage
+import kotlinx.coroutines.CancellationException
 
 /** Port of stores/authStore.ts. */
 object AuthStore {
-    enum class Status { Idle, Loading, Authenticated }
+    enum class Status { Idle, Loading, RestoreFailed, Authenticated }
 
     var status by mutableStateOf(Status.Idle)
         private set
@@ -49,14 +51,16 @@ object AuthStore {
         }
     }
 
-    /** Restores the session from the persisted refresh cookie (7 days), like the web's fetchMe. */
+    /** Restores the signed-in user from the persisted refresh cookie. */
     suspend fun fetchMe() {
         status = Status.Loading
         status = try {
             user = api.me()
             Status.Authenticated
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Status.Idle
+            if (e is ApiException && e.code == 401) Status.Idle else Status.RestoreFailed
         }
     }
 

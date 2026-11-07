@@ -396,6 +396,14 @@ data class ClearedResponse(@SerialName("cleared_count") val clearedCount: Int = 
 @Serializable
 data class Bucket(val count: Int = 0, val items: List<Photo> = emptyList())
 
+@Serializable
+data class PhotoReviewQuestion(
+    val kind: String,
+    val photos: List<Photo>,
+    val detail: String = "",
+    val score: Double? = null,
+)
+
 /** Organize's Clean up: photos scored under the cut-off; [nextBefore] is null once the library runs out. */
 @Serializable
 data class PhotoPersonTag(val id: String, val name: String, @SerialName("face_thumbnail") val faceThumbnail: String? = null)
@@ -417,6 +425,7 @@ data class FaceReviewItem(
     @SerialName("face_id") val faceId: String,
     @SerialName("photo_id") val photoId: String,
     @SerialName("face_thumbnail") val faceThumbnail: String? = null,
+    @SerialName("photo_thumbnail") val photoThumbnail: String? = null,
 )
 
 /** One grid screen: "Are these all [personName]?" */
