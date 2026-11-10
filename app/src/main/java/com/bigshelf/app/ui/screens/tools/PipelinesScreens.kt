@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -36,10 +38,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.Run
+import com.bigshelf.app.data.RunLog
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
@@ -82,10 +86,8 @@ private fun instant(iso: String?): Instant? = iso?.let {
 private val CLOCK = DateTimeFormatter.ofPattern("h:mm:ss a").withZone(ZoneId.systemDefault())
 private fun clock(iso: String?) = instant(iso)?.let(CLOCK::format) ?: "—"
 
-/** "2m 05s"-style elapsed time; runs still going count up to now (web `duration`). */
-private fun duration(run: Run): String {
-    val start = instant(run.startedAt) ?: return "—"
-    val secs = Duration.between(start, instant(run.finishedAt) ?: Instant.now()).seconds.coerceAtLeast(0)
+/** "2m 05s"-style elapsed time. */
+private fun fmtSecs(secs: Long): String {
     val h = secs / 3600
     val m = (secs % 3600) / 60
     val s = secs % 60
@@ -94,6 +96,12 @@ private fun duration(run: Run): String {
         m > 0 -> "${m}m ${s.toString().padStart(2, '0')}s"
         else -> "${s}s"
     }
+}
+
+/** Runs still going count up to now (web `duration`). */
+private fun duration(run: Run): String {
+    val start = instant(run.startedAt) ?: return "—"
+    return fmtSecs(Duration.between(start, instant(run.finishedAt) ?: Instant.now()).seconds.coerceAtLeast(0))
 }
 
 /** "5m ago" (web `ago`). */
@@ -312,9 +320,186 @@ private fun stepsOf(run: Run, pipelineName: String): List<Step> {
         Step("refresh", "Refresh views", if (run.finishedAt != null) "success" else "queued", listOf("Views" to "Photos, faces, people", "Finished" to clock(run.finishedAt)))
 }
 
+private val LOG_CLOCK = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
+
+private fun statusTone(status: String): Color = when (status) {
+    "running" -> BsColors.Info
+    "success" -> BsColors.Success
+    "failed" -> BsColors.Danger
+    "queued" -> BsColors.Muted
+    else -> BsColors.MutedFaint
+}
+
+private fun statusLabel(run: Run): String = when {
+    run.status == "queued" && (run.queuePosition ?: 0) > 0 -> "Queued · ${run.queuePosition} ahead"
+    else -> run.status.replaceFirstChar { it.uppercase() }
+}
+
+/** Rough time left at the pace so far; null until there's a pace to measure. */
+private fun eta(run: Run): String? {
+    if (run.status != "running") return null
+    val start = instant(run.startedAt) ?: return null
+    val processed = run.done + run.failed
+    if (processed <= 0 || run.total <= processed) return null
+    val elapsed = Duration.between(start, Instant.now()).seconds.coerceAtLeast(1)
+    return fmtSecs(elapsed * (run.total - processed) / processed)
+}
+
+@Composable
+private fun StatusPill(run: Run) {
+    val tone = statusTone(run.status)
+    Row(
+        Modifier.clip(BsShapes.Full).background(tone.copy(alpha = 0.14f)).padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        StatusIcon(run.status, 14)
+        Text(statusLabel(run), style = BsText.Xs2.copy(fontWeight = BsWeight.Medium), color = tone, maxLines = 1)
+    }
+}
+
+@Composable
+private fun Stat(label: String, value: String, modifier: Modifier = Modifier, tone: Color = BsColors.Foreground) {
+    Column(modifier) {
+        Text(label, style = BsText.Xs2, color = BsColors.MutedFaint)
+        Text(value, style = BsText.Sm.copy(fontFamily = MonoFamily, fontWeight = BsWeight.Medium), color = tone, maxLines = 1)
+    }
+}
+
+/** Headline card: one big percentage, the bar, and the numbers that used to repeat further down. */
+@Composable
+private fun RunHero(run: Run) {
+    val processed = run.done + run.failed
+    val left = eta(run)
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .clip(BsShapes.Xl)
+            .background(BsColors.Surface)
+            .border(1.dp, BsColors.Border, BsShapes.Xl)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("${run.percent}", style = BsText.Xl4.copy(fontFamily = MonoFamily, fontWeight = BsWeight.Semibold))
+                    Text("%", Modifier.padding(start = 2.dp, bottom = 6.dp), style = BsText.Base, color = BsColors.Muted)
+                }
+                Text("%,d of %,d photos".format(processed, run.total), style = BsText.Xs, color = BsColors.Muted)
+            }
+            StatusPill(run)
+        }
+        BsProgress(run.percent.toFloat(), height = 8.dp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Stat("Done", "%,d".format(run.done), Modifier.weight(1f), if (run.done > 0) BsColors.Success else BsColors.Foreground)
+            Stat("Failed", "%,d".format(run.failed), Modifier.weight(1f), if (run.failed > 0) BsColors.Danger else BsColors.Foreground)
+            Stat("Elapsed", duration(run), Modifier.weight(1f))
+            if (left != null) Stat("Left", "~$left", Modifier.weight(1f), BsColors.Info)
+        }
+    }
+}
+
+/** The run's steps as a connected rail; finished steps light their connector. */
+@Composable
+private fun StepRail(steps: List<Step>, selectedId: String, onPick: (String) -> Unit) {
+    fun line(done: Boolean) = if (done) BsColors.Success.copy(alpha = 0.5f) else BsColors.Border
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp)) {
+        itemsIndexed(steps, key = { _, s -> s.id }) { i, s ->
+            val selected = s.id == selectedId
+            Column(
+                Modifier
+                    .width(96.dp)
+                    .clip(BsShapes.Md)
+                    .bsClickable(scale = 0.96f) { onPick(s.id) }
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f).height(2.dp).background(if (i > 0) line(steps[i - 1].status == "success") else Color.Transparent))
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(BsShapes.Full)
+                            .background(if (selected) Neutral.N800 else BsColors.Surface)
+                            .border(1.5.dp, if (selected) BsColors.Foreground else BsColors.Border, BsShapes.Full),
+                        contentAlignment = Alignment.Center,
+                    ) { StatusIcon(s.status, 16) }
+                    Box(Modifier.weight(1f).height(2.dp).background(if (i < steps.lastIndex) line(s.status == "success") else Color.Transparent))
+                }
+                Text(
+                    s.title,
+                    Modifier.padding(horizontal = 4.dp),
+                    style = BsText.Xs2.copy(fontWeight = BsWeight.Medium),
+                    color = if (selected) BsColors.Foreground else BsColors.Muted,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** Log console: header with a live marker, then lines following the tail. */
+@Composable
+private fun LogConsole(logs: List<RunLog>, live: Boolean, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .clip(BsShapes.Lg)
+            .background(Color.Black.copy(alpha = 0.4f))
+            .border(1.dp, BsColors.Border, BsShapes.Lg),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Logs", style = BsText.Xs.copy(fontWeight = BsWeight.Semibold))
+            Text("  ${logs.size} ${if (logs.size == 1) "line" else "lines"}", style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint, modifier = Modifier.weight(1f))
+            if (live) {
+                Box(Modifier.size(6.dp).clip(BsShapes.Full).background(BsColors.Success))
+                Text("Live", Modifier.padding(start = 6.dp), style = BsText.Xs2, color = BsColors.Success)
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(BsColors.Border))
+        if (logs.isEmpty()) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (live) Spinner(size = 16.dp, tint = BsColors.MutedFaint)
+                    Text(if (live) "Waiting for output…" else "No log lines", style = BsText.Xs, color = BsColors.MutedFaint)
+                }
+            }
+        } else {
+            val state = rememberLazyListState()
+            LaunchedEffect(logs.size) { state.animateScrollToItem(logs.lastIndex) }
+            LazyColumn(Modifier.weight(1f), state = state, contentPadding = PaddingValues(vertical = 8.dp)) {
+                items(logs) { line ->
+                    Row(Modifier.padding(horizontal = 12.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            instant(line.timestamp)?.let(LOG_CLOCK::format) ?: "—",
+                            Modifier.width(60.dp),
+                            style = BsText.Xs2.copy(fontFamily = MonoFamily),
+                            color = BsColors.MutedFaint,
+                        )
+                        Text(
+                            line.message,
+                            Modifier.weight(1f),
+                            style = BsText.Xs2.copy(fontFamily = MonoFamily),
+                            color = when (line.level) {
+                                "error" -> BsColors.Danger
+                                "warn", "warning" -> BsColors.Warning
+                                else -> BsColors.MutedSoft
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 /**
- * Port of RunDetail.tsx for phones: status card, the steps as a row of chips (the web's node
- * graph), the picked step's numbers, then its log lines following the tail like a CI console.
+ * Port of RunDetail.tsx for phones: a headline card (percent, bar, numbers), the steps as a
+ * connected rail, the picked step's numbers, then a live log console filling the rest.
  */
 @Composable
 fun RunScreen(runId: String, onBack: () -> Unit) {
@@ -374,103 +559,30 @@ fun RunScreen(runId: String, onBack: () -> Unit) {
         val isStage = run.stages.any { it.id == step.id }
         val logs = run.logs.filter { it.step == step.id || (isStage && it.step == "run") }
 
-        // Status card
-        Column(
+        RunHero(run)
+        Spacer(Modifier.height(8.dp))
+        StepRail(steps, step.id) { picked = it }
+
+        // The picked step's numbers
+        Row(
             Modifier
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .clip(BsShapes.Lg)
                 .background(BsColors.Surface)
-                .border(1.dp, BsColors.Border, BsShapes.Lg)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatusIcon(run.status, 20)
-                Column(Modifier.weight(1f)) {
-                    Text(run.status.replaceFirstChar { it.uppercase() }, style = BsText.Sm.copy(fontWeight = BsWeight.Semibold))
-                    Text(
-                        "${run.done} ok · ${run.failed} failed · ${duration(run)}",
-                        style = BsText.Xs2.copy(fontFamily = MonoFamily),
-                        color = BsColors.MutedFaint,
-                    )
-                }
-                Text("${run.done + run.failed}/${run.total}", style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.Muted)
-            }
-            BsProgress(run.percent.toFloat())
+            step.rows.forEach { (label, value) -> Stat(label, value, Modifier.weight(1f)) }
         }
 
-        // Steps as chips
-        LazyRow(
-            Modifier.padding(top = 16.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(steps, key = { it.id }) { s ->
-                val selected = s.id == step.id
-                Row(
-                    Modifier
-                        .heightIn(min = 40.dp)
-                        .clip(BsShapes.Full)
-                        .background(if (selected) Neutral.N800 else BsColors.Surface)
-                        .border(1.dp, if (selected) BsColors.BorderFocus else BsColors.Border, BsShapes.Full)
-                        .bsClickable(scale = 0.96f) { picked = s.id }
-                        .padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    StatusIcon(s.status, 14)
-                    Text(s.title, style = BsText.Xs.copy(fontWeight = BsWeight.Medium), color = if (selected) BsColors.Foreground else BsColors.Muted)
-                }
-            }
-        }
-
-        // The picked step's numbers
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            step.rows.forEach { (label, value) ->
-                Column {
-                    Text(label, style = BsText.Xs2, color = BsColors.MutedFaint)
-                    Text(value, style = BsText.Xs.copy(fontFamily = MonoFamily), color = BsColors.MutedSoft)
-                }
-            }
-        }
-
-        // Logs, following the tail
-        Text(
-            "${logs.size} log lines",
-            Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            style = BsText.Xs2.copy(fontFamily = MonoFamily),
-            color = BsColors.MutedFaint,
-        )
-        val logState = rememberLazyListState()
-        LaunchedEffect(logs.size) { if (logs.isNotEmpty()) logState.animateScrollToItem(logs.lastIndex) }
-        LazyColumn(
-            Modifier
+        LogConsole(
+            logs,
+            live = run.isActive,
+            modifier = Modifier
                 .weight(1f)
-                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp + LocalBottomBarInset.current)
-                .fillMaxWidth()
-                .clip(BsShapes.Lg)
-                .background(Color.Black.copy(alpha = 0.4f))
-                .border(1.dp, BsColors.Border, BsShapes.Lg),
-            state = logState,
-            contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-            itemsIndexed(logs) { i, line ->
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("${i + 1}", Modifier.width(24.dp), style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint)
-                    Column {
-                        Text(clock(line.timestamp), style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint)
-                        Text(
-                            line.message,
-                            style = BsText.Xs2.copy(fontFamily = MonoFamily),
-                            color = if (line.level == "error") BsColors.Danger else BsColors.MutedSoft,
-                        )
-                    }
-                }
-            }
-            if (logs.isEmpty()) {
-                item { Text("No log lines yet", Modifier.padding(12.dp), style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint) }
-            }
-        }
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp + LocalBottomBarInset.current)
+                .fillMaxWidth(),
+        )
     }
 }
