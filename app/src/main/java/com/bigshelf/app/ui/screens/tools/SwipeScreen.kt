@@ -78,7 +78,8 @@ import kotlin.math.abs
 private const val SWIPE_WINDOW = 20
 private const val SWIPE_REFILL_AT = 3
 private const val SWIPE_UNDO_LIMIT = 3
-// A keep this soon (ms) after the photo came up is a gut "yes": it gets two points of taste score
+// A keep this soon (ms) after the photo came up is a gut "yes" and gets the bigger boost. Triplets draw
+// photos scored above 6/10 less often (almost never past 8.5), so both keeps push the photo toward rare.
 private const val QUICK_KEEP_MS = 1500L
 // How far a drag must travel to count as a swipe
 private val THRESHOLD = 100.dp
@@ -100,8 +101,8 @@ private fun leanOf(o: Offset, threshold: Float): Pair<Verdict, Float>? = when {
 
 internal fun swipeTastePoints(elapsedMs: Long, rework: Boolean = false): Double = when {
     rework -> -1.0
-    elapsedMs < QUICK_KEEP_MS -> 2.0
-    else -> 0.25
+    elapsedMs < QUICK_KEEP_MS -> 5.0
+    else -> 3.0
 }
 
 // Filled in by its write once that lands; `saved` false means there's nothing to revert
