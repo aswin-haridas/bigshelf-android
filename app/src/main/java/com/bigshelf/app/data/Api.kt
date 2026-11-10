@@ -54,6 +54,39 @@ class StorageUploadException(code: Int) : ApiException(code, "Upload failed")
 fun Throwable.userMessage(fallback: String = "Request failed"): String =
     if (this is ApiException) message ?: fallback else "Something went wrong"
 
+/** What a status code means when the server sent no `detail` (a proxy's HTML page, an empty body). */
+private fun statusText(code: Int): String = when (code) {
+    400 -> "bad request"
+    401 -> "session expired, sign in again"
+    403 -> "not allowed"
+    404 -> "not found"
+    408 -> "request timed out"
+    409 -> "conflict"
+    413 -> "upload too large"
+    422 -> "invalid request"
+    429 -> "too many requests"
+    500 -> "server error"
+    502 -> "server unreachable (bad gateway)"
+    503 -> "server unavailable"
+    504 -> "server took too long (gateway timeout)"
+    else -> "unexpected response"
+}
+
+/**
+ * A specific reason a call failed, for toasts that would otherwise say only "Failed to X":
+ * the server's own message with its status code, or what went wrong on the way there.
+ */
+fun Throwable.reason(): String = when (this) {
+    is ApiException -> if (code > 0) "$message (HTTP $code)" else message ?: "Request failed"
+    is java.net.SocketTimeoutException -> "Timed out waiting for the server"
+    is java.net.UnknownHostException -> "Can't find the server, check your connection"
+    is java.net.ConnectException -> "Can't connect to the server"
+    is javax.net.ssl.SSLException -> "Secure connection failed (${message ?: "TLS error"})"
+    is kotlinx.serialization.SerializationException -> "Unexpected response from the server"
+    is IOException -> "Network error: ${message ?: javaClass.simpleName}"
+    else -> "${javaClass.simpleName}: ${message ?: "unknown error"}"
+}
+
 /**
  * HTTP client for the BigShelf backend - the Android port of frontend/src/lib/api.ts.
  *
@@ -168,7 +201,7 @@ class Api(context: Context, val baseUrl: String) {
         }.build()
         client.newCall(request).execute().use { res ->
             val text = res.body?.string().orEmpty()
-            if (!res.isSuccessful) throw ApiException(res.code, errorDetail(text) ?: "Request failed")
+            if (!res.isSuccessful) throw ApiException(res.code, errorDetail(text) ?: statusText(res.code).replaceFirstChar { it.uppercase() })
             text to res.headers
         }
     }

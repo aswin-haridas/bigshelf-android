@@ -32,6 +32,7 @@ import coil3.request.ImageRequest
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.RatingPair
 import com.bigshelf.app.data.Photo
+import com.bigshelf.app.data.reason
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIconButton
@@ -76,6 +77,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     var resetting by remember { mutableStateOf(false) }
     // Set when the last fetch failed; bumping `retry` runs it again
     var loadFailed by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf("") }
     var retry by remember { mutableStateOf(0) }
 
     // Top the queue up to WINDOW_SIZE; stops on its own when there's nothing new to ask
@@ -94,9 +96,10 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             )
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             loadFailed = true
-            toast.error("Failed to load photos")
+            loadError = e.reason()
+            toast.error("Failed to load photos: ${e.reason()}")
         } finally {
             loading = false
         }
@@ -129,9 +132,9 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             try {
                 answer.done.complete(api.compare(winner.id, loser.id))
                 refresh()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 answer.done.complete(null)
-                toast.error("Failed to save your pick")
+                toast.error("Failed to save your pick: ${e.reason()}")
                 answered.remove(pair.id)
                 rated = maxOf((rated ?: 1) - 1, 0)
                 history.remove(answer)
@@ -152,8 +155,8 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             try {
                 api.undoCompare(id)
                 refresh()
-            } catch (_: Exception) {
-                toast.error("Failed to undo")
+            } catch (e: Exception) {
+                toast.error("Failed to undo: ${e.reason()}")
             }
         }
     }
@@ -168,8 +171,8 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 history.clear()
                 refresh()
                 toast.success("$cleared answer${if (cleared == 1) "" else "s"} forgotten")
-            } catch (_: Exception) {
-                toast.error("Failed to reset")
+            } catch (e: Exception) {
+                toast.error("Failed to reset: ${e.reason()}")
             } finally {
                 resetting = false
             }
@@ -209,7 +212,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 EmptyState(
                     "Couldn't load photos",
                     Modifier.padding(vertical = 0.dp),
-                    description = "Check your connection and try again",
+                    description = loadError.ifBlank { "Check your connection and try again" },
                 )
                 BsButton(onClick = { loadFailed = false; loading = true; retry++ }, variant = ButtonVariant.Secondary) { Text("Try again") }
             }
