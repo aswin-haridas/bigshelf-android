@@ -1,35 +1,22 @@
 package com.bigshelf.app
 
-import android.app.KeyguardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
-import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
-import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
-import androidx.biometric.BiometricPrompt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.core.os.BundleCompat
-import androidx.fragment.app.FragmentActivity
 import com.bigshelf.app.state.AuthStore
 import com.bigshelf.app.state.UploadStore
 import com.bigshelf.app.ui.BigShelfRoot
 import com.bigshelf.app.ui.theme.BigShelfTheme
 
-class MainActivity : FragmentActivity() {
-    private var locked by mutableStateOf(true)
-    private var unlockError by mutableStateOf<String?>(null)
-    private var unlockInProgress = false
-    private lateinit var biometricPrompt: BiometricPrompt
+class MainActivity : ComponentActivity() {
     private val pendingShares = mutableListOf<Uri>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,17 +31,6 @@ class MainActivity : FragmentActivity() {
         } else {
             window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
-        biometricPrompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                unlockInProgress = false
-                locked = false
-            }
-
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                unlockInProgress = false
-                unlockError = errString.toString()
-            }
-        })
         preferHighRefreshRate()
         if (savedInstanceState == null) {
             queueShared(intent)
@@ -63,31 +39,9 @@ class MainActivity : FragmentActivity() {
         }
         setContent {
             BigShelfTheme {
-                BigShelfRoot(locked, unlockError, ::requestUnlock, ::uploadPendingShares)
+                BigShelfRoot(::uploadPendingShares)
             }
         }
-    }
-
-    private fun requestUnlock() {
-        if (unlockInProgress) return
-        if (!getSystemService(KeyguardManager::class.java).isDeviceSecure) {
-            unlockError = "Set up a screen lock in Android settings to unlock BigShelf."
-            return
-        }
-        unlockError = null
-        val biometric = if (Build.VERSION.SDK_INT >= 30) BIOMETRIC_STRONG else BIOMETRIC_WEAK
-        unlockInProgress = true
-        biometricPrompt.authenticate(
-            BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Unlock BigShelf")
-                .setAllowedAuthenticators(biometric or DEVICE_CREDENTIAL)
-                .build(),
-        )
-    }
-
-    override fun onStop() {
-        locked = true
-        super.onStop()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -109,7 +63,7 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         queueShared(intent)
-        if (!locked && AuthStore.status == AuthStore.Status.Authenticated) uploadPendingShares()
+        if (AuthStore.status == AuthStore.Status.Authenticated) uploadPendingShares()
     }
 
     private fun queueShared(intent: Intent) {
