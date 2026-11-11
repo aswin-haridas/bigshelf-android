@@ -1,5 +1,10 @@
 package com.bigshelf.app.ui.screens.photo
 
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import android.content.Intent
@@ -1039,7 +1044,7 @@ private fun SimilarPhotos(photoId: String, onOpenPhoto: (String) -> Unit) {
 /**
  * Port of crop-overlay.tsx: the 3:4 window the crop keeps, over the photo with everything
  * outside dimmed. It spans the full width or height, so dragging slides it along the other
- * axis. Saving overwrites the original; the viewer reloads it under its new URL.
+ * axis. Saving adds a copy; replacing the original is a separate, confirmed action.
  */
 @Composable
 private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = null) {
@@ -1048,6 +1053,7 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = 
     val scope = rememberCoroutineScope()
     var pos by remember(image.id) { mutableFloatStateOf(0.5f) }
     var saving by remember { mutableStateOf(false) }
+    var confirmReplace by remember { mutableStateOf(false) }
     // A fixed box (cropping a person out) is only confirmed, not dragged
     val box = fixedBox ?: CropBox.portrait(w, h, pos)
     val sideways = box.width < w // wider than 3:4: the window slides left/right
@@ -1059,11 +1065,34 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = 
     // Back leaves crop mode, not the viewer
     BackHandler(onBack = onClose)
 
+    fun save(replace: Boolean) {
+        saving = true
+        scope.launch {
+            try {
+                BigShelfApp.api.crop(image.id, box, replace)
+                PhotoEvents.invalidate("photo", "photos")
+                toast.success(if (replace) "Original replaced with crop" else "Crop saved as a copy")
+                onClose()
+            } catch (_: Exception) {
+                toast.error("Failed to crop photo")
+                saving = false
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AsyncImage(BigShelfApp.api.mediaUrl(image.url ?: image.thumbnailUrl), image.filename, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         Box(
             Modifier
                 .fillMaxSize()
+                // TalkBack / switch access: the window is a slider, so dragging is optional
+                .then(
+                    if (slack > 0) Modifier.semantics {
+                        contentDescription = "Crop position"
+                        progressBarRangeInfo = ProgressBarRangeInfo(pos, 0f..1f, steps = 19)
+                        setProgress { pos = it.coerceIn(0f, 1f); true }
+                    } else Modifier
+                )
                 .pointerInput(image.id, slack) {
                     detectDragGestures { change, drag ->
                         change.consume()
@@ -1093,24 +1122,18 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = 
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             BsButton(onClick = onClose, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Cancel") }
-            BsButton(
-                onClick = {
-                    saving = true
-                    scope.launch {
-                        try {
-                            BigShelfApp.api.crop(image.id, box)
-                            PhotoEvents.invalidate("photo", "photos")
-                            toast.success(if (fixedBox != null) "Cropped out" else "Cropped to 3:4")
-                            onClose()
-                        } catch (_: Exception) {
-                            toast.error("Failed to crop photo")
-                            saving = false
-                        }
-                    }
-                },
-                loading = saving,
-            ) { Text("Save crop") }
+            BsButton(onClick = { confirmReplace = true }, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Replace original") }
+            BsButton(onClick = { save(replace = false) }, loading = saving) { Text("Save a copy") }
         }
+    }
+    if (confirmReplace) {
+        ConfirmModal(
+            title = "Replace original",
+            message = "The original photo is deleted and can't be restored.",
+            confirmLabel = "Replace",
+            onConfirm = { save(replace = true) },
+            onClose = { confirmReplace = false },
+        )
     }
 }
 

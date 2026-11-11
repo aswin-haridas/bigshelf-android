@@ -1,5 +1,7 @@
 package com.bigshelf.app.ui.components
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -101,8 +103,8 @@ fun BsInput(
 }
 
 /**
- * Port of components/Field.tsx, minus the visible label: on a phone the [label] doubles as the
- * placeholder of an [BsInput]. Eye toggle for passwords, and an optional
+ * Port of components/Field.tsx: the [label] sits above the [BsInput] so it stays readable once
+ * there's a value. Eye toggle for passwords, and an optional
  * `text-2xs text-muted-faint font-light` hint.
  */
 @Composable
@@ -119,10 +121,12 @@ fun BsField(
 ) {
     var show by rememberSaveable { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = BsText.Xs, color = BsColors.MutedSoft)
         BsInput(
             value = value,
             onValueChange = onValueChange,
-            placeholder = label,
+            // Names the field for TalkBack; the visible label above isn't tied to it otherwise
+            modifier = Modifier.semantics { contentDescription = label },
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (password) KeyboardType.Password else keyboardType,
                 imeAction = imeAction,

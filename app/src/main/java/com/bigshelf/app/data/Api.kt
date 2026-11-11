@@ -546,7 +546,8 @@ class Api(context: Context, val baseUrl: String) {
     // ---------- Editing ----------
 
     /** Cuts the photo to [box] in place (the original is overwritten and reprocessed). */
-    suspend fun crop(photoId: String, box: CropBox) = sendUnit(
+    /** Saves the crop as a new photo; [replace] overwrites the original for good instead. */
+    suspend fun crop(photoId: String, box: CropBox, replace: Boolean = false) = sendUnit(
         "POST", "/api/v1/photos/$photoId/crop",
         buildJsonObject {
             put("box", buildJsonObject {
@@ -555,7 +556,7 @@ class Api(context: Context, val baseUrl: String) {
                 put("width", box.width)
                 put("height", box.height)
             })
-            put("save_as_new", false)
+            put("save_as_new", !replace)
         },
     )
 
