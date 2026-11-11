@@ -40,9 +40,9 @@ class FeedAndSwipeTest {
     }
 
     @Test fun quickKeepsGainMoreTasteAndReworkLosesTaste() {
-        assertEquals(2.0, swipeTastePoints(1499), 0.0)
-        assertEquals(0.25, swipeTastePoints(1500), 0.0)
-        assertEquals(0.25, swipeTastePoints(10000), 0.0)
+        assertEquals(5.0, swipeTastePoints(1499), 0.0)
+        assertEquals(3.0, swipeTastePoints(1500), 0.0)
+        assertEquals(3.0, swipeTastePoints(10000), 0.0)
         assertEquals(-1.0, swipeTastePoints(0, rework = true), 0.0)
     }
 

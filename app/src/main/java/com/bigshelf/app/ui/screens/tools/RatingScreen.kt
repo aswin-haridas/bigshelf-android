@@ -32,8 +32,11 @@ import coil3.request.ImageRequest
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.RatingPair
 import com.bigshelf.app.data.Photo
+import com.bigshelf.app.data.reason
 import com.bigshelf.app.state.PhotoEvents
+import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIconButton
+import com.bigshelf.app.ui.components.ButtonVariant
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
 import com.bigshelf.app.ui.components.toast
@@ -72,15 +75,20 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     var rated by remember { mutableStateOf<Int?>(null) }
     var loading by remember { mutableStateOf(true) }
     var resetting by remember { mutableStateOf(false) }
+    // Set when the last fetch failed; bumping `retry` runs it again
+    var loadFailed by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf("") }
+    var retry by remember { mutableStateOf(0) }
 
     // Top the queue up to WINDOW_SIZE; stops on its own when there's nothing new to ask
     // (a fetch that adds nothing keeps the size)
-    LaunchedEffect(queue.size) {
+    LaunchedEffect(queue.size, retry) {
         if (queue.size >= WINDOW_SIZE) return@LaunchedEffect
         try {
             val data = api.ratingPairs(WINDOW_SIZE)
             // Server count only once: later it may lag answers still in flight
             if (rated == null) rated = data.rated
+            loadFailed = false
             queue.addAll(
                 data.pairs
                     .filter { p -> p.id !in answered && queue.none { it.id == p.id } }
@@ -88,8 +96,10 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             )
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
-        } catch (_: Exception) {
-            toast.error("Failed to load photos")
+        } catch (e: Exception) {
+            loadFailed = true
+            loadError = e.reason()
+            toast.error("Failed to load photos: ${e.reason()}")
         } finally {
             loading = false
         }
@@ -122,12 +132,14 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             try {
                 answer.done.complete(api.compare(winner.id, loser.id))
                 refresh()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 answer.done.complete(null)
-                toast.error("Failed to save your pick")
+                toast.error("Failed to save your pick: ${e.reason()}")
                 answered.remove(pair.id)
                 rated = maxOf((rated ?: 1) - 1, 0)
                 history.remove(answer)
+                // Put the pair back so the pick isn't lost, ready to be tapped again
+                if (queue.none { it.id == pair.id }) queue.add(0, pair)
             }
         }
     }
@@ -143,8 +155,8 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
             try {
                 api.undoCompare(id)
                 refresh()
-            } catch (_: Exception) {
-                toast.error("Failed to undo")
+            } catch (e: Exception) {
+                toast.error("Failed to undo: ${e.reason()}")
             }
         }
     }
@@ -159,8 +171,8 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 history.clear()
                 refresh()
                 toast.success("$cleared answer${if (cleared == 1) "" else "s"} forgotten")
-            } catch (_: Exception) {
-                toast.error("Failed to reset")
+            } catch (e: Exception) {
+                toast.error("Failed to reset: ${e.reason()}")
             } finally {
                 resetting = false
             }
@@ -192,6 +204,18 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
 
         when {
             loading -> LoadingText(text = "Picking photos…")
+            current == null && loadFailed -> Column(
+                Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            ) {
+                EmptyState(
+                    "Couldn't load photos",
+                    Modifier.padding(vertical = 0.dp),
+                    description = loadError.ifBlank { "Check your connection and try again" },
+                )
+                BsButton(onClick = { loadFailed = false; loading = true; retry++ }, variant = ButtonVariant.Secondary) { Text("Try again") }
+            }
             current == null -> EmptyState(
                 "Not enough photos to compare",
                 Modifier.padding(horizontal = 24.dp),

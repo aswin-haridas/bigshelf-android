@@ -46,6 +46,8 @@ object toast {
     private var nextId = 0L
 
     private fun show(kind: Kind, text: String, action: Pair<String, () -> Unit>? = null) {
+        // A repeat of a toast already showing (e.g. every failed request in a row) isn't stacked again
+        if (items.any { it.kind == kind && it.text == text && action == null }) return
         items += Item(nextId++, kind, text, action)
         // Sonner shows at most 3 at a time
         while (items.size > 3) items.removeAt(0)

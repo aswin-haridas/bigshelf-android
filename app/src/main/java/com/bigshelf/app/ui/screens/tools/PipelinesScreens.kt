@@ -81,10 +81,8 @@ private fun instant(iso: String?): Instant? = iso?.let {
 private val CLOCK = DateTimeFormatter.ofPattern("h:mm:ss a").withZone(ZoneId.systemDefault())
 private fun clock(iso: String?) = instant(iso)?.let(CLOCK::format) ?: "—"
 
-/** "2m 05s"-style elapsed time; runs still going count up to now (web `duration`). */
-private fun duration(run: Run): String {
-    val start = instant(run.startedAt) ?: return "—"
-    val secs = Duration.between(start, instant(run.finishedAt) ?: Instant.now()).seconds.coerceAtLeast(0)
+/** "2m 05s"-style elapsed time. */
+private fun fmtSecs(secs: Long): String {
     val h = secs / 3600
     val m = (secs % 3600) / 60
     val s = secs % 60
@@ -93,6 +91,12 @@ private fun duration(run: Run): String {
         m > 0 -> "${m}m ${s.toString().padStart(2, '0')}s"
         else -> "${s}s"
     }
+}
+
+/** Runs still going count up to now (web `duration`). */
+private fun duration(run: Run): String {
+    val start = instant(run.startedAt) ?: return "—"
+    return fmtSecs(Duration.between(start, instant(run.finishedAt) ?: Instant.now()).seconds.coerceAtLeast(0))
 }
 
 /** "5m ago" (web `ago`). */
@@ -311,8 +315,90 @@ private fun stepsOf(run: Run, pipelineName: String): List<Step> {
         Step("refresh", "Refresh views", if (run.finishedAt != null) "success" else "queued", listOf("Views" to "Photos, faces, people", "Finished" to clock(run.finishedAt)))
 }
 
+private val LOG_CLOCK = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
+
+private fun statusTone(status: String): Color = when (status) {
+    "running" -> BsColors.Info
+    "success" -> BsColors.Success
+    "failed" -> BsColors.Danger
+    "queued" -> BsColors.Muted
+    else -> BsColors.MutedFaint
+}
+
+private fun statusLabel(run: Run): String = when {
+    run.status == "queued" && (run.queuePosition ?: 0) > 0 -> "Queued · ${run.queuePosition} ahead"
+    run.status == "queued" -> "Next to start"
+    else -> run.status.replaceFirstChar { it.uppercase() }
+}
+
+/** Rough time left at the pace so far; null until there's a pace to measure. */
+private fun eta(run: Run): String? {
+    if (run.status != "running") return null
+    val start = instant(run.startedAt) ?: return null
+    val processed = run.done + run.failed
+    if (processed <= 0 || run.total <= processed) return null
+    val elapsed = Duration.between(start, Instant.now()).seconds.coerceAtLeast(1)
+    return fmtSecs(elapsed * (run.total - processed) / processed)
+}
+
+@Composable
+private fun StatusPill(run: Run) {
+    val tone = statusTone(run.status)
+    Row(
+        Modifier.clip(BsShapes.Full).background(tone.copy(alpha = 0.14f)).padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        StatusIcon(run.status, 14)
+        Text(statusLabel(run), style = BsText.Xs2.copy(fontWeight = BsWeight.Medium), color = tone, maxLines = 1)
+    }
+}
+
+@Composable
+private fun Stat(label: String, value: String, modifier: Modifier = Modifier, tone: Color = BsColors.Foreground) {
+    Column(modifier) {
+        Text(label, style = BsText.Xs2, color = BsColors.MutedFaint)
+        Text(value, style = BsText.Sm.copy(fontFamily = MonoFamily, fontWeight = BsWeight.Medium), color = tone, maxLines = 1)
+    }
+}
+
+/** Headline card: one big percentage, the bar, and the numbers that used to repeat further down. */
+@Composable
+private fun RunHero(run: Run, pipelineName: String) {
+    val processed = run.done + run.failed
+    val left = eta(run)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(BsShapes.Xl)
+            .background(BsColors.Surface)
+            .border(1.dp, BsColors.Border, BsShapes.Xl)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(pipelineName, style = BsText.Sm.copy(fontWeight = BsWeight.Semibold))
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("${run.percent}", style = BsText.Xl4.copy(fontFamily = MonoFamily, fontWeight = BsWeight.Semibold))
+                    Text("%", Modifier.padding(start = 2.dp, bottom = 6.dp), style = BsText.Base, color = BsColors.Muted)
+                }
+                Text("%,d of %,d photos".format(processed, run.total), style = BsText.Xs, color = BsColors.Muted)
+            }
+            StatusPill(run)
+        }
+        BsProgress(run.percent.toFloat(), height = 8.dp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Stat("Done", "%,d".format(run.done), Modifier.weight(1f), if (run.done > 0) BsColors.Success else BsColors.Foreground)
+            Stat("Failed", "%,d".format(run.failed), Modifier.weight(1f), if (run.failed > 0) BsColors.Danger else BsColors.Foreground)
+            Stat("Elapsed", duration(run), Modifier.weight(1f))
+            if (left != null) Stat("Left", "~$left", Modifier.weight(1f), BsColors.Info)
+        }
+    }
+}
+
 /**
- * A single scrolling run summary, with expandable steps and activity only when available.
+ * A single scrolling run summary, with expandable steps and compact activity.
  */
 @Composable
 fun RunScreen(runId: String, onBack: () -> Unit) {
@@ -385,28 +471,7 @@ fun RunScreen(runId: String, onBack: () -> Unit) {
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "summary") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(pipelineName, style = BsText.Sm.copy(fontWeight = BsWeight.Semibold))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusIcon(run.status, 16)
-                        Text(run.status.replaceFirstChar { it.uppercase() }, Modifier.weight(1f), style = BsText.Xs, color = BsColors.MutedSoft)
-                        Text("${run.done + run.failed} / ${run.total}", style = BsText.Xs, color = BsColors.Muted)
-                    }
-                    BsProgress(run.percent.toFloat())
-                    val detail = buildList {
-                        if (run.status == "queued") {
-                            val ahead = run.queuePosition ?: 0
-                            add(if (ahead > 0) "Waiting for $ahead run${if (ahead == 1) "" else "s"}" else "Next to start")
-                        } else {
-                            add("${run.done} completed")
-                            if (run.startedAt != null) add(duration(run))
-                        }
-                        if (run.failed > 0) add("${run.failed} failed")
-                    }.joinToString(" · ")
-                    Text(detail, style = BsText.Xs2, color = if (run.failed > 0) BsColors.Danger else BsColors.Muted)
-                }
-            }
+            item(key = "summary") { RunHero(run, pipelineName) }
             item(key = "steps") {
                 Column(Modifier.padding(top = 8.dp)) {
                     Text("Steps", style = BsText.Xs.copy(fontWeight = BsWeight.Medium), color = BsColors.Muted)
@@ -452,8 +517,16 @@ fun RunScreen(runId: String, onBack: () -> Unit) {
             }
             itemsIndexed(logs) { _, line ->
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(clock(line.timestamp), style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint)
-                    Text(line.message, style = BsText.Xs2.copy(fontFamily = MonoFamily), color = if (line.level == "error") BsColors.Danger else BsColors.MutedSoft)
+                    Text(instant(line.timestamp)?.let(LOG_CLOCK::format) ?: "—", style = BsText.Xs2.copy(fontFamily = MonoFamily), color = BsColors.MutedFaint)
+                    Text(
+                        line.message,
+                        style = BsText.Xs2.copy(fontFamily = MonoFamily),
+                        color = when (line.level) {
+                            "error" -> BsColors.Danger
+                            "warn", "warning" -> BsColors.Warning
+                            else -> BsColors.MutedSoft
+                        },
+                    )
                 }
             }
             item(key = "run-id") {
