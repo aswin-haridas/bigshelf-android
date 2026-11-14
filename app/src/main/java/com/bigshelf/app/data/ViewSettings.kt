@@ -75,15 +75,6 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("tripletMatchFaces", value).apply()
     }
 
-    // Random Triplets fill the set with the body poses most like the first photo's. Off by default.
-    var tripletMatchPose by mutableStateOf(prefs.getBoolean("tripletMatchPose", false))
-        private set
-
-    fun updateTripletMatchPose(value: Boolean) {
-        tripletMatchPose = value
-        prefs.edit().putBoolean("tripletMatchPose", value).apply()
-    }
-
     // Random Triplets fill the set with the clothes colours most like the first photo's. Off by default.
     var tripletMatchColors by mutableStateOf(prefs.getBoolean("tripletMatchColors", false))
         private set

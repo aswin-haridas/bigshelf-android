@@ -250,7 +250,6 @@ fun TripletSettingsCard() {
             Triple("Faces", settings.tripletMatchFaces, settings::updateTripletMatchFaces),
             Triple("Outfit", settings.tripletOutfit, settings::updateTripletOutfit),
             Triple("Colors", settings.tripletMatchColors, settings::updateTripletMatchColors),
-            Triple("Pose", settings.tripletMatchPose, settings::updateTripletMatchPose),
             Triple("Scene", settings.tripletMatchScene, settings::updateTripletMatchScene),
         )
         matches.chunked(3).forEach { row ->
