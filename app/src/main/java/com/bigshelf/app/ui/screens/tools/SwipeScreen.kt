@@ -166,7 +166,7 @@ fun SwipeScreen(onBack: () -> Unit) {
     fun refresh() = PhotoEvents.invalidate("photos", "photo", "bin-photos", "people")
 
     // Optimistic: the card moves on at once and the write runs behind it. A failed write puts the
-    // photo back on top without a word. NonCancellable so leaving the screen doesn't drop a write.
+    // photo back on top with a toast. NonCancellable so leaving the screen doesn't drop a write.
     fun swipe(photo: Photo, verdict: Verdict) {
         val points = when (verdict) {
             Verdict.Keep -> swipeTastePoints(SystemClock.elapsedRealtime() - shownAt)
@@ -196,6 +196,7 @@ fun SwipeScreen(onBack: () -> Unit) {
                 entry.saved = true
                 refresh()
             } catch (_: Exception) {
+                toast.error("Couldn't save swipe. Try again.")
                 // Still in history, or aged out of it: bring it back. Undone already: it's back on top.
                 if (history.remove(entry) || queue.none { it.id == photo.id }) {
                     queue.add(0, photo)
