@@ -41,8 +41,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Automatic backup of every photo and video on the phone, oldest first, through the same
  * presigned upload as the Upload button. A periodic WorkManager job does the work on Wi-Fi;
- * the MediaStore id of the last item handled is the watermark, so each run only reads what's
- * new and a paused or interrupted run picks up where it stopped.
+ * a per-account ledger records confirmed media versions so delayed files and edits are retried.
  */
 class Backup(context: Context) {
     private val appContext = context.applicationContext
@@ -55,10 +54,6 @@ class Backup(context: Context) {
     var paused by mutableStateOf(prefs.getBoolean("paused", false))
         private set
 
-    // MediaStore ids only grow, so everything above this hasn't been backed up yet
-    var lastId: Long
-        get() = prefs.getLong("lastId", 0)
-        set(value) = prefs.edit().putLong("lastId", value).apply()
 
     init {
         notifier.createNotificationChannel(
@@ -99,28 +94,49 @@ class Backup(context: Context) {
         ContextCompat.checkSelfPermission(appContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
-    data class Item(val id: Long, val uri: Uri)
+    data class Item(val id: Long, val uri: Uri, val fingerprint: String = "")
 
-    /** Photos and videos above the watermark, oldest first. Empty without media permission. */
-    // ponytail: an item still IS_PENDING (a video being recorded) when a newer one is backed up
-    // falls below the watermark and is skipped; switch to a set of uploaded ids if that bites.
-    fun pending(): List<Item> {
+    // A per-account ledger is crash-safe and also notices edits to older MediaStore rows.
+    private val ledger = object : android.database.sqlite.SQLiteOpenHelper(appContext, "backup-confirmed.db", null, 1) {
+        override fun onCreate(db: android.database.sqlite.SQLiteDatabase) {
+            db.execSQL("CREATE TABLE confirmed(account TEXT NOT NULL, media_uri TEXT NOT NULL, fingerprint TEXT NOT NULL, PRIMARY KEY(account, media_uri))")
+        }
+        override fun onUpgrade(db: android.database.sqlite.SQLiteDatabase, old: Int, new: Int) = Unit
+    }
+
+    fun confirm(account: String, item: Item) {
+        ledger.writableDatabase.execSQL("INSERT OR REPLACE INTO confirmed VALUES(?,?,?)", arrayOf<Any>(account, item.uri.toString(), item.fingerprint))
+    }
+
+    /** Media versions not yet confirmed for this server and account, oldest first. */
+    fun pending(account: String): List<Item> {
+        val confirmed = mutableMapOf<String, String>()
+        ledger.readableDatabase.rawQuery("SELECT media_uri,fingerprint FROM confirmed WHERE account=?", arrayOf(account)).use { c ->
+            while (c.moveToNext()) confirmed[c.getString(0)] = c.getString(1)
+        }
         val items = mutableListOf<Item>()
+        val projection = mutableListOf(FileColumns._ID, FileColumns.MEDIA_TYPE, FileColumns.SIZE, FileColumns.DATE_MODIFIED)
+        if (Build.VERSION.SDK_INT >= 29) projection += FileColumns.VOLUME_NAME
+        if (Build.VERSION.SDK_INT >= 30) projection += FileColumns.GENERATION_MODIFIED
         appContext.contentResolver.query(
             MediaStore.Files.getContentUri("external"),
-            arrayOf(FileColumns._ID, FileColumns.MEDIA_TYPE),
-            "${FileColumns.MEDIA_TYPE} IN (${FileColumns.MEDIA_TYPE_IMAGE}, ${FileColumns.MEDIA_TYPE_VIDEO}) AND ${FileColumns._ID} > ?",
-            arrayOf(lastId.toString()),
+            projection.toTypedArray(),
+            "${FileColumns.MEDIA_TYPE} IN (${FileColumns.MEDIA_TYPE_IMAGE}, ${FileColumns.MEDIA_TYPE_VIDEO})",
+            null,
             "${FileColumns._ID} ASC",
         )?.use { c ->
             while (c.moveToNext()) {
                 val id = c.getLong(0)
-                val collection = if (c.getInt(1) == FileColumns.MEDIA_TYPE_VIDEO) {
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-                } else {
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                }
-                items += Item(id, ContentUris.withAppendedId(collection, id))
+                val collection = if (Build.VERSION.SDK_INT >= 29) {
+                    val volume = c.getString(4)
+                    if (c.getInt(1) == FileColumns.MEDIA_TYPE_VIDEO) MediaStore.Video.Media.getContentUri(volume)
+                    else MediaStore.Images.Media.getContentUri(volume)
+                } else if (c.getInt(1) == FileColumns.MEDIA_TYPE_VIDEO) MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                val uri = ContentUris.withAppendedId(collection, id)
+                val generation = if (Build.VERSION.SDK_INT >= 30) c.getLong(5) else 0
+                val fingerprint = "${c.getLong(2)}:${c.getLong(3)}:$generation"
+                if (confirmed[uri.toString()] != fingerprint) items += Item(id, uri, fingerprint)
             }
         }
         return items
@@ -129,7 +145,7 @@ class Backup(context: Context) {
     /** SHA-256 hex of the file, the backend's content_hash: photos already uploaded get a 409. */
     fun sha256(uri: Uri): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        appContext.contentResolver.openInputStream(uri)!!.use { input ->
+        BigShelfApp.api.openOriginal(uri).use { input ->
             val buffer = ByteArray(64 * 1024)
             while (true) {
                 val read = input.read(buffer)
@@ -197,7 +213,11 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             backup.notifyResult("Backup stopped", "Allow BigShelf to access your photos and videos to keep backing up.")
             return Result.success()
         }
-        val items = backup.pending()
+        // Include the server origin: the same user id on another server is a different backup.
+        val account = try { "${BigShelfApp.api.baseUrl}:${BigShelfApp.api.me().id}" } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) { return Result.retry() }
+        val items = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { backup.pending(account) }
         if (items.isEmpty()) return Result.success()
 
         var uploaded = 0
@@ -207,7 +227,8 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 setProgress(workDataOf(DONE to i, TOTAL to items.size))
                 show(backup.progressNotification(i, items.size))
                 try {
-                    BigShelfApp.api.upload(item.uri, backup.sha256(item.uri)) {}
+                    val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { backup.sha256(item.uri) }
+                    BigShelfApp.api.upload(item.uri, hash) {}
                     uploaded++
                 } catch (e: StorageUploadException) {
                     throw e
@@ -218,16 +239,16 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             return Result.success()
                         }
                         409 -> Unit // already in the library
-                        in 400..499 -> rejected++ // too large or unsupported: the API will never take it
+                        400, 413, 415, 422 -> rejected++
                         else -> throw e
                     }
                 } catch (_: FileNotFoundException) {
                     // deleted from the phone since the scan
                 }
-                backup.lastId = item.id
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { backup.confirm(account, item) }
             }
         } catch (e: CancellationException) {
-            throw e // paused, or Wi-Fi lost: the next run resumes from the watermark
+            throw e // paused, or Wi-Fi lost: the next run resumes from the confirmation ledger
         } catch (e: Exception) {
             backup.notifyResult("Backup failed", "${e.userMessage("Upload failed")}. It will try again shortly.")
             return Result.retry()

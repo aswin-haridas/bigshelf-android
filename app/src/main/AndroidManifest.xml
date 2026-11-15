@@ -49,6 +49,8 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
+        <receiver android:name=".data.UpdateStatusReceiver" android:exported="false" />
+
         <!-- The backup notification's Pause button -->
         <receiver android:name=".data.BackupPauseReceiver" android:exported="false" />
     </application>

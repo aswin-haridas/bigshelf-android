@@ -784,6 +784,17 @@ class Api(context: Context, val baseUrl: String) {
             // Lands in this album once processed (yours, or one shared with you)
             if (albumId != null) put("album_id", albumId)
         })
+        // HTTP 202 only queues the import. Backup must wait for a durable media result.
+        repeat(900) {
+            val result = get("/api/v1/photos/uploads/${init.jobId}", UploadStatus.serializer())
+            when (result.status) {
+                "success", "duplicate" -> return
+                "rejected" -> throw ApiException(422, result.error ?: "Unsupported media")
+                "failed", "expired", "cancelled" -> throw ApiException(503, result.error ?: "Import failed; retry later")
+            }
+            kotlinx.coroutines.delay(2000)
+        }
+        throw ApiException(503, "Import is still pending; backup will retry")
     }
 
     /**
@@ -791,7 +802,7 @@ class Api(context: Context, val baseUrl: String) {
      * unless the app holds ACCESS_MEDIA_LOCATION and asks MediaStore for the original; picker
      * URIs that don't allow that (or no permission) fall back to the redacted copy.
      */
-    private fun openOriginal(uri: Uri): java.io.InputStream {
+    internal fun openOriginal(uri: Uri): java.io.InputStream {
         val resolver = appContext.contentResolver
         val canAsk = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             uri.authority == MediaStore.AUTHORITY &&

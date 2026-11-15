@@ -292,6 +292,9 @@ data class UploadInit(
 )
 
 @Serializable
+data class UploadStatus(val status: String, @SerialName("photo_id") val photoId: String? = null, val error: String? = null)
+
+@Serializable
 data class CountResponse(
     @SerialName("deleted_count") val deletedCount: Int? = null,
     @SerialName("flagged_count") val flaggedCount: Int? = null,

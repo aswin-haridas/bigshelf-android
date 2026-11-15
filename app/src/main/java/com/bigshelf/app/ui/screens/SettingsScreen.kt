@@ -135,13 +135,15 @@ private fun AutoUpdateRow() {
     val context = LocalContext.current
     // Re-read on return from the system page, where the switch is flipped
     var allowed by remember { mutableStateOf(Updater.canInstall(context)) }
+    var updateResult by remember { mutableStateOf(Updater.lastResult(context)) }
     LifecycleResumeEffect(Unit) {
         allowed = Updater.canInstall(context)
+        updateResult = Updater.lastResult(context)
         onPauseOrDispose {}
     }
     SettingRow(
         "Automatic updates",
-        if (allowed) "New versions install at launch and in the background on Wi-Fi" else "Allow installing updates once to turn on",
+        updateResult ?: if (allowed) "New versions install at launch and in the background on Wi-Fi" else "Allow installing updates once to turn on",
         Modifier.divider(true),
     ) {
         if (!allowed) {
@@ -428,7 +430,7 @@ fun BackupScreen(onBack: () -> Unit) {
     val total = progress?.getInt(BackupWorker.TOTAL, 0) ?: 0
     // Recounted as the run moves on; null without media permission
     val waiting by produceState<Int?>(null, backup.enabled, backup.paused, progress) {
-        value = if (backup.hasPermission()) withContext(Dispatchers.IO) { backup.pending().size } else null
+        value = if (backup.hasPermission()) withContext(Dispatchers.IO) { backup.pending("${api.baseUrl}:${AuthStore.user?.id}").size } else null
     }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         if (backup.hasPermission()) backup.updateEnabled(true)
