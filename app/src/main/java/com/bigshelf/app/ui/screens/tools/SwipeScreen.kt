@@ -78,7 +78,8 @@ import kotlin.math.abs
 private const val SWIPE_WINDOW = 20
 private const val SWIPE_REFILL_AT = 3
 private const val SWIPE_UNDO_LIMIT = 3
-// A keep this soon (ms) after the photo came up is a gut "yes": it gets two points of taste score
+// A keep this soon (ms) after the photo came up is a gut "yes" and gets the bigger boost. Triplets draw
+// photos scored above 6/10 less often (almost never past 8.5), so both keeps push the photo toward rare.
 private const val QUICK_KEEP_MS = 1500L
 // How far a drag must travel to count as a swipe
 private val THRESHOLD = 100.dp
@@ -100,8 +101,8 @@ private fun leanOf(o: Offset, threshold: Float): Pair<Verdict, Float>? = when {
 
 internal fun swipeTastePoints(elapsedMs: Long, rework: Boolean = false): Double = when {
     rework -> -1.0
-    elapsedMs < QUICK_KEEP_MS -> 2.0
-    else -> 0.25
+    elapsedMs < QUICK_KEEP_MS -> 5.0
+    else -> 3.0
 }
 
 // Filled in by its write once that lands; `saved` false means there's nothing to revert
@@ -165,7 +166,7 @@ fun SwipeScreen(onBack: () -> Unit) {
     fun refresh() = PhotoEvents.invalidate("photos", "photo", "bin-photos", "people")
 
     // Optimistic: the card moves on at once and the write runs behind it. A failed write puts the
-    // photo back on top without a word. NonCancellable so leaving the screen doesn't drop a write.
+    // photo back on top with a toast. NonCancellable so leaving the screen doesn't drop a write.
     fun swipe(photo: Photo, verdict: Verdict) {
         val points = when (verdict) {
             Verdict.Keep -> swipeTastePoints(SystemClock.elapsedRealtime() - shownAt)
@@ -195,6 +196,7 @@ fun SwipeScreen(onBack: () -> Unit) {
                 entry.saved = true
                 refresh()
             } catch (_: Exception) {
+                toast.error("Couldn't save swipe. Try again.")
                 // Still in history, or aged out of it: bring it back. Undone already: it's back on top.
                 if (history.remove(entry) || queue.none { it.id == photo.id }) {
                     queue.add(0, photo)

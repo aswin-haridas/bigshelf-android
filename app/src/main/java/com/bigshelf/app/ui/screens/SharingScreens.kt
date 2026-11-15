@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.screens
 
+import com.bigshelf.app.ui.components.LoadError
 import com.bigshelf.app.ui.components.TriangleLoader
 import com.bigshelf.app.ui.components.ShinyText
 import android.content.Context
@@ -111,7 +112,9 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         ) {
             Section("Shared with you") {
                 val albums = shared.data.orEmpty()
-                if (albums.isEmpty()) {
+                if (shared.isError && shared.data == null) {
+                    LoadError(shared::refetch, what = "shared albums")
+                } else if (albums.isEmpty()) {
                     if (shared.isLoading) ShinyText("Loading…", Modifier.padding(horizontal = 20.dp)) else Hint("Nothing yet")
                 } else {
                     LazyRow(
@@ -132,7 +135,9 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             }
             Section("Your links") {
                 val list = links.data.orEmpty()
-                if (list.isEmpty()) {
+                if (links.isError && links.data == null) {
+                    LoadError(links::refetch, what = "your links")
+                } else if (list.isEmpty()) {
                     if (links.isLoading) ShinyText("Loading…", Modifier.padding(horizontal = 20.dp)) else Hint("No links")
                 } else {
                     Column(

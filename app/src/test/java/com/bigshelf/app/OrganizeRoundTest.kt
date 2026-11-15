@@ -8,7 +8,7 @@ import org.junit.Test
 class OrganizeRoundTest {
     @Test fun advancesThroughAllQuestionKindsInRoundsOfFive() {
         var round = OrganizeRound()
-        val expected = listOf("outfit", "person", "pose", "scene", "human", "collage", "bin", "duplicate", "face")
+        val expected = listOf("outfit", "person", "scene", "human", "collage", "bin", "duplicate", "face")
         for (kind in expected) {
             assertEquals(kind, round.kind.apiName)
             assertEquals(null, round.skip)

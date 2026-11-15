@@ -150,9 +150,9 @@ fun EmptyState(title: String, modifier: Modifier = Modifier, description: String
 }
 
 @Composable
-fun LoadError(onRetry: (() -> Unit)?, modifier: Modifier = Modifier) {
+fun LoadError(onRetry: (() -> Unit)?, modifier: Modifier = Modifier, what: String = "photos") {
     Column(modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Couldn't load photos. Check your connection and try again.", style = BsText.Sm, color = BsColors.Muted, textAlign = TextAlign.Center)
+        Text("Couldn't load $what. Check your connection and try again.", style = BsText.Sm, color = BsColors.Muted, textAlign = TextAlign.Center)
         if (onRetry != null) BsButton(onClick = onRetry, variant = ButtonVariant.Secondary) { Text("Retry") }
     }
 }

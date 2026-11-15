@@ -56,7 +56,6 @@ private const val ROUND_SIZE = 5
 internal enum class OrganizeKind(val question: String, val isMatch: Boolean = false) {
     OUTFIT("Are they wearing the same outfit?", isMatch = true),
     PERSON("Is it the same person in both photos?", isMatch = true),
-    POSE("Are they in the same pose?", isMatch = true),
     SCENE("Were these taken in the same setting?", isMatch = true),
     HUMAN("Is there a person in this photo?"),
     COLLAGE("Is this a collage of several photos?"),

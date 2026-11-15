@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -41,7 +42,7 @@ enum class ButtonVariant { Primary, Secondary, Ghost }
  * - primary: white with black text, dimming while pressed
  * - secondary: surface grey, lighter while pressed
  * - ghost: transparent, surface grey while pressed
- * Loading swaps to the surface + muted text with a 14dp spinner.
+ * Loading swaps to the surface + muted text with a 14dp spinner; disabled dims the whole button.
  */
 @Composable
 fun BsButton(
@@ -71,6 +72,7 @@ fun BsButton(
     Row(
         modifier = modifier
             .pressScale(interaction, if (clickable) 0.97f else 1f)
+            .alpha(if (enabled) 1f else 0.4f)
             .clip(shape)
             .background(bg)
             .clickable(interaction, indication = null, enabled = clickable, onClick = onClick)
