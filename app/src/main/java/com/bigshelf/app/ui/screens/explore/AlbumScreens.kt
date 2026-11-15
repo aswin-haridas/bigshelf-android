@@ -205,7 +205,7 @@ fun AlbumScreen(albumId: String, onBack: () -> Unit, onNavigate: (String) -> Uni
             isError = feed.isError,
             onRetry = feed::retry,
             totalCount = feed.total,
-            // Albums keep the backend's order (similar shots together), not a timeline
+            // Keep the stored album order across pages.
             groupByDate = false,
             header = if (subAlbums.isEmpty()) null else {
                 {

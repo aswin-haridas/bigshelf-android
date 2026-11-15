@@ -10,10 +10,12 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -49,6 +51,9 @@ open class ApiException(val code: Int, message: String) : IOException(message)
 
 /** The presigned PUT to storage failed (expired URL, timeout, storage down): worth retrying. */
 class StorageUploadException(code: Int) : ApiException(code, "Upload failed")
+
+/** Media validation rejected this file, so repeating the same upload will fail. */
+class RejectedUploadException(message: String) : ApiException(422, message)
 
 /** Web `getErrorMessage`: the error's message, or [fallback] for non-API failures. */
 fun Throwable.userMessage(fallback: String = "Request failed"): String =
@@ -782,12 +787,21 @@ class Api(context: Context, val baseUrl: String) {
             }
         }
         val contentType = resolver.getType(uri) ?: "application/octet-stream"
-        val init = send("POST", "/api/v1/photos/uploads", UploadInit.serializer(), buildJsonObject {
+        if (size < 1) throw RejectedUploadException("Couldn't determine the size of this file")
+        val metadata = buildJsonObject {
             put("filename", name)
-            put("size", size.coerceAtLeast(0))
+            put("size", size)
             put("content_type", contentType)
             if (contentHash != null) put("content_hash", contentHash)
-        })
+        }
+        val init = try {
+            send("POST", "/api/v1/photos/uploads", UploadInit.serializer(), metadata)
+        } catch (e: ApiException) {
+            if (e.code == 413 || e.code == 415 || e.code == 422) {
+                throw RejectedUploadException(e.userMessage("Unsupported file"))
+            }
+            throw e
+        }
         // Interruptible so cancelling the caller (backup paused) aborts the PUT mid-file
         runInterruptible(Dispatchers.IO) {
             val body = object : RequestBody() {
@@ -818,17 +832,22 @@ class Api(context: Context, val baseUrl: String) {
             // Lands in this album once processed (yours, or one shared with you)
             if (albumId != null) put("album_id", albumId)
         })
-        // HTTP 202 only queues the import. Backup must wait for a durable media result.
-        repeat(900) {
-            val result = get("/api/v1/photos/uploads/${init.jobId}", UploadStatus.serializer())
-            when (result.status) {
-                "success", "duplicate" -> return
-                "rejected" -> throw ApiException(422, result.error ?: "Unsupported media")
-                "failed", "expired", "cancelled" -> throw ApiException(503, result.error ?: "Import failed; retry later")
+        // HTTP 202 only queues the import. Wait for a durable media result.
+        val result = withTimeoutOrNull(TimeUnit.MINUTES.toMillis(10)) {
+            val path = "/api/v1/photos/uploads/${init.jobId}"
+            var status = get(path, UploadStatus.serializer())
+            while (status.status == "reserved" || status.status == "queued") {
+                delay(3_000)
+                status = get(path, UploadStatus.serializer())
             }
-            kotlinx.coroutines.delay(2000)
+            status
+        } ?: throw ApiException(503, "Still waiting for the server to finish importing this file")
+        when (result.status) {
+            "success" -> Unit
+            "duplicate" -> throw ApiException(409, "Already in your library")
+            "rejected" -> throw RejectedUploadException(result.error ?: "The server could not read this file")
+            else -> throw ApiException(503, result.error ?: "Upload could not be confirmed")
         }
-        throw ApiException(503, "Import is still pending; backup will retry")
     }
 
     /**

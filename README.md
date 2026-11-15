@@ -1,7 +1,7 @@
 # BigShelf for Android
 
 Native Android client for BigShelf, written in Kotlin with Jetpack Compose. It talks to the
-same Go API and private vision service as the React app in `../web/frontend`. Its components and Phosphor icons
+same Go API and private vision service as the React app in `../core/frontend`. Its components and Phosphor icons
 started as ports of the web ones, but the look is now its own: minimal, true black, set in Inter.
 
 ## Run it

@@ -230,6 +230,8 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                     val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { backup.sha256(item.uri) }
                     BigShelfApp.api.upload(item.uri, hash) {}
                     uploaded++
+                } catch (_: RejectedUploadException) {
+                    rejected++
                 } catch (e: StorageUploadException) {
                     throw e
                 } catch (e: ApiException) {
@@ -239,7 +241,6 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             return Result.success()
                         }
                         409 -> Unit // already in the library
-                        400, 413, 415, 422 -> rejected++
                         else -> throw e
                     }
                 } catch (_: FileNotFoundException) {

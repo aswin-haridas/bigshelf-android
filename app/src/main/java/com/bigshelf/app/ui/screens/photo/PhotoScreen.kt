@@ -1,10 +1,10 @@
 package com.bigshelf.app.ui.screens.photo
 
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.setProgress
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import android.content.Intent
@@ -1046,6 +1046,7 @@ private fun SimilarPhotos(photoId: String, onOpenPhoto: (String) -> Unit) {
  * outside dimmed. It spans the full width or height, so dragging slides it along the other
  * axis. Saving adds a copy; replacing the original is a separate, confirmed action.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = null) {
     val w = image.width ?: return
@@ -1063,7 +1064,7 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = 
         else -> h - box.height
     } // image px the window can travel
     // Back leaves crop mode, not the viewer
-    BackHandler(onBack = onClose)
+    BackHandler { if (!saving) onClose() }
 
     fun save(replace: Boolean) {
         saving = true
@@ -1085,14 +1086,6 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = 
         Box(
             Modifier
                 .fillMaxSize()
-                // TalkBack / switch access: the window is a slider, so dragging is optional
-                .then(
-                    if (slack > 0) Modifier.semantics {
-                        contentDescription = "Crop position"
-                        progressBarRangeInfo = ProgressBarRangeInfo(pos, 0f..1f, steps = 19)
-                        setProgress { pos = it.coerceIn(0f, 1f); true }
-                    } else Modifier
-                )
                 .pointerInput(image.id, slack) {
                     detectDragGestures { change, drag ->
                         change.consume()
@@ -1117,13 +1110,30 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = 
                     drawRect(BsColors.Foreground, keep.topLeft, keep.size, style = Stroke(2.dp.toPx()))
                 },
         )
-        Row(
-            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            BsButton(onClick = onClose, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Cancel") }
-            BsButton(onClick = { confirmReplace = true }, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Replace original") }
-            BsButton(onClick = { save(replace = false) }, loading = saving) { Text("Save a copy") }
+            if (slack > 0) {
+                Column(Modifier.fillMaxWidth().clip(BsShapes.Md).background(BsColors.Surface).padding(horizontal = 12.dp)) {
+                    Text("Crop position", Modifier.padding(top = 8.dp), style = BsText.Sm, color = BsColors.Foreground)
+                    Slider(
+                        value = pos,
+                        onValueChange = { pos = it },
+                        modifier = Modifier.semantics { contentDescription = "Crop position" },
+                        enabled = !saving,
+                    )
+                }
+            }
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                BsButton(onClick = onClose, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Cancel") }
+                BsButton(onClick = { confirmReplace = true }, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Replace original") }
+                BsButton(onClick = { save(replace = false) }, loading = saving) { Text("Save a copy") }
+            }
         }
     }
     if (confirmReplace) {
