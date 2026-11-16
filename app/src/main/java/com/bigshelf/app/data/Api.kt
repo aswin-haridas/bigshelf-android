@@ -700,15 +700,29 @@ class Api(context: Context, val baseUrl: String) {
 
     // ---------- Rating ----------
 
-    suspend fun swipePhotos(exclude: Set<String>, limit: Int) = send(
+    suspend fun swipePhotos(exclude: Set<String>, limit: Int, showPersonRanks: Boolean) = send(
         "POST", "/api/v1/rating/swipe", ListSerializer(Photo.serializer()),
         buildJsonObject {
             put("exclude", JsonArray(exclude.map(::JsonPrimitive)))
             put("limit", limit)
+            put("show_person_ranks", showPersonRanks)
         },
     )
 
-    suspend fun ratingPairs(limit: Int) = get("/api/v1/rating", RatingResponse.serializer(), mapOf("limit" to limit))
+    suspend fun ratingPairs(limit: Int, showPersonRanks: Boolean) = get(
+        "/api/v1/rating", RatingResponse.serializer(),
+        mapOf("limit" to limit, "show_person_ranks" to showPersonRanks),
+    )
+
+    suspend fun recordSwipe(id: String, photoId: String, verdict: String, quick: Boolean) =
+        sendUnit("POST", "/api/v1/rating/swipe/verdict", buildJsonObject {
+            put("id", id)
+            put("photo_id", photoId)
+            put("verdict", verdict)
+            put("quick", quick)
+        })
+
+    suspend fun undoSwipe(id: String) = sendUnit("DELETE", "/api/v1/rating/swipe/verdict/$id")
 
     /** [winnerId] is liked more than [loserId]; returns the stored answer's id for Undo. */
     suspend fun compare(winnerId: String, loserId: String) = send(
@@ -720,14 +734,6 @@ class Api(context: Context, val baseUrl: String) {
     ).id
 
     suspend fun undoCompare(id: String) = sendUnit("DELETE", "/api/v1/rating/compare/$id")
-
-    /** Adds [points] of taste score on top of the taste model's (-1 takes a boost back). */
-    suspend fun boostTaste(id: String, points: Double = 1.0, rework: Boolean? = null, kept: Boolean? = null) =
-        send("POST", "/api/v1/rating/boost/$id?return_points=true", TasteAdjustment.serializer(), buildJsonObject {
-            put("points", points)
-            if (rework != null) put("needs_rework", rework)
-            if (kept != null) put("is_kept", kept)
-        })
 
     suspend fun resetRating() = send("DELETE", "/api/v1/rating", ClearedResponse.serializer())
 

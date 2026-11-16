@@ -79,6 +79,7 @@ data class Photo(
     val exif: CameraInfo? = null,
     // Home feed only (photos(people = true)): named people tagged on it, for the post header
     val people: List<PhotoPersonTag>? = null,
+    @SerialName("repair_target") val repairTarget: Boolean? = null,
     // Organize > Dates only: how taken_at was guessed (filename / scene / upload) and how sure
     @SerialName("taken_at_source") val takenAtSource: String? = null,
     @SerialName("taken_at_confidence") val takenAtConfidence: Double? = null,
@@ -409,7 +410,12 @@ data class PhotoReviewQuestion(
 
 /** Organize's Clean up: photos scored under the cut-off; [nextBefore] is null once the library runs out. */
 @Serializable
-data class PhotoPersonTag(val id: String, val name: String, @SerialName("face_thumbnail") val faceThumbnail: String? = null)
+data class PhotoPersonTag(
+    val id: String,
+    val name: String,
+    @SerialName("face_thumbnail") val faceThumbnail: String? = null,
+    val rank: Int? = null,
+)
 
 /** Photos with a low-confidence predicted capture date, least confident first. */
 @Serializable

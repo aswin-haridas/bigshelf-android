@@ -66,6 +66,7 @@ private class Answer(val pair: RatingPair, val done: CompletableDeferred<String?
 @Composable
 fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     val api = BigShelfApp.api
+    val personRanks = rememberPersonRanks()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val queue = remember { mutableStateListOf<RatingPair>() }
@@ -85,7 +86,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     LaunchedEffect(queue.size, retry) {
         if (queue.size >= WINDOW_SIZE) return@LaunchedEffect
         try {
-            val data = api.ratingPairs(WINDOW_SIZE)
+            val data = api.ratingPairs(WINDOW_SIZE, BigShelfApp.settings.showPersonRanks)
             // Server count only once: later it may lag answers still in flight
             if (rated == null) rated = data.rated
             loadFailed = false
@@ -117,7 +118,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     }
 
     // Taste score lives on the photo detail; refresh it so it shows the new rating
-    fun refresh() = PhotoEvents.invalidate("photo")
+    fun refresh() = PhotoEvents.invalidate("photo", "people", "triplets")
 
     // The user likes `winner` more: show the next pair at once, the server catches up
     fun pick(pair: RatingPair, winner: Photo) {
@@ -187,7 +188,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
         ) {
             BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground)
             Text(
-                rated?.let { "$it rated" } ?: "Rating",
+                rated?.let { "$it votes" } ?: "Rating",
                 Modifier.weight(1f).padding(start = 4.dp),
                 style = BsText.Xs.copy(fontFamily = MonoFamily),
                 color = BsColors.Muted,
@@ -237,6 +238,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                             Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit,
                         )
+                        PersonRanks(photo, personRanks, Modifier.align(Alignment.BottomStart).padding(8.dp))
                         BsIconButton(
                             BsIcons.ArrowUpRight, "Open ${photo.filename}",
                             onClick = { onOpenPhoto(photo.id) },

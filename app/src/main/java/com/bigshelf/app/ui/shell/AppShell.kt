@@ -318,13 +318,10 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
             )
         }
         composable(Routes.TRIPLETS) {
-            // Random photos of one person; the Match toggles fill the set with photos like the first.
-            // Downloading moves the photos to Archive (when on in Settings)
-            val settings = BigShelfApp.settings
             var editingSettings by remember { mutableStateOf(false) }
             TriptychScreen(
                 "Matches",
-                "Up to ${settings.tripletCount} photos${if (settings.tripletMatchFaces) " of the same profile" else " per set"}",
+                "Repair photos with ChatGPT",
                 TRIPLETS_ENDPOINT,
                 onBack = onBack, onOpenPhoto = openPhoto,
                 onSettings = { editingSettings = true },

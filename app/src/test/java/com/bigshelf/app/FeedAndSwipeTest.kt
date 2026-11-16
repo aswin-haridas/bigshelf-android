@@ -6,7 +6,7 @@ import com.bigshelf.app.data.PhotoPersonTag
 import com.bigshelf.app.state.PagedPhotos
 import com.bigshelf.app.state.QueryState
 import com.bigshelf.app.ui.screens.groupIntoPosts
-import com.bigshelf.app.ui.screens.tools.swipeTastePoints
+import com.bigshelf.app.ui.screens.tools.isQuickKeep
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.CompletableDeferred
@@ -40,10 +40,9 @@ class FeedAndSwipeTest {
     }
 
     @Test fun quickKeepsGainMoreTasteAndReworkLosesTaste() {
-        assertEquals(5.0, swipeTastePoints(1499), 0.0)
-        assertEquals(3.0, swipeTastePoints(1500), 0.0)
-        assertEquals(3.0, swipeTastePoints(10000), 0.0)
-        assertEquals(-1.0, swipeTastePoints(0, rework = true), 0.0)
+        assertEquals(true, isQuickKeep(1499))
+        assertEquals(false, isQuickKeep(1500))
+        assertEquals(false, isQuickKeep(10000))
     }
 
     @Test fun failedPagesExposeAnErrorAndRetryTheSamePage() = runBlocking {

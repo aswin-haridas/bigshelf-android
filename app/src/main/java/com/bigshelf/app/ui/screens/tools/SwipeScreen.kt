@@ -68,6 +68,7 @@ import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.CancellationException
 import com.bigshelf.app.ui.components.LoadError
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -78,8 +79,6 @@ import kotlin.math.abs
 private const val SWIPE_WINDOW = 20
 private const val SWIPE_REFILL_AT = 3
 private const val SWIPE_UNDO_LIMIT = 3
-// A keep this soon (ms) after the photo came up is a gut "yes" and gets the bigger boost. Triplets draw
-// photos scored above 6/10 less often (almost never past 8.5), so both keeps push the photo toward rare.
 private const val QUICK_KEEP_MS = 1500L
 // How far a drag must travel to count as a swipe
 private val THRESHOLD = 100.dp
@@ -99,25 +98,17 @@ private fun leanOf(o: Offset, threshold: Float): Pair<Verdict, Float>? = when {
     else -> null
 }
 
-internal fun swipeTastePoints(elapsedMs: Long, rework: Boolean = false): Double = when {
-    rework -> -1.0
-    elapsedMs < QUICK_KEEP_MS -> 5.0
-    else -> 3.0
-}
+internal fun isQuickKeep(elapsedMs: Long) = elapsedMs < QUICK_KEEP_MS
 
-// Filled in by its write once that lands; `saved` false means there's nothing to revert
-private class Swipe(var photo: Photo, val verdict: Verdict) {
-    var points = 0.0
-    var previousKept = false
-    var previousRework = false
+private class Swipe(val id: String, val photo: Photo) {
     var saved = false
     var write: Job? = null
 }
 
-/** Unreviewed photos only; swipes adjust their taste score directly. */
 @Composable
 fun SwipeScreen(onBack: () -> Unit) {
     val api = BigShelfApp.api
+    val personRanks = rememberPersonRanks()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val queue = remember { mutableStateListOf<Photo>() }
@@ -128,6 +119,7 @@ fun SwipeScreen(onBack: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
     var refill by remember { mutableStateOf(0) }
+    var undoing by remember { mutableStateOf(false) }
 
     // The seen set keeps refills from repeating photos, even after their taste scores change.
     // Watches the queue size instead of keying on it: keying restarted the effect on every swipe,
@@ -138,7 +130,7 @@ fun SwipeScreen(onBack: () -> Unit) {
             loading = true
             loadError = false
             try {
-                val fresh = api.swipePhotos(seen, SWIPE_WINDOW).filter { seen.add(it.id) }
+                val fresh = api.swipePhotos(seen, SWIPE_WINDOW, BigShelfApp.settings.showPersonRanks).filter { seen.add(it.id) }
                 queue.addAll(fresh)
             } catch (e: CancellationException) {
                 throw e
@@ -163,67 +155,50 @@ fun SwipeScreen(onBack: () -> Unit) {
         }
     }
 
-    fun refresh() = PhotoEvents.invalidate("photos", "photo", "bin-photos", "people")
+    fun refresh() = PhotoEvents.invalidate("photos", "photo", "bin-photos", "people", "triplets")
 
-    // Optimistic: the card moves on at once and the write runs behind it. A failed write puts the
-    // photo back on top with a toast. NonCancellable so leaving the screen doesn't drop a write.
+    fun restore(photo: Photo) {
+        queue.add(0, photo)
+        count = maxOf(count - 1, 0)
+    }
+
+    // Advance immediately and let the write finish even if the user leaves the screen.
     fun swipe(photo: Photo, verdict: Verdict) {
-        val points = when (verdict) {
-            Verdict.Keep -> swipeTastePoints(SystemClock.elapsedRealtime() - shownAt)
-            Verdict.Rework -> swipeTastePoints(0, rework = true)
-            else -> 0.0
-        }
-        val entry = Swipe(photo, verdict)
-        queue.remove(photo)
+        if (!queue.remove(photo)) return
+        val quick = verdict == Verdict.Keep && isQuickKeep(SystemClock.elapsedRealtime() - shownAt)
+        val entry = Swipe(UUID.randomUUID().toString(), photo)
         count++
         history.add(entry)
         if (history.size > SWIPE_UNDO_LIMIT) history.removeAt(0)
         entry.write = scope.launch(NonCancellable) {
             try {
-                when (verdict) {
-                    Verdict.Bin -> api.flagDeleted(listOf(photo.id), true)
-                    Verdict.Favorite -> {
-                        entry.photo = api.photo(photo.id)
-                        api.setFavorite(photo.id, true)
-                    }
-                    Verdict.Keep, Verdict.Rework -> {
-                        val adjustment = api.boostTaste(photo.id, points, rework = if (verdict == Verdict.Rework) true else null, kept = if (verdict == Verdict.Keep) true else null)
-                        entry.points = adjustment.points
-                        entry.previousRework = adjustment.previousRework
-                        entry.previousKept = adjustment.previousKept
-                    }
-                }
+                api.recordSwipe(entry.id, photo.id, verdict.name.lowercase(), quick)
                 entry.saved = true
                 refresh()
             } catch (_: Exception) {
+                history.remove(entry)
+                restore(photo)
                 toast.error("Couldn't save swipe. Try again.")
-                // Still in history, or aged out of it: bring it back. Undone already: it's back on top.
-                if (history.remove(entry) || queue.none { it.id == photo.id }) {
-                    queue.add(0, photo)
-                    count = maxOf(count - 1, 0)
-                }
             }
         }
     }
 
     fun undo() {
-        val last = history.removeLastOrNull() ?: return
-        queue.add(0, last.photo)
-        count = maxOf(count - 1, 0)
+        val last = history.lastOrNull() ?: return
+        if (undoing) return
+        undoing = true
         scope.launch(NonCancellable) {
-            // Let the swipe's own write land first, or the revert could be overtaken by it
-            last.write?.join()
-            if (!last.saved) return@launch
             try {
-                when (last.verdict) {
-                    Verdict.Bin -> api.flagDeleted(listOf(last.photo.id), false)
-                    Verdict.Favorite -> api.setFavorite(last.photo.id, last.photo.isFavorite)
-                    Verdict.Rework -> api.boostTaste(last.photo.id, -last.points, rework = last.previousRework)
-                    Verdict.Keep -> api.boostTaste(last.photo.id, -last.points, kept = last.previousKept)
-                }
+                last.write?.join()
+                if (!last.saved) return@launch
+                api.undoSwipe(last.id)
+                history.remove(last)
+                restore(last.photo)
                 refresh()
             } catch (_: Exception) {
                 toast.error("Couldn't undo swipe. Try again.")
+            } finally {
+                undoing = false
             }
         }
     }
@@ -234,7 +209,7 @@ fun SwipeScreen(onBack: () -> Unit) {
             count = if (count > 0) "$count swiped" else null,
             leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) },
         ) {
-            BsIconButton(BsIcons.ArrowUUpLeft, "Undo the last swipe", onClick = ::undo, enabled = history.isNotEmpty())
+            BsIconButton(BsIcons.ArrowUUpLeft, "Undo the last swipe", onClick = ::undo, enabled = history.isNotEmpty() && !undoing)
         }
 
         when {
@@ -281,7 +256,7 @@ fun SwipeScreen(onBack: () -> Unit) {
                         val cardModifier = if (maxWidth / maxHeight < 3f / 4f) Modifier.fillMaxWidth() else Modifier.fillMaxSize()
                         val card = cardModifier.aspectRatio(3f / 4f, matchHeightConstraintsFirst = maxWidth / maxHeight >= 3f / 4f)
                         next?.let { key(it.id) { SwipeCard(it, card.graphicsLayer { scaleX = 0.95f; scaleY = 0.95f; alpha = 0.6f }) } }
-                        key(current.id) { SwipeCard(current, card, offset.value, lean) }
+                        key(current.id) { SwipeCard(current, card, offset.value, lean, showRanks = true, ranks = personRanks) }
                     }
                     if (loadError) LoadError(onRetry = { refill++ })
                     // Left to right as the swipes go: Bin is a left swipe, Keep a right one
@@ -319,7 +294,14 @@ private fun RowScope.VerdictButton(verdict: Verdict, active: Boolean, onClick: (
 // The photo, moved by the screen's drag. `lean` fades in the verdict it's heading for: a colour wash
 // over the photo and a centred icon that grows with the drag and pops once letting go would pick it.
 @Composable
-private fun SwipeCard(photo: Photo, modifier: Modifier, offset: Offset = Offset.Zero, lean: Pair<Verdict, Float>? = null) {
+private fun SwipeCard(
+    photo: Photo,
+    modifier: Modifier,
+    offset: Offset = Offset.Zero,
+    lean: Pair<Verdict, Float>? = null,
+    showRanks: Boolean = false,
+    ranks: Map<String, Int>? = null,
+) {
     val committed = lean != null && lean.second >= 1f
     val pop by animateFloatAsState(if (committed) 1.15f else 1f, label = "pop")
     Box(
@@ -338,6 +320,7 @@ private fun SwipeCard(photo: Photo, modifier: Modifier, offset: Offset = Offset.
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        if (showRanks) PersonRanks(photo, ranks, Modifier.align(Alignment.BottomStart).padding(8.dp))
         lean?.let { (verdict, progress) ->
             val p = progress.coerceIn(0f, 1f)
             Box(Modifier.fillMaxSize().background(verdict.color.copy(alpha = 0.35f * p)))

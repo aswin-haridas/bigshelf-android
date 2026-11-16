@@ -12,7 +12,7 @@ object PhotoEvents {
     val invalidations: SharedFlow<Set<String>> = _invalidations
 
     /** Web `PHOTO_VIEW_KEYS`: every view that lists photos. */
-    val PHOTO_VIEW_KEYS = setOf("photos", "bin-photos", "archive-photos", "organize", "people", "faces", "duplicates", "photo")
+    val PHOTO_VIEW_KEYS = setOf("photos", "bin-photos", "archive-photos", "organize", "people", "faces", "duplicates", "photo", "triplets")
 
     fun invalidate(vararg keys: String) {
         _invalidations.tryEmit(keys.toSet())

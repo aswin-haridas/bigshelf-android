@@ -2,6 +2,7 @@ package com.bigshelf.app.ui.screens.tools
 
 import android.content.ClipData
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
+import com.bigshelf.app.ui.shell.rememberUploadPicker
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +38,7 @@ import com.bigshelf.app.data.PhotoSet
 import com.bigshelf.app.data.ViewSettings
 import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.SelectionStore
+import com.bigshelf.app.state.UploadStore
 import com.bigshelf.app.state.ViewerList
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
@@ -51,6 +54,7 @@ import com.bigshelf.app.ui.photos.ImageCard
 import com.bigshelf.app.ui.screens.people.PersonList
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
+import com.bigshelf.app.ui.theme.BsText
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
@@ -66,15 +70,18 @@ private fun setOptions(endpoint: String, s: ViewSettings): Map<String, Any?> {
     val common = mapOf<String, Any?>("include_ai" to s.includeAi)
     return when (endpoint) {
         TRIPLETS_ENDPOINT -> common + mapOf(
-            "count" to s.tripletCount, "similar_faces" to s.tripletMatchFaces,
+            "repair_only" to true, "count" to s.tripletCount, "similar_faces" to s.tripletMatchFaces,
             "similar_outfit" to s.tripletOutfit, "similar_colors" to s.tripletMatchColors,
             "similar_scene" to s.tripletMatchScene,
-            "clear_lead" to s.tripletClearLead, "order" to s.tripletOrder,
+            "order" to s.tripletOrder,
         )
         else -> common
     }
 }
 const val COMPOSER_ENDPOINT = "/api/v1/composer"
+
+private const val REPAIR_PROMPT = """Repair each image whose filename begins with repair-. Use files beginning with reference- only as visual references for identity, clothing, or scene. Return one separate corrected image per repair file.
+Inspect each original and correct visible issues such as awkward framing, exposure, colour cast, noise, or mild blur. Preserve the person's identity, expression, body proportions, clothing, and setting. Keep edits natural. If detail is too damaged to recover faithfully, say so instead of inventing it."""
 
 // Upload both photos in order (the face photo first, then the outfit) with this prompt.
 const val OUTFIT_SWAP_PROMPT = """Edit the first image: replace the person's outfit with the outfit worn in the second image. Both images show the same person.
@@ -109,6 +116,9 @@ fun TriptychScreen(
 ) {
     val api = BigShelfApp.api
     val settings = BigShelfApp.settings
+    val repairMode = endpoint == TRIPLETS_ENDPOINT
+    val editPrompt = if (repairMode) REPAIR_PROMPT else prompt
+    val uploadFixes = if (repairMode) rememberUploadPicker() else null
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -119,7 +129,6 @@ fun TriptychScreen(
 
     // Keep the visible set and four prepared sets; options changes get a fresh cache.
     val cache = remember(options) { mutableStateMapOf<Int, PhotoSet>() }
-    var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf<String?>(null) }
     var picking by remember { mutableStateOf(false) }
@@ -134,40 +143,40 @@ fun TriptychScreen(
         lastOffset[endpoint] = next
     }
 
-    // Prepare sequentially: each request consumes the server's seen queue.
-    LaunchedEffect(offset, options, revision) {
-        cache.keys.filter { it < offset || it >= offset + 5 }.forEach { cache.remove(it) }
-        failed = false
-        loading = true
-        try {
-            val current = cache[offset] ?: fetch(offset).also {
-                coroutineContext.ensureActive()
-                cache[offset] = it
-            }
-            shown = current
-            loading = false
-            if (current.photos.isEmpty()) return@LaunchedEffect
-            for (ahead in 1..4) {
-                val at = offset + ahead
-                val next = cache[at] ?: fetch(at).also {
+    val current = cache[offset]
+    val loading = current == null && !failed
+    LaunchedEffect(current) {
+        if (current != null) shown = current
+    }
+
+    // One loader per filter, so Next can adopt the request already preparing that set.
+    LaunchedEffect(options, revision) {
+        snapshotFlow { offset }.collect {
+            failed = false
+            try {
+                while (true) {
+                    cache.keys.filter { it < offset || it >= offset + 5 }.forEach { cache.remove(it) }
+                    val at = (offset until offset + 5).firstOrNull { it !in cache } ?: break
+                    if (cache[at - 1]?.photos?.isEmpty() == true) break
+                    val next = fetch(at)
                     coroutineContext.ensureActive()
-                    cache[at] = it
-                }
-                if (next.photos.isEmpty()) break
-                val loader = SingletonImageLoader.get(context)
-                next.photos.forEach { photo ->
-                    photo.thumbnailUrl?.let {
-                        loader.enqueue(ImageRequest.Builder(context).data(api.mediaUrl(it)).build())
+                    cache[at] = next
+                    if (next.photos.isEmpty()) break
+                    if (at > offset) {
+                        val loader = SingletonImageLoader.get(context)
+                        next.photos.forEach { photo ->
+                            photo.thumbnailUrl?.let {
+                                loader.enqueue(ImageRequest.Builder(context).data(api.mediaUrl(it)).build())
+                            }
+                        }
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // A failed warm-up retries when the user reaches its position.
+                failed = cache[offset] == null
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // Warm-up failures retry when reached; current-set failures offer Retry.
-            failed = shown == null || cache[offset] == null
-        } finally {
-            loading = false
         }
     }
 
@@ -176,27 +185,62 @@ fun TriptychScreen(
         revision++
     }
 
+    LaunchedEffect(endpoint, options) {
+        if (endpoint == TRIPLETS_ENDPOINT) {
+            PhotoEvents.invalidations.collect { keys ->
+                if ("triplets" in keys && cache.containsKey(offset)) {
+                    cache.keys.filter { it > offset }.forEach { cache.remove(it) }
+                    revision++
+                }
+            }
+        }
+    }
+
     fun setPerson(id: String?) {
         onlyPerson = id
         lastPerson[endpoint] = id
         moveTo(0)
     }
 
-    val set = shown
+    val set = current ?: shown
     val photos = set?.photos.orEmpty()
+    val repairIds = photos.filter { it.repairTarget == true }.map { it.id }
+    val canRepair = repairIds.isNotEmpty() && photos.any { it.repairTarget == false }
+    val uploading = (UploadStore.upload?.progress ?: 100) < 100
 
     fun download() {
-        if (photos.isEmpty() || busy != null) return
+        if (photos.isEmpty() || busy != null || (repairMode && !canRepair)) return
         busy = "download"
         scope.launch {
             try {
-                Downloads.save(context, photos)
+                Downloads.save(context, photos, repairSet = repairMode)
                 toast.success("Downloading ${photos.size} photos")
-                // Archived photos drop out of the list, so the same offset is the next set;
-                // without archiving they stay put, so step to the next one
-                if (settings.archiveOnDownload) refetchShifted() else moveTo(offset + 1)
+                if (!repairMode) {
+                    if (settings.archiveOnDownload) refetchShifted() else moveTo(offset + 1)
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 toast.error("Download failed")
+            } finally {
+                busy = null
+            }
+        }
+    }
+
+    fun archiveOriginals() {
+        if (repairIds.isEmpty() || busy != null || uploading) return
+        busy = "archive"
+        scope.launch {
+            try {
+                api.flagArchived(repairIds, true)
+                PhotoEvents.invalidateAll()
+                refetchShifted()
+                toast.success("Repair originals archived")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                toast.error("Couldn't archive the repair originals")
             } finally {
                 busy = null
             }
@@ -230,10 +274,10 @@ fun TriptychScreen(
         ) {
             if (onSettings != null) BsIconButton(BsIcons.Gear, "${title} settings", onClick = onSettings)
             BsIconButton(BsIcons.Funnel, "Only this person", onClick = { picking = true }, active = onlyPerson != null)
-            if (prompt != null) {
-                BsIconButton(BsIcons.Copy, "Copy prompt", onClick = {
+            if (editPrompt != null && (!repairMode || canRepair)) {
+                BsIconButton(BsIcons.Copy, if (repairMode) "Copy repair prompt" else "Copy prompt", onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Prompt", prompt))
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Prompt", editPrompt))
                     toast.success("Prompt copied")
                 })
             }
@@ -246,7 +290,10 @@ fun TriptychScreen(
                     Text("Unable to load ${title.lowercase()}")
                     BsButton(onClick = { revision++ }) { Text("Retry") }
                 }
-                photos.isEmpty() -> EmptyState("No ${title.lowercase()} are available yet", Modifier.padding(horizontal = 24.dp))
+                photos.isEmpty() -> EmptyState(
+                    if (repairMode) "No repair sets with a good reference are available" else "No ${title.lowercase()} are available yet",
+                    Modifier.padding(horizontal = 24.dp),
+                )
                 else -> LazyVerticalGrid(
                     // Two across for a few photos, three when the set is bigger
                     columns = GridCells.Fixed(if (photos.size <= 4) 2 else 3),
@@ -256,20 +303,30 @@ fun TriptychScreen(
                 ) {
                     items(photos, key = { it.id }) { photo ->
                         val selecting = SelectionStore.count > 0
-                        ImageCard(
-                            photo = photo,
-                            selected = SelectionStore.isSelected(photo.id),
-                            selectionActive = selecting,
-                            onClick = {
-                                // While selecting, a tap toggles instead of opening (same as the grids)
-                                if (selecting) SelectionStore.toggle(photo)
-                                else {
-                                    ViewerList.photos = photos
-                                    onOpenPhoto(photo.id)
-                                }
-                            },
-                            onToggle = { SelectionStore.toggle(photo) },
-                        )
+                        Column {
+                            if (repairMode) {
+                                Text(
+                                    if (photo.repairTarget == true) "Repair original" else "Reference",
+                                    style = BsText.Xs,
+                                    color = BsColors.Foreground,
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                )
+                            }
+                            ImageCard(
+                                photo = photo,
+                                selected = SelectionStore.isSelected(photo.id),
+                                selectionActive = selecting,
+                                onClick = {
+                                    // While selecting, a tap toggles instead of opening (same as the grids)
+                                    if (selecting) SelectionStore.toggle(photo)
+                                    else {
+                                        ViewerList.photos = photos
+                                        onOpenPhoto(photo.id)
+                                    }
+                                },
+                                onToggle = { SelectionStore.toggle(photo) },
+                            )
+                        }
                     }
                 }
             }
@@ -280,6 +337,28 @@ fun TriptychScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).padding(bottom = LocalBottomBarInset.current),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (uploadFixes != null) {
+                    Text(
+                        "Open the photos in ChatGPT with the repair prompt. Upload the fixes here, then archive the originals.",
+                        style = BsText.Xs,
+                        color = BsColors.Muted,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BsButton(
+                            onClick = uploadFixes,
+                            modifier = Modifier.weight(1f),
+                            variant = ButtonVariant.Secondary,
+                            enabled = repairIds.isNotEmpty() && busy == null && !loading && !uploading,
+                        ) { Text("Upload fixes") }
+                        BsButton(
+                            onClick = ::archiveOriginals,
+                            modifier = Modifier.weight(1f),
+                            variant = ButtonVariant.Secondary,
+                            enabled = repairIds.isNotEmpty() && busy == null && !loading && !uploading,
+                            loading = busy == "archive",
+                        ) { Text("Archive originals") }
+                    }
+                }
                 // Shown when the set names its person (outfit sets of untagged photos don't)
                 if (set?.personId != null) {
                     BsButton(
@@ -295,15 +374,15 @@ fun TriptychScreen(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BsButton(onClick = ::download, modifier = Modifier.weight(1f), enabled = busy == null && !loading && !failed, loading = busy == "download") {
+                    BsButton(onClick = ::download, modifier = Modifier.weight(1f), enabled = busy == null && !loading && !failed && (!repairMode || canRepair), loading = busy == "download") {
                         BsIcon(BsIcons.DownloadSimple, size = 16.dp)
-                        Text("Download")
+                        Text(if (repairMode) "Download for repair" else "Download")
                     }
                     BsButton(
                         onClick = { moveTo(offset + 1) },
                         modifier = Modifier.weight(1f),
                         variant = ButtonVariant.Secondary,
-                        enabled = busy == null && !loading && !failed,
+                        enabled = (busy == null || (repairMode && busy == "download")) && !loading && !failed,
                         loading = loading,
                     ) {
                         BsIcon(BsIcons.ArrowRight, size = 16.dp)

@@ -265,10 +265,6 @@ fun TripletSettingsCard() {
             }
         }
         ToggleRow("AI images", "Include AI images.", settings.includeAi, settings::updateIncludeAi, divider = true)
-        ToggleRow(
-            "Clear face first", "Lead with a sharp, close face.",
-            settings.tripletClearLead, settings::updateTripletClearLead, divider = true,
-        )
         SettingRow("Photos per set", "Strict matching may return fewer photos.") {
             BsButton(onClick = { choosingSize = true }, variant = ButtonVariant.Secondary) {
                 Text("${settings.tripletCount} photos")
@@ -324,8 +320,15 @@ fun SettingsScreen(onBack: () -> Unit) {
         SettingsCard {
             ToggleRow("AI images on Home", "Show ChatGPT images in the Home grid.", settings.showAi, settings::updateShowAi)
             ToggleRow(
+                "Show person ranks",
+                "Show tagged people’s rank by average photo taste score in Swipe and Rating.",
+                settings.showPersonRanks,
+                settings::updateShowPersonRanks,
+                divider = true,
+            )
+            ToggleRow(
                 "Archive on download",
-                "Move photos to Archive after downloading them.",
+                "Move photos to Archive after regular downloads.",
                 settings.archiveOnDownload,
                 settings::updateArchiveOnDownload,
                 divider = true,
@@ -340,7 +343,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Matches", "How Matches picks and matches each set of photos.")
+            Section("Matches", "How Matches finds references for repair originals.")
             TripletSettingsCard()
         }
 

@@ -21,6 +21,14 @@ class ViewSettings(context: Context) {
         prefs.edit().putBoolean("showAi", value).apply()
     }
 
+    var showPersonRanks by mutableStateOf(prefs.getBoolean("showPersonRanks", false))
+        private set
+
+    fun updateShowPersonRanks(value: Boolean) {
+        showPersonRanks = value
+        prefs.edit().putBoolean("showPersonRanks", value).apply()
+    }
+
     // Move photos to Archive after downloading them. Off by default.
     var archiveOnDownload by mutableStateOf(prefs.getBoolean("archiveOnDownload", false))
         private set
@@ -91,15 +99,6 @@ class ViewSettings(context: Context) {
     fun updateTripletMatchScene(value: Boolean) {
         tripletMatchScene = value
         prefs.edit().putBoolean("tripletMatchScene", value).apply()
-    }
-
-    // Random Triplets lead with a clear face (big, sharp, typical). On by default; off orders the whole set.
-    var tripletClearLead by mutableStateOf(prefs.getBoolean("tripletClearLead", true))
-        private set
-
-    fun updateTripletClearLead(value: Boolean) {
-        tripletClearLead = value
-        prefs.edit().putBoolean("tripletClearLead", value).apply()
     }
 
     // Order of a set's photos (newest / oldest / best / random), random and outfit sets alike
