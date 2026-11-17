@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,18 +25,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bigshelf.app.ui.theme.BsIcons
+import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.delay
 import com.bigshelf.app.ui.theme.BsMotion
 
 /**
- * Port of the web's sonner `<Toaster position="top-center">` with its compact overrides
- * (280px wide, 8x12 padding, 12px text, 6px gap). Sonner's default light theme: white card,
- * #ededed border, near-black text. Call `toast.success("…")` from anywhere.
+ * Transient feedback at the top of the window, with optional actions such as Undo.
  */
 object toast {
     internal enum class Kind { Success, Error, Info, Message }
@@ -66,34 +69,34 @@ object toast {
     }
 }
 
-private val ToastBg = Color(0xFFFFFFFF)
-private val ToastBorder = Color(0xFFEDEDED)
-private val ToastText = Color(0xFF171717)
-
 @Composable
 fun Toaster(modifier: Modifier = Modifier) {
+    val accessibility = LocalAccessibilityManager.current
     Column(
-        modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp),
+        modifier.fillMaxWidth().statusBarsPadding().padding(start = 12.dp, top = 16.dp, end = 12.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         toast.items.forEach { item ->
             key(item.id) {
-                LaunchedEffect(Unit) {
-                    delay(if (item.action != null) 6000 else 4000) // sonner default; longer to reach Undo
+                LaunchedEffect(accessibility) {
+                    val timeout = if (item.action != null) 6000L else 4000L
+                    delay(accessibility?.calculateRecommendedTimeoutMillis(
+                        timeout, containsIcons = true, containsText = true, containsControls = true,
+                    ) ?: timeout)
                     toast.dismiss(item.id)
                 }
                 val visible = remember { MutableTransitionState(false).apply { targetState = true } }
                 AnimatedVisibility(visible, enter = fadeIn(BsMotion.spec()) + slideInVertically(BsMotion.spec()) { -it }, exit = fadeOut(BsMotion.fast())) {
                     Row(
                         Modifier
-                            .width(280.dp)
+                            .widthIn(max = 320.dp)
                             .shadow(6.dp, BsShapes.Lg, ambientColor = Color.Black.copy(alpha = 0.1f))
                             .clip(BsShapes.Lg)
-                            .background(ToastBg)
-                            .border(1.dp, ToastBorder, BsShapes.Lg)
-                            .bsClickable(scale = 1f) { toast.dismiss(item.id) }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .background(BsColors.Surface)
+                            .border(1.dp, BsColors.ControlBorder, BsShapes.Lg)
+                            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -103,31 +106,25 @@ fun Toaster(modifier: Modifier = Modifier) {
                             toast.Kind.Info -> BsIcons.InfoFill
                             toast.Kind.Message -> null
                         }
-                        if (icon != null) BsIcon(icon, size = 16.dp, tint = ToastText)
+                        if (icon != null) BsIcon(icon, size = 16.dp, tint = BsColors.Foreground)
                         Text(
                             item.text,
                             Modifier.weight(1f, fill = item.action != null),
-                            color = ToastText,
+                            color = BsColors.Foreground,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
                             fontWeight = BsWeight.Medium,
                         )
                         item.action?.let { (label, onAction) ->
-                            Text(
-                                label,
-                                Modifier
-                                    .clip(BsShapes.Md)
-                                    .bsClickable {
-                                        toast.dismiss(item.id)
-                                        onAction()
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                color = ToastText,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp,
-                                fontWeight = BsWeight.Semibold,
-                            )
+                            BsButton(
+                                onClick = {
+                                    toast.dismiss(item.id)
+                                    onAction()
+                                },
+                                variant = ButtonVariant.Ghost,
+                            ) { Text(label) }
                         }
+                        BsIconButton(BsIcons.XBold, "Dismiss notification", onClick = { toast.dismiss(item.id) })
                     }
                 }
             }

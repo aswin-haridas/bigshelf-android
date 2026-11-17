@@ -79,7 +79,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.time.format.FormatStyle
 import com.bigshelf.app.state.AuthStore
 import com.bigshelf.app.ui.screens.AlbumSharingModal
 import com.bigshelf.app.ui.shell.rememberUploadPicker
@@ -317,6 +317,7 @@ fun TextPromptModal(
         BsInput(
             value = text,
             onValueChange = { text = it },
+            accessibilityLabel = "Album name",
             autoFocus = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
@@ -334,7 +335,7 @@ private fun dayEnd(utcMillis: Long): String =
         .atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toOffsetDateTime().toString()
 
 private fun shortDate(utcMillis: Long): String =
-    DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
         .format(Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC).toLocalDate())
 
 /**
@@ -356,7 +357,6 @@ fun AlbumFormModal(
     var saving by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
     var place by remember { mutableStateOf<NamedPlace?>(null) }
-    val range = rememberDateRangePickerState()
     var dates by remember { mutableStateOf<Pair<Long, Long?>?>(null) }
     val places = rememberQuery("places", invalidatedBy = setOf("photos")) { PlaceNames.places(context) }
 
@@ -408,7 +408,7 @@ fun AlbumFormModal(
                     onClick = { picking = true },
                     icon = BsIcons.CalendarBlank,
                 )
-                if (dates != null) Chip("Clear", onClick = { dates = null; range.setSelection(null, null) })
+                if (dates != null) Chip("Clear dates", onClick = { dates = null })
             }
             val list = places.data.orEmpty()
             if (list.isNotEmpty()) {
@@ -423,6 +423,10 @@ fun AlbumFormModal(
     }
 
     if (picking) {
+        val range = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = dates?.first,
+            initialSelectedEndDateMillis = dates?.second,
+        )
         DatePickerDialog(
             onDismissRequest = { picking = false },
             confirmButton = {
@@ -437,7 +441,7 @@ fun AlbumFormModal(
             },
             dismissButton = { BsButton(onClick = { picking = false }, variant = ButtonVariant.Ghost) { Text("Cancel") } },
         ) {
-            DateRangePicker(range, Modifier.heightIn(max = 520.dp), title = null, showModeToggle = false)
+            DateRangePicker(range, Modifier.heightIn(max = 520.dp))
         }
     }
 }

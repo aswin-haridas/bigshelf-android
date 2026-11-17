@@ -3,12 +3,12 @@ package com.bigshelf.app.ui.photos
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.triStateToggleable
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.bigshelf.app.ui.components.LoadError
 import com.bigshelf.app.ui.components.BsIcon
-import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +38,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -315,26 +320,33 @@ private fun DateHeader(label: String, count: Int, selectable: List<Photo>?, modi
     ) {
         // While selecting, a tap on the month's circle picks (or drops) the whole month
         if (selectable != null) {
-            val all = selectable.all { SelectionStore.isSelected(it.id) }
+            val selectedCount = selectable.count { SelectionStore.isSelected(it.id) }
+            val state = when (selectedCount) {
+                0 -> ToggleableState.Off
+                selectable.size -> ToggleableState.On
+                else -> ToggleableState.Indeterminate
+            }
             Box(
                 Modifier
                     .padding(end = 10.dp)
                     .size(24.dp)
                     .clip(BsShapes.Full)
-                    .background(if (all) BsColors.Primary else Color.Black.copy(alpha = 0.4f))
+                    .background(if (state != ToggleableState.Off) BsColors.Primary else Color.Black.copy(alpha = 0.4f))
                     .border(1.dp, BsColors.Muted.copy(alpha = 0.7f), BsShapes.Full)
-                    .bsClickable {
-                        if (all) selectable.forEach { if (SelectionStore.isSelected(it.id)) SelectionStore.toggle(it) }
+                    .triStateToggleable(state, role = Role.Checkbox) {
+                        if (state == ToggleableState.On) selectable.forEach { SelectionStore.toggle(it) }
                         else SelectionStore.selectMany(selectable)
-                    },
+                    }
+                    .semantics { contentDescription = "Select photos from $label" },
                 contentAlignment = Alignment.Center,
             ) {
-                if (all) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground, contentDescription = "Deselect $label")
+                if (state == ToggleableState.On) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)
+                if (state == ToggleableState.Indeterminate) Box(Modifier.size(10.dp, 2.dp).background(BsColors.Foreground))
             }
         }
         Text(
             label,
-            Modifier.weight(1f),
+            Modifier.weight(1f).semantics { heading() },
             style = BsText.Xs.copy(
                 fontWeight = BsWeight.Semibold,
             ),

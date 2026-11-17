@@ -22,10 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.ui.theme.BsColors
@@ -51,7 +52,7 @@ fun BsModal(
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     // The X slides the sheet down before it leaves, like a drag or a tap outside
-    val close: () -> Unit = { scope.launch { state.hide() }.invokeOnCompletion { onClose() } }
+    val close: () -> Unit = { scope.launch { state.hide(); onClose() } }
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = state,
@@ -70,19 +71,12 @@ fun BsModal(
                 // Titles carry names ("Share \"…\"", "Edit: …"): never push the X off the sheet
                 Text(
                     title,
-                    Modifier.weight(1f).padding(end = 8.dp),
+                    Modifier.weight(1f).padding(end = 8.dp).semantics { heading() },
                     style = BsText.Base.copy(fontWeight = BsWeight.Semibold),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Box(
-                    Modifier
-                        .bsClickable(onClick = close)
-                        .clip(BsShapes.Md)
-                        .padding(8.dp),
-                ) {
-                    BsIcon(BsIcons.XBold, size = 16.dp, tint = BsColors.Muted, contentDescription = "Close")
-                }
+                BsIconButton(BsIcons.XBold, "Close dialog", onClick = close, tint = BsColors.Muted)
             }
             // Tall content scrolls between a fixed header and footer, so the buttons stay reachable
             Box(

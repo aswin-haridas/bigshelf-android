@@ -2,17 +2,24 @@ package com.bigshelf.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,7 +74,7 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
     Row(
         modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(IntrinsicSize.Min)
             .selectableGroup()
             .clip(BsShapes.Full)
             .background(BsColors.Surface)
@@ -76,19 +83,22 @@ fun <T> BsTabs(tabs: List<TabItem<T>>, active: T, onChange: (T) -> Unit, modifie
     ) {
         tabs.forEach { tab ->
             val selected = tab.id == active
+            val interaction = remember { MutableInteractionSource() }
             val bg by animateColorAsState(if (selected) BsColors.SurfaceHover else Color.Transparent, BsMotion.fast(), label = "tabBg")
             Box(
                 Modifier
                     // Roughly by label length, so long labels ("Untagged") don't ellipsize next to short ones
                     .weight(tab.label.length + 4f)
                     .fillMaxHeight()
+                    .heightIn(min = 48.dp)
                     .clip(BsShapes.Full)
                     .background(bg)
-                    .selectable(selected = selected, role = Role.Tab, onClick = { onChange(tab.id) })
-                    .padding(horizontal = 4.dp),
+                    .bsFocusIndicator(interaction, BsShapes.Full)
+                    .selectable(selected, interaction, LocalIndication.current, role = Role.Tab, onClick = { onChange(tab.id) })
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                FitText(tab.label, BsText.Xs.copy(fontWeight = BsWeight.Medium, color = if (selected) BsColors.Foreground else BsColors.Muted))
+                Text(tab.label, style = BsText.Xs.copy(fontWeight = BsWeight.Medium), color = if (selected) BsColors.Foreground else BsColors.Muted, textAlign = TextAlign.Center)
             }
         }
     }
@@ -118,11 +128,12 @@ fun BsSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Mod
 /** Port of components/ui/Progress.tsx track: `h-1 rounded-full bg-border`, primary fill. */
 @Composable
 fun BsProgress(percent: Float, modifier: Modifier = Modifier, height: androidx.compose.ui.unit.Dp = 4.dp, track: Color = BsColors.Border) {
-    Box(modifier.fillMaxWidth().height(height).clip(BsShapes.Full).background(track)) {
+    val value = percent.coerceIn(0f, 100f)
+    Box(modifier.semantics { progressBarRangeInfo = ProgressBarRangeInfo(value, 0f..100f) }.fillMaxWidth().height(height).clip(BsShapes.Full).background(track)) {
         Box(
             Modifier
                 .fillMaxHeight()
-                .fillMaxWidth(percent.coerceIn(0f, 100f) / 100f)
+                .fillMaxWidth(value / 100f)
                 .clip(BsShapes.Full)
                 .background(BsColors.Primary),
         )
@@ -191,6 +202,7 @@ fun PageHeader(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
+                Modifier.semantics { heading() },
                 style = BsText.Lg.copy(fontWeight = BsWeight.Semibold),
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

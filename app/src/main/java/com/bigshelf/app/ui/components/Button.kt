@@ -1,7 +1,6 @@
 package com.bigshelf.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
@@ -26,6 +26,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -75,7 +78,9 @@ fun BsButton(
             .alpha(if (enabled) 1f else 0.4f)
             .clip(shape)
             .background(bg)
-            .clickable(interaction, indication = null, enabled = clickable, onClick = onClick)
+            .bsFocusIndicator(interaction, shape)
+            .clickable(interaction, indication = null, enabled = clickable, role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
@@ -95,7 +100,7 @@ fun BsButton(
     }
 }
 
-/** Borderless 44dp icon button: a bare glyph, on a surface circle when [active]. */
+/** Borderless icon button: a bare glyph in a 48dp target, on a surface circle when [active]. */
 @Composable
 fun BsIconButton(
     icon: ImageVector,
@@ -109,14 +114,16 @@ fun BsIconButton(
 ) {
     Box(
         modifier = modifier
-            .bsClickable(enabled = enabled && !loading, onClick = onClick)
             .clip(BsShapes.Full)
             .background(if (active) BsColors.Surface else Color.Transparent)
-            .size(44.dp),
+            .bsClickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
+            .semantics { this.contentDescription = contentDescription }
+            .alpha(if (enabled) 1f else 0.4f)
+            .size(48.dp),
         contentAlignment = Alignment.Center,
     ) {
         val color = tint ?: BsColors.Foreground
         if (loading) Spinner(size = 20.dp, tint = color)
-        else BsIcon(icon, size = 20.dp, tint = color, contentDescription = contentDescription)
+        else BsIcon(icon, size = 20.dp, tint = color)
     }
 }

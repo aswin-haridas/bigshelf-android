@@ -31,6 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -73,7 +77,7 @@ fun AuthLayout(content: @Composable ColumnScope.() -> Unit) {
         ) {
             Image(
                 painterResource(R.drawable.bigshelf_hero),
-                contentDescription = "Hero background",
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -94,6 +98,7 @@ private fun AuthHeader(title: String) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             title,
+            Modifier.semantics { heading() },
             style = BsText.Xl.copy(fontWeight = BsWeight.Semibold, letterSpacing = BsText.TrackingTight),
             color = BsColors.Foreground,
         )
@@ -126,6 +131,7 @@ private fun AuthError(error: String?) {
         error,
         Modifier
             .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .clip(BsShapes.Lg)
             .background(BsColors.DangerBg.copy(alpha = 0.4f))
             .border(1.dp, BsColors.DangerBorder, BsShapes.Lg)
@@ -166,7 +172,7 @@ fun LoginScreen(onRegister: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
         AuthError(AuthStore.error)
-        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading, shape = BsShapes.Xl) {
+        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), loading = loading, shape = BsShapes.Xl) {
             Text(if (loading) "Logging in..." else "Log in")
         }
     }
@@ -204,7 +210,7 @@ fun RegisterScreen(onLogin: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
         AuthError(AuthStore.error)
-        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), enabled = !loading, shape = BsShapes.Xl) {
+        BsButton(onClick = { submit() }, Modifier.fillMaxWidth(), loading = loading, shape = BsShapes.Xl) {
             Text(if (loading) "Signing up..." else "Sign Up")
         }
     }

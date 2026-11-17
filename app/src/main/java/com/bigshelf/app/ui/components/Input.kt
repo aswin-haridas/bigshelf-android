@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.components
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.animateColorAsState
@@ -12,7 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
@@ -63,18 +64,21 @@ fun BsInput(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    accessibilityLabel: String = placeholder,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val border by animateColorAsState(if (focused) BsColors.BorderFocus else BsColors.Border, BsMotion.fast(), label = "inputBorder")
+    val border by animateColorAsState(if (focused) BsColors.FocusRing else BsColors.ControlBorder, BsMotion.fast(), label = "inputBorder")
     val focusRequester = remember { FocusRequester() }
     if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.fillMaxWidth().focusRequester(focusRequester),
+        modifier = modifier.fillMaxWidth().focusRequester(focusRequester).semantics {
+            if (accessibilityLabel.isNotEmpty()) contentDescription = accessibilityLabel
+        },
         singleLine = singleLine,
         textStyle = textStyle.copy(color = BsColors.Foreground),
         cursorBrush = SolidColor(BsColors.Foreground),
@@ -87,13 +91,14 @@ fun BsInput(
                 modifier = Modifier
                     .clip(BsShapes.Xl)
                     .background(BsColors.Surface)
-                    .border(1.dp, border, BsShapes.Xl)
-                    .padding(start = 14.dp, end = if (trailing != null) 12.dp else 14.dp, top = 14.dp, bottom = 14.dp),
+                    .border(if (focused) 2.dp else 1.dp, border, BsShapes.Xl)
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 14.dp, vertical = if (trailing == null) 12.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box(Modifier.weight(1f)) {
-                    if (value.isEmpty()) Text(placeholder, style = textStyle, color = BsColors.MutedFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, style = textStyle, color = BsColors.MutedFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
                 trailing?.invoke()
@@ -121,12 +126,11 @@ fun BsField(
 ) {
     var show by rememberSaveable { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, style = BsText.Xs, color = BsColors.MutedSoft)
+        Text(label, Modifier.clearAndSetSemantics {}, style = BsText.Xs, color = BsColors.MutedSoft)
         BsInput(
             value = value,
             onValueChange = onValueChange,
-            // Names the field for TalkBack; the visible label above isn't tied to it otherwise
-            modifier = Modifier.semantics { contentDescription = label },
+            accessibilityLabel = listOfNotNull(label, hint).joinToString(". "),
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (password) KeyboardType.Password else keyboardType,
                 imeAction = imeAction,
@@ -135,10 +139,9 @@ fun BsField(
             visualTransformation = if (password && !show) PasswordVisualTransformation() else VisualTransformation.None,
             trailing = if (password) {
                 {
-                    BsIcon(
-                        if (show) BsIcons.EyeSlash else BsIcons.Eye,
-                        Modifier.bsClickable { show = !show },
-                        size = 20.dp,
+                    BsIconButton(
+                        icon = if (show) BsIcons.EyeSlash else BsIcons.Eye,
+                        onClick = { show = !show },
                         tint = BsColors.MutedFaint,
                         contentDescription = if (show) "Hide password" else "Show password",
                     )
@@ -148,7 +151,7 @@ fun BsField(
         if (hint != null) {
             Text(
                 hint,
-                Modifier.padding(top = 4.dp),
+                Modifier.padding(top = 4.dp).clearAndSetSemantics {},
                 style = BsText.Xs2.copy(fontWeight = BsWeight.Light),
                 color = BsColors.MutedFaint,
             )
@@ -170,11 +173,12 @@ fun BsSearchBar(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg by animateColorAsState(if (focused) BsColors.SurfaceHover else BsColors.Surface, BsMotion.fast(), label = "searchBg")
+    val focusRequester = remember { FocusRequester() }
     val style = BsText.Sm
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier,
+        modifier = modifier.focusRequester(focusRequester).semantics { contentDescription = placeholder },
         singleLine = true,
         textStyle = style.copy(color = BsColors.Foreground),
         cursorBrush = SolidColor(BsColors.Foreground),
@@ -183,9 +187,11 @@ fun BsSearchBar(
         decorationBox = { inner ->
             Row(
                 Modifier
-                    .height(48.dp)
+                    .heightIn(min = 48.dp)
                     .clip(BsShapes.Full)
                     .background(bg)
+                    .border(1.dp, BsColors.ControlBorder, BsShapes.Full)
+                    .bsFocusIndicator(interaction, BsShapes.Full)
                     .padding(start = 16.dp, end = if (value.isEmpty()) 16.dp else 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -195,9 +201,15 @@ fun BsSearchBar(
                     inner()
                 }
                 if (value.isNotEmpty()) {
-                    Box(Modifier.size(40.dp).bsClickable { onValueChange("") }, contentAlignment = Alignment.Center) {
-                        BsIcon(BsIcons.XCircleFill, size = 20.dp, tint = BsColors.Muted, contentDescription = "Clear search")
-                    }
+                    BsIconButton(
+                        BsIcons.XCircleFill,
+                        "Clear search",
+                        onClick = {
+                            focusRequester.requestFocus()
+                            onValueChange("")
+                        },
+                        tint = BsColors.Muted,
+                    )
                 }
             }
         },

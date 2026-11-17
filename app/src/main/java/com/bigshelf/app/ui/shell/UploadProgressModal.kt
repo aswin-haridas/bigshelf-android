@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +50,7 @@ fun UploadProgressModal(modifier: Modifier = Modifier) {
             Modifier.padding(bottom = 8.dp),
             style = BsText.Sm.copy(fontWeight = BsWeight.Medium),
         )
-        BsProgress(shown, height = 8.dp, track = Neutral.N700)
+        BsProgress(shown, Modifier.semantics { contentDescription = "Upload progress" }, height = 8.dp, track = Neutral.N700)
         Text(
             "${upload.progress}% · ${upload.processed} of ${upload.fileCount} processed",
             Modifier.padding(top = 8.dp),

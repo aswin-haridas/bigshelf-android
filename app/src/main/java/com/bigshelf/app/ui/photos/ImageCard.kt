@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
@@ -40,7 +44,6 @@ import com.bigshelf.app.data.Photo
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.Skeleton
 import com.bigshelf.app.ui.components.Spinner
-import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
@@ -69,6 +72,12 @@ fun ImageCard(
     aspectRatio: Float? = 3f / 4f,
 ) {
     val processing = photo.isProcessing
+    val name = photo.title ?: photo.filename
+    val description = when {
+        photo.isVideo -> "$name, video"
+        photo.isAiImage -> "$name, AI image"
+        else -> name
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     Box(
@@ -89,7 +98,14 @@ fun ImageCard(
                     if (waitForUpOrCancellation() == null) job.cancel()
                 }
             }
-            .combinedClickable(onClick = onClick, onLongClick = onToggle),
+            .combinedClickable(
+                role = Role.Button,
+                onClickLabel = if (photo.isVideo) "Open video" else "Open photo",
+                onClick = onClick,
+                onLongClickLabel = if (selected) "Deselect" else "Select",
+                onLongClick = onToggle,
+            )
+            .semantics { contentDescription = description },
     ) {
         val src = photo.thumbnailUrl ?: photo.imageSrc
         if (src != null) {
@@ -99,7 +115,7 @@ fun ImageCard(
             // Grid tiles use the 720x960 (3:4) thumbnail, like the web
             AsyncImage(
                 model = BigShelfApp.api.mediaUrl(src),
-                contentDescription = photo.title ?: photo.filename,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
                 onSuccess = { loaded = true },
@@ -132,7 +148,8 @@ fun ImageCard(
                     .clip(BsShapes.Full)
                     .background(if (selected) BsColors.Primary else Color.Black.copy(alpha = 0.4f))
                     .border(1.dp, BsColors.Muted.copy(alpha = 0.7f), BsShapes.Full)
-                    .bsClickable(onClick = onToggle),
+                    .toggleable(value = selected, role = Role.Checkbox, onValueChange = { onToggle() })
+                    .semantics { contentDescription = "Select $name" },
                 contentAlignment = Alignment.Center,
             ) {
                 if (selected) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)

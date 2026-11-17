@@ -12,11 +12,13 @@ object BsColors {
     val SurfaceHover = Color(0xFF1C1C1C)
     val Border = Color(0xFF1F1F1F)
     val BorderFocus = Color(0xFF3F3F3F)
+    val ControlBorder = Color(0xFF6D6D6D)
+    val FocusRing = Color(0xFFC4B5FD)
 
     val Foreground = Color(0xFFFFFFFF)
     val Muted = Color(0xFF8E8E8E)
     val MutedSoft = Color(0xFFD4D4D4)
-    val MutedFaint = Color(0xFF5C5C5C)
+    val MutedFaint = Color(0xFF898989)
 
     val Primary = Color(0xFF7C3AED)
     val PrimaryDeep = Color(0xFF3B0764)
