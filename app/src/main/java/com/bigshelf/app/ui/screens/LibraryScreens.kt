@@ -74,7 +74,7 @@ fun BinScreen(onOpenPhoto: (String) -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("Bin", count = countLabel(total, "photo"), leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) }) {
             if (total > 0) {
-                BsButton(onClick = { confirm = true }, variant = ButtonVariant.Secondary, enabled = !emptying, contentColor = BsColors.Danger) {
+                BsButton(onClick = { confirm = true }, variant = ButtonVariant.Danger, enabled = !emptying) {
                     if (emptying) Spinner(size = 14.dp) else BsIcon(BsIcons.Trash, size = 14.dp)
                     Text("Empty")
                 }
@@ -156,9 +156,8 @@ fun ArchiveScreen(onFolder: (String) -> Unit, onBack: () -> Unit) {
             if (list.isNotEmpty()) {
                 BsButton(
                     onClick = { confirmEmpty = true },
-                    variant = ButtonVariant.Secondary,
+                    variant = ButtonVariant.Danger,
                     enabled = !emptying && busy == null,
-                    contentColor = BsColors.Danger,
                 ) {
                     if (emptying) Spinner(size = 14.dp) else BsIcon(BsIcons.Trash, size = 14.dp)
                     Text("Empty")

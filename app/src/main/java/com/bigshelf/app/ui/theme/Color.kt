@@ -30,6 +30,7 @@ object BsColors {
     val Success = Color(0xFF34D399)
     val Warning = Color(0xFFFBBF24)
     val Info = Color(0xFF60A5FA)
+    val Favorite = Color(0xFFF472B6) // pink-400, the favourite / heart accent
 }
 
 /** Greys a few older components use directly, tuned to the black palette. New UI should use [BsColors]. */

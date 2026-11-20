@@ -439,8 +439,7 @@ fun RunScreen(runId: String, onBack: () -> Unit) {
                             }
                         }
                     },
-                    variant = ButtonVariant.Ghost,
-                    contentColor = BsColors.Danger,
+                    variant = ButtonVariant.DangerGhost,
                     loading = cancelling,
                 ) { Text("Cancel") }
             }

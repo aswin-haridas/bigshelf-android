@@ -2,11 +2,8 @@ package com.bigshelf.app.ui.theme
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.adamglin.PhosphorIcons
-import com.adamglin.phosphoricons.Bold
 import com.adamglin.phosphoricons.Fill
 import com.adamglin.phosphoricons.Regular
-import com.adamglin.phosphoricons.bold.Check as BoldCheck
-import com.adamglin.phosphoricons.bold.X as BoldX
 import com.adamglin.phosphoricons.fill.CheckCircle as FillCheckCircle
 import com.adamglin.phosphoricons.fill.FlowerTulip as FillFlowerTulip
 import com.adamglin.phosphoricons.fill.Heart as FillHeart
@@ -68,6 +65,7 @@ import com.adamglin.phosphoricons.regular.ArrowCounterClockwise
 import com.adamglin.phosphoricons.regular.ArrowLeft
 import com.adamglin.phosphoricons.regular.ArrowsClockwise
 import com.adamglin.phosphoricons.regular.CaretRight
+import com.adamglin.phosphoricons.regular.Check
 import com.adamglin.phosphoricons.regular.DownloadSimple
 import com.adamglin.phosphoricons.regular.Eye
 import com.adamglin.phosphoricons.regular.EyeSlash
@@ -96,7 +94,7 @@ import com.adamglin.phosphoricons.regular.Wrench
 
 /**
  * Phosphor icons - the same set the web app imports from @phosphor-icons/react.
- * Names keep the web's `XxxIcon` naming so screens read like their .tsx counterparts.
+ * Names are Phosphor's own, minus the web's `Icon` suffix (`XIcon` there is `X` here).
  * Sizes stay on the web scale: 12 / 14 / 16 / 20 / 24 / 32 dp.
  */
 object BsIcons {
@@ -156,7 +154,7 @@ object BsIcons {
     val ArrowLeft: ImageVector get() = PhosphorIcons.Regular.ArrowLeft
     val ArrowsClockwise: ImageVector get() = PhosphorIcons.Regular.ArrowsClockwise
     val CaretRight: ImageVector get() = PhosphorIcons.Regular.CaretRight
-    val CheckBold: ImageVector get() = PhosphorIcons.Bold.BoldCheck
+    val Check: ImageVector get() = PhosphorIcons.Regular.Check
     val CheckCircleFill: ImageVector get() = PhosphorIcons.Fill.FillCheckCircle
     val DownloadSimple: ImageVector get() = PhosphorIcons.Regular.DownloadSimple
     val Eye: ImageVector get() = PhosphorIcons.Regular.Eye
@@ -189,5 +187,4 @@ object BsIcons {
     val Users: ImageVector get() = PhosphorIcons.Regular.Users
     val UsersFill: ImageVector get() = PhosphorIcons.Fill.FillUsers
     val WarningCircleFill: ImageVector get() = PhosphorIcons.Fill.FillWarningCircle
-    val XBold: ImageVector get() = PhosphorIcons.Bold.BoldX
 }

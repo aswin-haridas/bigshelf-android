@@ -316,8 +316,7 @@ fun FramerScreen(photoId: String?, onBack: () -> Unit) {
                             BsButton(
                                 onClick = ::deleteVideo,
                                 modifier = Modifier.weight(1f),
-                                variant = ButtonVariant.Secondary,
-                                contentColor = BsColors.Danger,
+                                variant = ButtonVariant.Danger,
                                 loading = deleting,
                                 enabled = !loadingVideo && (libraryId != null || video != null),
                             ) {
@@ -485,7 +484,7 @@ private fun FrameTile(frame: Frame, selected: Boolean, showGrid: Boolean, modifi
                 .background(if (selected) BsColors.Primary else Color.Black.copy(alpha = 0.4f)),
             contentAlignment = Alignment.Center,
         ) {
-            if (selected) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)
+            if (selected) BsIcon(BsIcons.Check, size = 14.dp, tint = BsColors.Foreground)
         }
         Row(
             Modifier

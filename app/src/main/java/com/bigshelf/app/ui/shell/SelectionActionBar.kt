@@ -253,7 +253,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(48.dp).clip(BsShapes.Full).bsClickable(enabled = !busy, onClick = SelectionStore::clear), contentAlignment = Alignment.Center) {
-                BsIcon(BsIcons.XBold, size = 20.dp, tint = BsColors.Foreground, contentDescription = "Clear selection")
+                BsIcon(BsIcons.X, size = 20.dp, tint = BsColors.Foreground, contentDescription = "Clear selection")
             }
             Text("$count selected", Modifier.weight(1f), style = BsText.Sm.copy(fontWeight = BsWeight.Medium))
             if (unselected.isNotEmpty()) {

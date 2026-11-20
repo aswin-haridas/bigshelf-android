@@ -364,8 +364,7 @@ fun TriptychScreen(
                     BsButton(
                         onClick = ::skipPerson,
                         modifier = Modifier.fillMaxWidth(),
-                        variant = ButtonVariant.Ghost,
-                        contentColor = BsColors.Danger,
+                        variant = ButtonVariant.DangerGhost,
                         enabled = busy == null && !loading,
                         loading = busy == "skip",
                     ) {

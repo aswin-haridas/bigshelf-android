@@ -271,7 +271,7 @@ fun AlbumSharingModal(album: AlbumListItem, onUpload: () -> Unit, onLeft: () -> 
                         Text(person.username, Modifier.weight(1f), style = BsText.Sm, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         when {
                             person.role == "owner" -> Text("Owner", style = BsText.Xs, color = BsColors.Muted)
-                            owner -> BsIconButton(BsIcons.XBold, "Remove ${person.username}", onClick = {
+                            owner -> BsIconButton(BsIcons.X, "Remove ${person.username}", onClick = {
                                 run(person.id, "Couldn't remove ${person.username}") {
                                     api.removeAlbumMember(album.id, person.id)
                                     people.data = list.filter { it.id != person.id }
@@ -310,8 +310,7 @@ fun AlbumSharingModal(album: AlbumListItem, onUpload: () -> Unit, onLeft: () -> 
                             onLeft()
                         }
                     },
-                    variant = ButtonVariant.Ghost,
-                    contentColor = BsColors.Danger,
+                    variant = ButtonVariant.DangerGhost,
                     loading = busy == "leave",
                 ) {
                     BsIcon(BsIcons.SignOut, size = 16.dp, tint = BsColors.Danger)

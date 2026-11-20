@@ -76,7 +76,7 @@ fun BsModal(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                BsIconButton(BsIcons.XBold, "Close dialog", onClick = close, tint = BsColors.Muted)
+                BsIconButton(BsIcons.X, "Close dialog", onClick = close, tint = BsColors.Muted)
             }
             // Tall content scrolls between a fixed header and footer, so the buttons stay reachable
             Box(
@@ -115,7 +115,7 @@ fun ConfirmModal(
         onClose = onClose,
         footer = {
             BsButton(onClick = onClose, variant = ButtonVariant.Ghost) { Text("Cancel") }
-            BsButton(onClick = { onClose(); onConfirm() }, variant = ButtonVariant.Secondary, contentColor = BsColors.Danger) {
+            BsButton(onClick = { onClose(); onConfirm() }, variant = ButtonVariant.Danger) {
                 Text(confirmLabel)
             }
         },

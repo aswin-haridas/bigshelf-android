@@ -286,7 +286,7 @@ fun FacesScreen(query: QueryState<List<FaceItem>>, onFace: (String) -> Unit, onT
                                         .border(1.dp, BsColors.Muted.copy(alpha = 0.7f), BsShapes.Full),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    if (picked) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)
+                                    if (picked) BsIcon(BsIcons.Check, size = 14.dp, tint = BsColors.Foreground)
                                 }
                             }
                         }
@@ -313,8 +313,7 @@ fun FacesScreen(query: QueryState<List<FaceItem>>, onFace: (String) -> Unit, onT
                 }
                 BsButton(
                     onClick = ::forget,
-                    variant = ButtonVariant.Secondary,
-                    contentColor = BsColors.Danger,
+                    variant = ButtonVariant.Danger,
                     enabled = busy == null,
                     loading = busy == "forget",
                     textStyle = BsText.Xs,

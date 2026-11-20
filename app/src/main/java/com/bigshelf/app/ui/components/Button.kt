@@ -38,13 +38,14 @@ import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.BsMotion
 
-enum class ButtonVariant { Primary, Secondary, Ghost }
+enum class ButtonVariant { Primary, Secondary, Ghost, Danger, DangerGhost }
 
 /**
  * Minimal buttons, rounded and flat:
  * - primary: white with black text, dimming while pressed
  * - secondary: surface grey, lighter while pressed
  * - ghost: transparent, surface grey while pressed
+ * - danger / dangerGhost: secondary / ghost fill with danger-red text, for destructive actions
  * Loading swaps to the surface + muted text with a 14dp spinner; disabled dims the whole button.
  */
 @Composable
@@ -66,7 +67,8 @@ fun BsButton(
     val target = when {
         loading -> BsColors.Surface
         variant == ButtonVariant.Primary -> if (pressed) BsColors.MutedSoft else BsColors.Foreground
-        variant == ButtonVariant.Secondary -> if (pressed) BsColors.SurfaceHover else BsColors.Surface
+        variant == ButtonVariant.Secondary || variant == ButtonVariant.Danger ->
+            if (pressed) BsColors.SurfaceHover else BsColors.Surface
         else -> if (pressed) BsColors.Surface else Color.Transparent
     }
     val bg by animateColorAsState(target, BsMotion.fast(), label = "buttonBg")
@@ -90,6 +92,7 @@ fun BsButton(
                 loading -> BsColors.Muted
                 contentColor != null -> contentColor
                 variant == ButtonVariant.Primary -> BsColors.Background
+                variant == ButtonVariant.Danger || variant == ButtonVariant.DangerGhost -> BsColors.Danger
                 else -> BsColors.Foreground
             },
             LocalTextStyle provides textStyle.copy(fontWeight = BsWeight.Medium),

@@ -124,7 +124,7 @@ fun Toaster(modifier: Modifier = Modifier) {
                                 variant = ButtonVariant.Ghost,
                             ) { Text(label) }
                         }
-                        BsIconButton(BsIcons.XBold, "Dismiss notification", onClick = { toast.dismiss(item.id) })
+                        BsIconButton(BsIcons.X, "Dismiss notification", onClick = { toast.dismiss(item.id) })
                     }
                 }
             }

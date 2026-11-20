@@ -152,7 +152,7 @@ fun ImageCard(
                     .semantics { contentDescription = "Select $name" },
                 contentAlignment = Alignment.Center,
             ) {
-                if (selected) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)
+                if (selected) BsIcon(BsIcons.Check, size = 14.dp, tint = BsColors.Foreground)
             }
         }
 

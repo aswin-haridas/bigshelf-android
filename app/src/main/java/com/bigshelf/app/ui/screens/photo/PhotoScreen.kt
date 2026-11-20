@@ -932,9 +932,8 @@ private fun FaceTagModal(
             if (!wholePhoto) {
                 BsButton(
                     onClick = { run("Failed to forget face") { onChanged(api.photoFaceAction(photo.id, faceIndex, "ignore").photo); "Face forgotten" } },
-                    variant = ButtonVariant.Ghost,
+                    variant = ButtonVariant.DangerGhost,
                     enabled = !saving,
-                    contentColor = BsColors.Danger,
                     textStyle = BsText.Xs,
                 ) { Text("Forget face") }
             }

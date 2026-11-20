@@ -146,7 +146,7 @@ fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 } else Text("Duplicates", style = BsText.Sm.copy(fontWeight = BsWeight.Medium), maxLines = 1)
             }
             if (current != null) {
-                BsIconButton(BsIcons.CheckBold, "Keep both", onClick = { decide(current, null) }, tint = BsColors.Foreground)
+                BsIconButton(BsIcons.Check, "Keep both", onClick = { decide(current, null) }, tint = BsColors.Foreground)
                 if (best != null) BsIconButton(BsIcons.Star, "Pick the best", onClick = { decide(current, best) }, tint = BsColors.Success)
             }
             BsIconButton(BsIcons.ArrowUUpLeft, "Undo", onClick = ::undo, enabled = history.isNotEmpty(), tint = if (history.isNotEmpty()) BsColors.Foreground else null)

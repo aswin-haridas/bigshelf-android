@@ -340,7 +340,7 @@ private fun DateHeader(label: String, count: Int, selectable: List<Photo>?, modi
                     .semantics { contentDescription = "Select photos from $label" },
                 contentAlignment = Alignment.Center,
             ) {
-                if (state == ToggleableState.On) BsIcon(BsIcons.CheckBold, size = 14.dp, tint = BsColors.Foreground)
+                if (state == ToggleableState.On) BsIcon(BsIcons.Check, size = 14.dp, tint = BsColors.Foreground)
                 if (state == ToggleableState.Indeterminate) Box(Modifier.size(10.dp, 2.dp).background(BsColors.Foreground))
             }
         }

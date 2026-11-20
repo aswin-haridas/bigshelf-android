@@ -84,10 +84,10 @@ private const val QUICK_KEEP_MS = 1500L
 private val THRESHOLD = 100.dp
 
 private enum class Verdict(val label: String, val color: Color, val icon: ImageVector) {
-    Keep("Keep", BsColors.Success, BsIcons.CheckBold),
+    Keep("Keep", BsColors.Success, BsIcons.Check),
     Bin("Bin", BsColors.Danger, BsIcons.Trash),
-    Favorite("Favourite", Color(0xFFF472B6), BsIcons.Heart),
-    Rework("Rework", Color(0xFFFBBF24), BsIcons.Wrench),
+    Favorite("Favourite", BsColors.Favorite, BsIcons.Heart),
+    Rework("Rework", BsColors.Warning, BsIcons.Wrench),
 }
 
 // Which verdict a drag is heading for, and how far there it is (1 = past the threshold)
@@ -336,7 +336,7 @@ private fun SwipeCard(
                     Modifier.size(88.dp).clip(BsShapes.Full).background(verdict.color).border(3.dp, Color.White, BsShapes.Full),
                     contentAlignment = Alignment.Center,
                 ) {
-                    BsIcon(verdict.icon, size = 40.dp, tint = Color.White)
+                    BsIcon(verdict.icon, size = 32.dp, tint = Color.White)
                 }
                 Text(
                     verdict.label,
