@@ -13,13 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,13 +50,16 @@ import com.bigshelf.app.data.Photo
 import com.bigshelf.app.data.PhotoPersonTag
 import com.bigshelf.app.state.AuthStore
 import com.bigshelf.app.state.PagedPhotos
-import com.bigshelf.app.state.rememberPagedPhotos
+import com.bigshelf.app.state.QueryState
+import com.bigshelf.app.state.UploadStore
 import com.bigshelf.app.state.rememberQuery
+import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsSearchBar
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
 import com.bigshelf.app.ui.components.LoadError
+import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.photos.ImagesGrid
 import com.bigshelf.app.state.ViewerList
@@ -61,6 +70,7 @@ import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -121,25 +131,38 @@ private fun Modifier.pinchToggle(onPinch: (Boolean) -> Unit) = pointerInput(Unit
  * Photo timeline with an optional swipeable burst feed and ranked search results.
  */
 @Composable
-fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
+internal fun HomeScreen(
+    feed: PagedPhotos,
+    burstOf: Map<String, String>,
+    feedView: Boolean,
+    onFeedViewChange: (Boolean) -> Unit,
+    onOpenPhoto: (String) -> Unit,
+    onProfile: () -> Unit,
+) {
     val api = BigShelfApp.api
     val settings = BigShelfApp.settings
     val showAi = settings.showAi
     var search by rememberSaveable { mutableStateOf("") }
     var q by rememberSaveable { mutableStateOf("") }
-    var feedView by rememberSaveable { mutableStateOf(false) }
     // Debounced 300ms, like the web search box
     LaunchedEffect(search) {
         delay(300)
         q = search.trim()
     }
 
-    val feed = rememberPagedPhotos("home", invalidatedBy = setOf("photos")) { page, cursor -> api.photos(page, cursor = cursor, people = true, sort = "uploaded") }
     val textSearch = rememberQuery("search", q, invalidatedBy = setOf("photos")) {
         if (q.isEmpty()) emptyList() else api.searchPhotos(q)
     }
     val filter: (List<Photo>) -> List<Photo> = { all -> if (showAi) all else all.filterNot { it.isAiImage } }
     val results = filter(textSearch.data.orEmpty())
+    val listedIds = remember(feed.photos) { feed.photos.mapTo(HashSet()) { it.id } }
+    val previews = UploadStore.previews.filterNot { it.photoId in listedIds }
+    LaunchedEffect(listedIds, UploadStore.previews) {
+        if (previews.size != UploadStore.previews.size) UploadStore.removeListedPreviews(listedIds)
+    }
+    val uploadHeader: (@Composable () -> Unit)? = if (previews.isEmpty()) null else {
+        { UploadPreviews(previews, onOpenPhoto) }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -177,35 +200,66 @@ fun HomeScreen(onOpenPhoto: (String) -> Unit, onProfile: () -> Unit) {
                 explore = true,
             )
         } else {
-            // Pinch out on All photos opens the Feed; pinch in goes back
-            Box(Modifier.fillMaxSize().pinchToggle { feedView = it }) {
-            if (feedView) {
-                PhotoFeed(feed, showAi, onOpenPhoto)
-            } else {
-                val photos = remember(feed.photos, showAi) { filter(feed.photos) }
-                ImagesGrid(
-                    photos = photos,
-                    onOpen = { onOpenPhoto(it.id) },
-                    fetchNextPage = feed::fetchNextPage,
-                    hasNextPage = feed.hasNextPage,
-                    isFetchingNextPage = feed.isFetching,
-                    isError = feed.isError,
-                    onRetry = feed::retry,
-                    totalCount = if (showAi) feed.total else null,
-                )
+            // Hoisted so the "New photos" button can scroll them to the top
+            val gridState = rememberLazyGridState()
+            val listState = rememberLazyListState()
+            val scope = rememberCoroutineScope()
+            val atTop by remember(feedView) {
+                derivedStateOf {
+                    if (feedView) listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                    else gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+                }
             }
+            val newCount = filter(feed.newPhotos).size
+            val hasNew = newCount > 0 || feed.newNeedsReload
+            val jumpToNew: suspend () -> Unit = {
+                feed.showNew()
+                // Lists keep their place by key, so without this the new photos land just above view
+                if (feedView) listState.scrollToItem(0) else gridState.scrollToItem(0)
+            }
+            // Nobody is reading below the top: show new photos straight away
+            LaunchedEffect(hasNew, atTop) { if (hasNew && atTop) jumpToNew() }
+            // Pinch out on All photos opens the Feed; pinch in goes back
+            Box(Modifier.fillMaxSize().pinchToggle(onFeedViewChange)) {
+                if (feedView) {
+                    PhotoFeed(feed, showAi, burstOf, onOpenPhoto, listState, uploadHeader)
+                } else {
+                    val photos = remember(feed.photos, showAi) { filter(feed.photos) }
+                    ImagesGrid(
+                        photos = photos,
+                        onOpen = { onOpenPhoto(it.id) },
+                        fetchNextPage = feed::fetchNextPage,
+                        hasNextPage = feed.hasNextPage,
+                        isFetchingNextPage = feed.isFetching,
+                        isError = feed.isError,
+                        onRetry = feed::retry,
+                        totalCount = if (showAi) feed.total else null,
+                        header = uploadHeader,
+                        showEmptyState = previews.isEmpty(),
+                        state = gridState,
+                    )
+                }
+                if ((hasNew || previews.isNotEmpty()) && !atTop) {
+                    NewPhotosButton(
+                        when {
+                            previews.isNotEmpty() -> "New uploads"
+                            feed.newNeedsReload -> "New photos"
+                            else -> "$newCount new ${if (newCount == 1) "photo" else "photos"}"
+                        },
+                        Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                    ) { scope.launch { jumpToNew() } }
+                }
             }
         }
     }
 }
 
-/** Burst discovery is only needed in Feed mode, never for the photo timeline or search. */
 @Composable
-private fun PhotoFeed(feed: PagedPhotos, showAi: Boolean, onOpenPhoto: (String) -> Unit) {
+internal fun rememberHomeBursts(active: Boolean): QueryState<Map<String, String>> {
     val api = BigShelfApp.api
     // Burst membership comes from the server: its rule needs scene embeddings the app never loads.
     // shortcut: Feed pages all burst groups; use an ids-only endpoint if burst discovery becomes slow.
-    val bursts = rememberQuery("home-bursts", invalidatedBy = setOf("photos")) {
+    return rememberQuery("home-bursts", invalidatedBy = setOf("photos"), active = active) {
         buildMap {
             var offset = 0
             do {
@@ -215,31 +269,88 @@ private fun PhotoFeed(feed: PagedPhotos, showAi: Boolean, onOpenPhoto: (String) 
             } while (page.groups.isNotEmpty() && offset < page.total)
         }
     }
-    val posts = remember(feed.photos, showAi, bursts.data) {
+}
+
+@Composable
+private fun PhotoFeed(
+    feed: PagedPhotos,
+    showAi: Boolean,
+    burstOf: Map<String, String>,
+    onOpenPhoto: (String) -> Unit,
+    listState: LazyListState,
+    uploadHeader: (@Composable () -> Unit)?,
+) {
+    val posts = remember(feed.photos, showAi, burstOf) {
         val photos = if (showAi) feed.photos else feed.photos.filterNot { it.isAiImage }
-        groupIntoPosts(photos, bursts.data.orEmpty())
+        groupIntoPosts(photos, burstOf)
     }
-    val listState = rememberLazyListState()
     LaunchedEffect(listState, posts.size, feed.isFetching, feed.hasNextPage, feed.isError) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
             .collect { if (!feed.isError && it >= posts.size - 3) feed.fetchNextPage() }
     }
     when {
-        posts.isEmpty() && feed.isFetching -> LoadingText()
-        posts.isEmpty() && feed.isError -> LoadError(feed::retry)
-        posts.isEmpty() -> EmptyState("No photos yet", description = "Tap Upload to add photos")
+        uploadHeader == null && posts.isEmpty() && feed.isFetching -> LoadingText()
+        uploadHeader == null && posts.isEmpty() && feed.isError -> LoadError(feed::retry)
+        uploadHeader == null && posts.isEmpty() -> EmptyState("No photos yet", description = "Tap Upload to add photos")
         else -> LazyColumn(
             Modifier.fillMaxSize(),
             state = listState,
             contentPadding = PaddingValues(bottom = LocalBottomBarInset.current + 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            items(posts, key = { it.photos.first().id }, contentType = { "post" }) { post ->
-                Post(post.photos, post.burst, onOpenPhoto)
+            if (posts.isEmpty() && uploadHeader != null) item(key = "upload-previews") { uploadHeader() }
+            itemsIndexed(posts, key = { _, post -> post.photos.first().id }, contentType = { _, _ -> "post" }) { index, post ->
+                Column {
+                    // Keep the first post's scroll anchor when local uploads appear above it.
+                    if (index == 0) uploadHeader?.invoke()
+                    Post(post.photos, post.burst, onOpenPhoto)
+                }
             }
             if (feed.isError) item { LoadError(feed::retry) }
             else if (feed.isFetching) item { Text("Loading…", Modifier.padding(16.dp), style = BsText.Sm, color = BsColors.Muted) }
         }
+    }
+}
+
+@Composable
+private fun UploadPreviews(previews: List<UploadStore.Preview>, onOpenPhoto: (String) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        items(previews, key = { it.id }) { preview ->
+            val photoId = preview.photoId
+            val open = if (photoId == null) Modifier else Modifier.bsClickable {
+                ViewerList.photos = emptyList()
+                onOpenPhoto(photoId)
+            }
+            Box(
+                Modifier.size(96.dp, 128.dp).clip(BsShapes.Md).background(BsColors.Surface).then(open),
+            ) {
+                AsyncImage(
+                    model = preview.uri,
+                    contentDescription = if (photoId == null) "Upload preview, adding to library" else "Uploaded photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (photoId == null) Spinner(Modifier.align(Alignment.BottomEnd).padding(6.dp), size = 16.dp)
+            }
+        }
+    }
+}
+
+/** Floating pill over the top of Home for photos that arrived while scrolled down; tap jumps up to them. */
+@Composable
+private fun NewPhotosButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    BsButton(
+        onClick,
+        modifier,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+        textStyle = BsText.Xs,
+        shape = BsShapes.Full,
+    ) {
+        BsIcon(BsIcons.ArrowUp, size = 14.dp)
+        Text(label)
     }
 }
 

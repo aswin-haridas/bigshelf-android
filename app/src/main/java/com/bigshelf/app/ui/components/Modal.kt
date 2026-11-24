@@ -109,13 +109,18 @@ fun ConfirmModal(
     confirmLabel: String,
     onConfirm: () -> Unit,
     onClose: () -> Unit,
+    // Red confirm button for actions that delete or can't be undone; false for safe ones
+    destructive: Boolean = true,
 ) {
     BsModal(
         title = title,
         onClose = onClose,
         footer = {
             BsButton(onClick = onClose, variant = ButtonVariant.Ghost) { Text("Cancel") }
-            BsButton(onClick = { onClose(); onConfirm() }, variant = ButtonVariant.Danger) {
+            BsButton(
+                onClick = { onClose(); onConfirm() },
+                variant = if (destructive) ButtonVariant.Danger else ButtonVariant.Primary,
+            ) {
                 Text(confirmLabel)
             }
         },

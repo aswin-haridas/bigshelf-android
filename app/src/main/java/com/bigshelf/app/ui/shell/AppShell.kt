@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.bigshelf.app.state.EventStream
 import com.bigshelf.app.state.SelectionStore
+import com.bigshelf.app.state.rememberPagedPhotos
 import com.bigshelf.app.state.rememberQuery
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -62,6 +64,7 @@ import com.bigshelf.app.ui.screens.ArchiveScreen
 import com.bigshelf.app.ui.screens.BackupScreen
 import com.bigshelf.app.ui.screens.BinScreen
 import com.bigshelf.app.ui.screens.HomeScreen
+import com.bigshelf.app.ui.screens.rememberHomeBursts
 import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.screens.SettingsScreen
 import com.bigshelf.app.ui.screens.TripletSettingsCard
@@ -238,8 +241,14 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit) {
 @Composable
 private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String) -> Unit, onBack: () -> Unit, sectionFrom: String) {
     val openPhoto: (String) -> Unit = { nav.navigate(Routes.photo(it)) }
-    // Keep People tab data above the destinations, which leave composition when switching tabs.
     val api = BigShelfApp.api
+    // The saved Home scroll position needs the same pages and burst grouping when Back recomposes it.
+    val homeFeedView = rememberSaveable { mutableStateOf(false) }
+    val homeFeed = rememberPagedPhotos("home", invalidatedBy = setOf("photos"), holdNew = true) { page, cursor ->
+        api.photos(page, cursor = cursor, people = true, sort = "uploaded")
+    }
+    val homeBursts = rememberHomeBursts(active = path == Routes.HOME && homeFeedView.value)
+    // Keep People tab data above the destinations, which leave composition when switching tabs.
     val people = rememberQuery("people", invalidatedBy = setOf("people"), active = path == Routes.PEOPLE) { api.people() }
     val faces = rememberQuery("faces", invalidatedBy = setOf("faces"), active = path == Routes.FACES) { api.faces() }
     val untagged = rememberQuery("untagged", invalidatedBy = setOf("people"), active = path == Routes.UNTAGGED) { api.untaggedPhotos() }
@@ -260,7 +269,16 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
         popEnterTransition = { fadeIn(BsMotion.spec()) },
         popExitTransition = { fadeOut(BsMotion.fast()) },
     ) {
-        composable(Routes.HOME) { HomeScreen(onOpenPhoto = openPhoto, onProfile = { nav.navigate(Routes.SETTINGS) }) }
+        composable(Routes.HOME) {
+            HomeScreen(
+                feed = homeFeed,
+                burstOf = homeBursts.data.orEmpty(),
+                feedView = homeFeedView.value,
+                onFeedViewChange = { homeFeedView.value = it },
+                onOpenPhoto = openPhoto,
+                onProfile = { nav.navigate(Routes.SETTINGS) },
+            )
+        }
         composable(Routes.LIBRARY) { LibraryScreen(onNavigate = { nav.navigate(it) }) }
         searchGraph(nav, onBack = onBack, openPhoto = openPhoto)
         composable(Routes.PEOPLE) { PeopleScreen(people, onPerson = { nav.navigate(Routes.person(it)) }, onTab = peopleTab) }

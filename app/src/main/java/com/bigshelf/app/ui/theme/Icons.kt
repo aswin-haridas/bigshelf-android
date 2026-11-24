@@ -17,6 +17,7 @@ import com.adamglin.phosphoricons.fill.Play as FillPlay
 import com.adamglin.phosphoricons.fill.WarningCircle as FillWarningCircle
 import com.adamglin.phosphoricons.fill.MagnifyingGlass as FillMagnifyingGlass
 import com.adamglin.phosphoricons.regular.ArrowRight
+import com.adamglin.phosphoricons.regular.ArrowUp
 import com.adamglin.phosphoricons.regular.UserMinus
 import com.adamglin.phosphoricons.regular.Crop
 import com.adamglin.phosphoricons.regular.SquareSplitVertical
@@ -100,6 +101,7 @@ import com.adamglin.phosphoricons.regular.Wrench
 object BsIcons {
     // Tools ported from the web: Triptych, Framer, viewer crop / split, image search
     val ArrowRight: ImageVector get() = PhosphorIcons.Regular.ArrowRight
+    val ArrowUp: ImageVector get() = PhosphorIcons.Regular.ArrowUp
     val UserMinus: ImageVector get() = PhosphorIcons.Regular.UserMinus
     val Crop: ImageVector get() = PhosphorIcons.Regular.Crop
     val SquareSplitVertical: ImageVector get() = PhosphorIcons.Regular.SquareSplitVertical

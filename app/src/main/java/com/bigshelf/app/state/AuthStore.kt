@@ -80,6 +80,7 @@ object AuthStore {
         status = Status.Idle
         error = null
         SelectionStore.clear()
+        UploadStore.clear()
     }
 
     fun clearError() {

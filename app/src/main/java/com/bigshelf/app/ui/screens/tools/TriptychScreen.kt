@@ -206,7 +206,7 @@ fun TriptychScreen(
     val photos = set?.photos.orEmpty()
     val repairIds = photos.filter { it.repairTarget == true }.map { it.id }
     val canRepair = repairIds.isNotEmpty() && photos.any { it.repairTarget == false }
-    val uploading = (UploadStore.upload?.progress ?: 100) < 100
+    val uploading = UploadStore.previews.any { it.photoId == null }
 
     fun download() {
         if (photos.isEmpty() || busy != null || (repairMode && !canRepair)) return

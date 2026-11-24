@@ -783,6 +783,10 @@ class Api(context: Context, val baseUrl: String) {
      * a file already in the library with a 409 before any bytes are sent.
      */
     suspend fun upload(uri: Uri, contentHash: String? = null, albumId: String? = null, onProgress: (Long) -> Unit) {
+        awaitUpload(queueUpload(uri, contentHash, albumId, onProgress))
+    }
+
+    internal suspend fun queueUpload(uri: Uri, contentHash: String?, albumId: String?, onProgress: (Long) -> Unit): String {
         val resolver = appContext.contentResolver
         var name = "upload"
         var size = -1L
@@ -838,9 +842,12 @@ class Api(context: Context, val baseUrl: String) {
             // Lands in this album once processed (yours, or one shared with you)
             if (albumId != null) put("album_id", albumId)
         })
-        // HTTP 202 only queues the import. Wait for a durable media result.
+        return init.jobId
+    }
+
+    internal suspend fun awaitUpload(jobId: String): String? {
         val result = withTimeoutOrNull(TimeUnit.MINUTES.toMillis(10)) {
-            val path = "/api/v1/photos/uploads/${init.jobId}"
+            val path = "/api/v1/photos/uploads/$jobId"
             var status = get(path, UploadStatus.serializer())
             while (status.status == "reserved" || status.status == "queued") {
                 delay(3_000)
@@ -848,8 +855,8 @@ class Api(context: Context, val baseUrl: String) {
             }
             status
         } ?: throw ApiException(503, "Still waiting for the server to finish importing this file")
-        when (result.status) {
-            "success" -> Unit
+        return when (result.status) {
+            "success" -> result.photoId
             "duplicate" -> throw ApiException(409, "Already in your library")
             "rejected" -> throw RejectedUploadException(result.error ?: "The server could not read this file")
             else -> throw ApiException(503, result.error ?: "Upload could not be confirmed")

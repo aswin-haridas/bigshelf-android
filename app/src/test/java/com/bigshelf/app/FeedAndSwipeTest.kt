@@ -5,6 +5,7 @@ import com.bigshelf.app.data.PhotoPage
 import com.bigshelf.app.data.PhotoPersonTag
 import com.bigshelf.app.state.PagedPhotos
 import com.bigshelf.app.state.QueryState
+import com.bigshelf.app.state.mergeFirstPage
 import com.bigshelf.app.ui.screens.groupIntoPosts
 import com.bigshelf.app.ui.screens.tools.isQuickKeep
 import kotlinx.coroutines.runBlocking
@@ -121,5 +122,44 @@ class FeedAndSwipeTest {
         assertTrue(pageCancelled)
         assertFalse(query.isError)
         assertFalse(feed.isError)
+    }
+
+    private fun ids(list: List<Photo>) = list.map { it.id }
+
+    @Test fun firstPageMergeKeepsDeeperPagesAndAppliesEditsAndRemovals() {
+        val old = listOf("a", "b", "c", "d", "e", "f").map { photo(it) }
+        // b was removed, c gained a tag, e shifted up from page 2, and n is new at the top
+        val first = listOf(photo("n"), photo("a"), photo("c", "Sam"), photo("d"), photo("e"))
+        val (shown, held) = mergeFirstPage(old, first, holdNew = true)!!
+        assertEquals(listOf("a", "c", "d", "e", "f"), ids(shown))
+        assertEquals(listOf("Sam"), shown[1].people?.map { it.name })
+        assertEquals(listOf("n"), ids(held))
+        assertEquals(listOf("n", "a", "c", "d", "e", "f"), ids(mergeFirstPage(old, first, holdNew = false)!!.first))
+        assertNull(mergeFirstPage(old, listOf(photo("x")), holdNew = true))
+    }
+
+    @Test fun syncKeepsLoadedPagesAndHoldsNewPhotosUntilShown() = runBlocking {
+        var top = listOf("a", "b")
+        val feed = PagedPhotos(this) { page, _ ->
+            if (page == 1) PhotoPage(items = top.map { photo(it) }, nextCursor = "next")
+            else PhotoPage(items = listOf(photo("c"), photo("d")))
+        }
+        feed.holdNew = true
+        feed.refresh(); yield()
+        feed.fetchNextPage(); yield()
+        top = listOf("new", "a")
+        feed.sync(); yield()
+        assertEquals(listOf("a", "b", "c", "d"), ids(feed.photos))
+        assertEquals(listOf("new"), ids(feed.newPhotos))
+        feed.showNew()
+        assertEquals(listOf("new", "a", "b", "c", "d"), ids(feed.photos))
+        assertTrue(feed.newPhotos.isEmpty())
+        // Page 1 no longer overlaps: Show reloads from the top instead of leaving a gap
+        top = listOf("x", "y")
+        feed.sync(); yield()
+        assertTrue(feed.newNeedsReload)
+        feed.showNew(); yield()
+        assertEquals(listOf("x", "y"), ids(feed.photos))
+        assertFalse(feed.newNeedsReload)
     }
 }

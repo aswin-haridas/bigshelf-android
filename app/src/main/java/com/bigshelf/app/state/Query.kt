@@ -112,12 +112,7 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
         isError = false
         job = scope.launch {
             try {
-                val first = load(1, null)
-                photos = first.items
-                total = first.total
-                hasNextPage = first.hasNext
-                cursor = first.nextCursor
-                page = 1
+                replaceWith(load(1, null))
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -126,6 +121,68 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
                 if (currentCoroutineContext().isActive) isFetching = false
             }
         }
+    }
+
+    /**
+     * Photos new at the top since the list loaded, held back by [sync] when [holdNew] is on so
+     * they don't appear above someone reading; [showNew] puts them in.
+     */
+    var newPhotos by mutableStateOf<List<Photo>>(emptyList())
+        private set
+    /** True when so much changed that page 1 no longer overlaps the list: [showNew] reloads instead. */
+    var newNeedsReload by mutableStateOf(false)
+        private set
+    var holdNew = false
+
+    /**
+     * An invalidation: refetches page 1 and merges it in place, keeping every deeper page
+     * already loaded (and so the scroll position). Falls back to [refresh] for an empty list.
+     */
+    fun sync() {
+        if (photos.isEmpty()) return refresh()
+        retryNextPage = false
+        job?.cancel()
+        isFetching = true
+        isError = false
+        job = scope.launch {
+            try {
+                val first = load(1, null)
+                val merged = mergeFirstPage(photos, first.items, holdNew)
+                if (merged == null) {
+                    // No overlap: everything visible is stale or pushed far down
+                    if (holdNew) newNeedsReload = true else replaceWith(first)
+                } else {
+                    photos = merged.first
+                    newPhotos = merged.second
+                    newNeedsReload = false
+                    total = first.total
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                isError = true
+            } finally {
+                if (currentCoroutineContext().isActive) isFetching = false
+            }
+        }
+    }
+
+    /** Puts the held [newPhotos] at the top. */
+    fun showNew() {
+        if (newNeedsReload) return refresh()
+        val seen = newPhotos.mapTo(HashSet()) { it.id }
+        photos = newPhotos + photos.filterNot { it.id in seen }
+        newPhotos = emptyList()
+    }
+
+    private fun replaceWith(first: PhotoPage) {
+        photos = first.items
+        total = first.total
+        hasNextPage = first.hasNext
+        cursor = first.nextCursor
+        page = 1
+        newPhotos = emptyList()
+        newNeedsReload = false
     }
 
     fun fetchNextPage() {
@@ -164,13 +221,39 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
 }
 
 @Composable
-fun rememberPagedPhotos(vararg keys: Any?, invalidatedBy: Set<String>, load: suspend (page: Int, cursor: String?) -> PhotoPage): PagedPhotos {
+fun rememberPagedPhotos(
+    vararg keys: Any?,
+    invalidatedBy: Set<String>,
+    // Hold photos that arrive at the top for a "New photos" button (see PagedPhotos.newPhotos)
+    holdNew: Boolean = false,
+    load: suspend (page: Int, cursor: String?) -> PhotoPage,
+): PagedPhotos {
     val scope = rememberCoroutineScope()
-    val paged = remember(*keys) { PagedPhotos(scope, load) }
+    val paged = remember(*keys) { PagedPhotos(scope, load).also { it.holdNew = holdNew } }
     DisposableEffect(paged) { onDispose { paged.cancel() } }
     LaunchedEffect(paged) {
         paged.refresh()
-        PhotoEvents.invalidations.collect { if (it.any(invalidatedBy::contains)) paged.refresh() }
+        PhotoEvents.invalidations.collect { if (it.any(invalidatedBy::contains)) paged.sync() }
     }
     return paged
+}
+
+/**
+ * Merges a fresh page 1 into a longer loaded list. Page 1 is the truth for the stretch it
+ * covers (edits, removals, moves); old photos after the last one page 1 still has stay as
+ * they are. With [holdNew], unseen photos above the first known one are returned separately
+ * instead of shown. Null when page 1 shares no photo with the list.
+ *
+ * ponytail: offset-paged lists (albums, colors, tags) can skip a photo on their next page
+ * after a removal; cursor paging (Home, Archive, Bin) can't.
+ */
+internal fun mergeFirstPage(old: List<Photo>, first: List<Photo>, holdNew: Boolean): Pair<List<Photo>, List<Photo>>? {
+    val oldIndex = old.withIndex().associate { it.value.id to it.index }
+    val firstKnown = first.indexOfFirst { it.id in oldIndex }
+    if (firstKnown == -1) return null
+    val lastKnownOld = first.mapNotNull { oldIndex[it.id] }.max()
+    val inFirst = first.mapTo(HashSet()) { it.id }
+    val tail = old.drop(lastKnownOld + 1).filterNot { it.id in inFirst }
+    return if (holdNew) (first.drop(firstKnown) + tail) to first.take(firstKnown)
+    else (first + tail) to emptyList()
 }

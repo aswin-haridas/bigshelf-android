@@ -46,13 +46,14 @@ fun UploadProgressModal(modifier: Modifier = Modifier) {
             .padding(16.dp),
     ) {
         Text(
-            if (done) "Upload complete" else "Uploading ${upload.fileCount} file(s)...",
+            if (done) "Transfer finished" else "Uploading ${upload.fileCount} file(s)…",
             Modifier.padding(bottom = 8.dp),
             style = BsText.Sm.copy(fontWeight = BsWeight.Medium),
         )
         BsProgress(shown, Modifier.semantics { contentDescription = "Upload progress" }, height = 8.dp, track = Neutral.N700)
         Text(
-            "${upload.progress}% · ${upload.processed} of ${upload.fileCount} processed",
+            if (done) "Files sent may still be processing."
+            else "${upload.progress}% · ${upload.checked} of ${upload.fileCount} files checked",
             Modifier.padding(top = 8.dp),
             style = BsText.Xs,
             color = BsColors.Muted,

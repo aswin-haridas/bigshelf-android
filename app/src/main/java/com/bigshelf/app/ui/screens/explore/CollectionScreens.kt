@@ -188,6 +188,7 @@ fun EventsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             confirmLabel = "Create albums",
             onConfirm = ::saveAll,
             onClose = { confirmSave = false },
+            destructive = false,
         )
     }
 }

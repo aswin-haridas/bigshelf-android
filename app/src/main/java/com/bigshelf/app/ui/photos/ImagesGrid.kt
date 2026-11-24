@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.layout.PaddingValues
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -140,6 +141,9 @@ fun ImagesGrid(
     onRetry: (() -> Unit)? = null,
     // Full-width content above the photos (search matches, sub-albums), scrolling with them
     header: (@Composable () -> Unit)? = null,
+    showEmptyState: Boolean = true,
+    // Pass one in to scroll the grid from outside (Home's "New photos" button)
+    state: LazyGridState = rememberLazyGridState(),
 ) {
     // Publish this grid's photos as the current view; cleared when the grid leaves
     DisposableEffect(photos) {
@@ -148,7 +152,6 @@ fun ImagesGrid(
     }
     val groups = remember(photos, groupByDate, explore) { if (groupByDate && !explore) groupByMonth(photos) else emptyList() }
     val blocks = remember(photos, explore) { if (explore) exploreBlocks(photos) else emptyList() }
-    val state = rememberLazyGridState()
     val loadMore by rememberUpdatedState(fetchNextPage)
     val canLoad by rememberUpdatedState(hasNextPage && !isFetchingNextPage && !isError)
 
@@ -242,7 +245,7 @@ fun ImagesGrid(
                 when {
                     isFetchingNextPage -> FooterText("Loading…", 16.dp)
                     isError -> LoadError(onRetry = onRetry)
-                    photos.isEmpty() -> FooterText("No photos found", 64.dp)
+                    photos.isEmpty() -> if (showEmptyState) FooterText("No photos found", 64.dp)
                     !hasNextPage && totalCount != null -> FooterText(photoCount(totalCount), 24.dp, BsText.Xs)
                 }
             }
