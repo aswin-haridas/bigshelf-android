@@ -52,9 +52,8 @@ import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
 import java.time.ZoneId
+import com.bigshelf.app.ui.screens.explore.instant
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -117,8 +116,7 @@ fun BinScreen(onOpenPhoto: (String) -> Unit, onBack: () -> Unit) {
 
 // "Sep 24, 2026, 3:12 PM" - the moment the batch was downloaded (web folderLabel)
 fun folderLabel(id: String): String = runCatching {
-    val instant = runCatching { OffsetDateTime.parse(id).toInstant() }
-        .getOrElse { LocalDateTime.parse(id).atZone(ZoneId.of("UTC")).toInstant() }
+    val instant = instant(id)!!
     DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
         .withLocale(Locale.US)
         .withZone(ZoneId.systemDefault())

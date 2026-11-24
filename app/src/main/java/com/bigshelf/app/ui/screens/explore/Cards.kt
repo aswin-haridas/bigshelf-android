@@ -37,6 +37,7 @@ import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import java.time.LocalDate
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.OffsetDateTime
@@ -184,12 +185,14 @@ fun colorLabel(id: String) = PHOTO_COLORS.firstOrNull { it.first == id }?.second
 
 // ---------- Dates ----------
 
-/** An API timestamp as a local date, or null if it doesn't parse. */
-fun localDate(iso: String?): LocalDate? = iso?.let {
-    runCatching { OffsetDateTime.parse(it).atZoneSameInstant(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
-        // No offset (some backends drop it): the API stores UTC
-        ?: runCatching { LocalDateTime.parse(it).atZone(ZoneOffset.UTC).withZoneSameInstant(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
+/** ISO timestamp from the API; ones without an offset are UTC. */
+fun instant(iso: String?): Instant? = iso?.let {
+    runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull()
+        ?: runCatching { LocalDateTime.parse(it).toInstant(ZoneOffset.UTC) }.getOrNull()
 }
+
+/** An API timestamp as a local date, or null if it doesn't parse. */
+fun localDate(iso: String?): LocalDate? = instant(iso)?.atZone(ZoneId.systemDefault())?.toLocalDate()
 
 /** "Mar 3, 2026", "Mar 1 – 3, 2026", "Dec 30, 2025 – Jan 2, 2026". */
 fun dateRange(startIso: String, endIso: String): String {

@@ -9,7 +9,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class User(
     val id: String,
-    val email: String,
     val username: String,
 )
 
@@ -65,9 +64,7 @@ data class Photo(
     @SerialName("ai_score") val aiScore: Double? = null,
     // Taste score out of 10 (how much you like it) from the taste model (detail only); null until trained
     @SerialName("taste_score") val tasteScore: Double? = null,
-    @SerialName("is_archived") val isArchived: Boolean = false,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
-    @SerialName("needs_rework") val needsRework: Boolean = false,
     @SerialName("is_video") val isVideo: Boolean = false,
     // Framer score within a group (duplicate pair, burst); the group's pick is marked best
     val quality: PhotoQuality? = null,
@@ -81,8 +78,6 @@ data class Photo(
     val people: List<PhotoPersonTag>? = null,
     @SerialName("repair_target") val repairTarget: Boolean? = null,
     // Organize > Dates only: how taken_at was guessed (filename / scene / upload) and how sure
-    @SerialName("taken_at_source") val takenAtSource: String? = null,
-    @SerialName("taken_at_confidence") val takenAtConfidence: Double? = null,
 ) {
     /** Same fallback as web `withIsAi`: server flag, else the ChatGPT filename rule. */
     val isAiImage get() = isAi || filename.lowercase().startsWith("chatgpt")
@@ -417,16 +412,6 @@ data class PhotoPersonTag(
     val rank: Int? = null,
 )
 
-/** Photos with a low-confidence predicted capture date, least confident first. */
-@Serializable
-data class DatesPage(val items: List<Photo> = emptyList(), val total: Int = 0)
-
-@Serializable
-data class UglyPage(
-    val items: List<Photo> = emptyList(),
-    @SerialName("next_before") val nextBefore: String? = null,
-)
-
 // ---------- Face review (web useFaceConfirmations) ----------
 
 @Serializable
@@ -446,21 +431,9 @@ data class FaceReviewBatch(
     val faces: List<FaceReviewItem> = emptyList(),
 )
 
+/** The current review screen. */
 @Serializable
-data class MergeSuggestionPerson(
-    @SerialName("person_id") val personId: String,
-    @SerialName("person_name") val personName: String,
-    @SerialName("face_thumbnail") val faceThumbnail: String? = null,
-    @SerialName("face_count") val faceCount: Int = 0,
-)
-
-/** Two people who look nearly identical: [merge] folds into [keep] on "Same person". */
-@Serializable
-data class MergeSuggestion(val keep: MergeSuggestionPerson, val merge: MergeSuggestionPerson)
-
-/** The current review screen; [merge] is asked before any face grid. */
-@Serializable
-data class FaceReview(val batch: FaceReviewBatch? = null, val merge: MergeSuggestion? = null, val total: Int = 0)
+data class FaceReview(val batch: FaceReviewBatch? = null, val total: Int = 0)
 
 /** A public link (/s/{token}) to an album or a selection of photos. */
 @Serializable
@@ -470,7 +443,6 @@ data class ShareLink(
     val title: String,
     @SerialName("album_id") val albumId: String? = null,
     @SerialName("photo_count") val photoCount: Int = 0,
-    @SerialName("expires_at") val expiresAt: String? = null,
 )
 
 /** Someone in a shared album; role is "owner" or "member". */
@@ -497,7 +469,6 @@ data class ClusterResult(@SerialName("auto_assigned_to_people") val autoAssigned
 /** [invalidate]: the query keys the backend says went stale with this merge. */
 @Serializable
 data class MergeGroupResult(
-    @SerialName("merged_count") val mergedCount: Int = 0,
     val invalidate: List<String> = emptyList(),
 )
 
@@ -584,6 +555,3 @@ data class CropBox(val x: Int, val y: Int, val width: Int, val height: Int) {
 
 @Serializable
 data class SplitResult(@SerialName("created_photos") val createdPhotos: List<Photo> = emptyList())
-
-@Serializable
-data class TasteAdjustment(val points: Double, @SerialName("previous_rework") val previousRework: Boolean, @SerialName("previous_kept") val previousKept: Boolean = false)

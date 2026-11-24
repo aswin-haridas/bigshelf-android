@@ -363,9 +363,6 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun setFavorite(id: String, favorite: Boolean) =
         send("PATCH", "/api/v1/photos/$id", Photo.serializer(), buildJsonObject { put("is_favorite", favorite) })
 
-    suspend fun setRework(id: String, rework: Boolean) =
-        send("PATCH", "/api/v1/photos/$id", Photo.serializer(), buildJsonObject { put("needs_rework", rework) })
-
     suspend fun markAi(id: String, isAi: Boolean) =
         send("PATCH", "/api/v1/photos/$id/ai", Photo.serializer(), params = mapOf("is_ai" to isAi))
 
@@ -449,12 +446,6 @@ class Api(context: Context, val baseUrl: String) {
             put("rejected_face_ids", ids(rejected))
             if (unsure.isNotEmpty()) put("unsure_face_ids", ids(unsure))
         },
-    )
-
-    /** "Different people": never suggest this pair again. */
-    suspend fun markDistinct(personIds: Collection<String>) = send(
-        "POST", "/api/v1/faces/confirmations/distinct", FaceReview.serializer(),
-        buildJsonObject { put("person_ids", ids(personIds)) },
     )
 
     suspend fun mergePeople(sourceId: String, targetId: String) =
@@ -628,8 +619,6 @@ class Api(context: Context, val baseUrl: String) {
 
     suspend fun deleteAlbum(id: String) = sendUnit("DELETE", "/api/v1/albums/$id")
 
-    suspend fun prioritize(id: String) = send("POST", "/api/v1/photos/$id/priority", Photo.serializer())
-
     // ---------- Pipelines ----------
 
     suspend fun pipelines() = get("/api/v1/pipelines", PipelinesData.serializer())
@@ -686,17 +675,6 @@ class Api(context: Context, val baseUrl: String) {
             put("answer", answer)
         },
     )
-
-    /** Predicted capture dates the backend isn't sure of (Organize > Dates). */
-    suspend fun photoDates() = get("/api/v1/photos/organize/dates", DatesPage.serializer())
-
-    /** Set or confirm a capture date (ISO-8601); the backend then treats it as ground truth. */
-    suspend fun setTakenAt(id: String, takenAt: String) =
-        send("PATCH", "/api/v1/photos/$id", Photo.serializer(), buildJsonObject { put("taken_at", takenAt) })
-
-    /** The next page's low framer scores (worst first), photos older than [before]. */
-    suspend fun uglyPhotos(before: String?) =
-        get("/api/v1/photos/organize/ugly", UglyPage.serializer(), mapOf("before" to before))
 
     // ---------- Rating ----------
 

@@ -213,11 +213,6 @@ class PagedPhotos(private val scope: CoroutineScope, private val load: suspend (
     fun retry() {
         if (retryNextPage) fetchNextPage() else refresh()
     }
-
-    /** Optimistic removal after a bulk action (web `dropFromCachedLists`). */
-    fun drop(ids: Set<String>) {
-        photos = photos.filterNot { it.id in ids }
-    }
 }
 
 @Composable

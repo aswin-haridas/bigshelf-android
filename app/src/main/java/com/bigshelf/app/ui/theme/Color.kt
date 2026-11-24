@@ -36,10 +36,6 @@ object BsColors {
 /** Greys a few older components use directly, tuned to the black palette. New UI should use [BsColors]. */
 internal object Neutral {
     val N300 = Color(0xFFD4D4D4)
-    val N400 = Color(0xFFA3A3A3)
-    val N600 = Color(0xFF3A3A3A)
     val N700 = Color(0xFF2A2A2A)
     val N800 = Color(0xFF1C1C1C)
-    val N900 = Color(0xFF121212)
-    val Rose400 = Color(0xFFFB7185)
 }

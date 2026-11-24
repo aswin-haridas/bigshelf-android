@@ -42,7 +42,7 @@ import com.bigshelf.app.ui.theme.BsMotion
  * Transient feedback at the top of the window, with optional actions such as Undo.
  */
 object toast {
-    internal enum class Kind { Success, Error, Info, Message }
+    internal enum class Kind { Success, Error, Info }
     internal data class Item(val id: Long, val kind: Kind, val text: String, val action: Pair<String, () -> Unit>? = null)
 
     internal val items = mutableStateListOf<Item>()
@@ -62,7 +62,6 @@ object toast {
     fun success(text: String, actionLabel: String, onAction: () -> Unit) = show(Kind.Success, text, actionLabel to onAction)
     fun error(text: String) = show(Kind.Error, text)
     fun info(text: String) = show(Kind.Info, text)
-    fun message(text: String) = show(Kind.Message, text)
 
     internal fun dismiss(id: Long) {
         items.removeAll { it.id == id }
@@ -104,9 +103,8 @@ fun Toaster(modifier: Modifier = Modifier) {
                             toast.Kind.Success -> BsIcons.CheckCircleFill
                             toast.Kind.Error -> BsIcons.WarningCircleFill
                             toast.Kind.Info -> BsIcons.InfoFill
-                            toast.Kind.Message -> null
                         }
-                        if (icon != null) BsIcon(icon, size = 16.dp, tint = BsColors.Foreground)
+                        BsIcon(icon, size = 16.dp, tint = BsColors.Foreground)
                         Text(
                             item.text,
                             Modifier.weight(1f, fill = item.action != null),

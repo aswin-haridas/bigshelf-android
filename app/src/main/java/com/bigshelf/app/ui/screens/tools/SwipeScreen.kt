@@ -1,5 +1,9 @@
 package com.bigshelf.app.ui.screens.tools
 
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import android.os.SystemClock
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -18,7 +22,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
-import com.bigshelf.app.ui.components.FitText
 import com.bigshelf.app.ui.components.bsClickable
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -272,6 +275,7 @@ fun SwipeScreen(onBack: () -> Unit) {
 }
 
 /** Equal-width thumb target: the verdict's colour on a 56dp circle, filled while a drag is set to pick it. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun RowScope.VerdictButton(verdict: Verdict, active: Boolean, onClick: () -> Unit) {
     val fill by animateColorAsState(if (active) verdict.color else BsColors.Surface, label = "fill")
@@ -287,7 +291,13 @@ private fun RowScope.VerdictButton(verdict: Verdict, active: Boolean, onClick: (
         ) {
             BsIcon(verdict.icon, size = 24.dp, tint = if (active) Color.White else verdict.color)
         }
-        FitText(verdict.label, BsText.Xs2.copy(color = if (active) verdict.color else BsColors.Muted))
+        BasicText(
+            verdict.label,
+            style = BsText.Xs2.copy(color = if (active) verdict.color else BsColors.Muted, textAlign = TextAlign.Center),
+            maxLines = 1,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = BsText.Xs2.fontSize),
+        )
     }
 }
 

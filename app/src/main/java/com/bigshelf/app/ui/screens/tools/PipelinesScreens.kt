@@ -60,23 +60,15 @@ import com.bigshelf.app.ui.theme.BsWeight
 import com.bigshelf.app.ui.theme.MonoFamily
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.bigshelf.app.ui.screens.explore.instant
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 // The SSE stream the web uses is replaced by polling: fast while a run moves, slow otherwise
 private const val ACTIVE_POLL_MS = 2000L
 private const val IDLE_POLL_MS = 15000L
-
-/** ISO timestamp from the API; naive ones are UTC. */
-private fun instant(iso: String?): Instant? = iso?.let {
-    runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull()
-        ?: runCatching { LocalDateTime.parse(it).toInstant(ZoneOffset.UTC) }.getOrNull()
-}
 
 private val CLOCK = DateTimeFormatter.ofPattern("h:mm:ss a").withZone(ZoneId.systemDefault())
 private fun clock(iso: String?) = instant(iso)?.let(CLOCK::format) ?: "—"

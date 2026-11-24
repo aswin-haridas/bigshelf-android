@@ -12,8 +12,6 @@ import com.bigshelf.app.data.Photo
  */
 object SelectionStore {
     val photos = mutableStateMapOf<String, Photo>()
-    var lastId by mutableStateOf<String?>(null)
-        private set
 
     // Photos the on-screen grid is showing, so the bar can "Select all" them
     var visible by mutableStateOf<List<Photo>>(emptyList())
@@ -25,17 +23,14 @@ object SelectionStore {
 
     fun toggle(photo: Photo) {
         if (photos.remove(photo.id) == null) photos[photo.id] = photo
-        lastId = photo.id
     }
 
     fun selectMany(batch: List<Photo>) {
         if (batch.isEmpty()) return
         batch.forEach { photos[it.id] = it }
-        lastId = batch.last().id
     }
 
     fun clear() {
         photos.clear()
-        lastId = null
     }
 }

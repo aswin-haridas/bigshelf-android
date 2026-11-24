@@ -33,13 +33,11 @@ object BsText {
     val TrackingTight = (-0.025).em
 
     /** `tracking-wider` */
-    val TrackingWider = 0.05.em
 }
 
 /** `--font-weight-*` tokens. No bold: the web rules forbid `font-bold`. */
 object BsWeight {
     val Light = FontWeight(300)
-    val Normal = FontWeight(400)
     val Medium = FontWeight(500)
     val Semibold = FontWeight(600)
 }

@@ -1,5 +1,6 @@
 package com.bigshelf.app.ui.shell
 
+import com.bigshelf.app.ui.photos.photoCountLabel
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -65,7 +66,6 @@ import kotlinx.coroutines.launch
 import com.bigshelf.app.ui.screens.sendLink
 import com.bigshelf.app.data.userMessage
 
-private fun plural(n: Int) = "$n photo${if (n > 1) "s" else ""}"
 
 /**
  * Port of components/SelectionActionBar.tsx: one bulk bar for the whole app, docked in place
@@ -160,7 +160,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
         }
             if (mode == "bin") {
                 Action("restore", BsIcons.ArrowCounterClockwise, "Restore") {
-                    runBulk("restore", { "${plural(it)} restored" }, "Failed to restore photos") { api.flagDeleted(it, false) }
+                    runBulk("restore", { "${photoCountLabel(it)} restored" }, "Failed to restore photos") { api.flagDeleted(it, false) }
                 }
                 Action("permanent-delete", BsIcons.Trash, "Delete forever", danger = true) { confirmPurge = true }
             } else {
@@ -169,7 +169,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                     Action("copy", BsIcons.Copy, "Copy") { albumPicker = "copy" }
                     Action("remove", BsIcons.MinusCircle, "Remove") {
                         runBulk(
-                            "remove", { "Removed ${plural(it)} from album" }, "Failed to remove from album",
+                            "remove", { "Removed ${photoCountLabel(it)} from album" }, "Failed to remove from album",
                             undo = { api.addToAlbum(albumId, it) },
                         ) { api.removeFromAlbum(albumId, it) }
                     }
@@ -178,14 +178,14 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                 }
                 if (personId != null) {
                     Action("untag", BsIcons.Tag, "Untag") {
-                        runBulk("untag", { "Untagged ${plural(it)}" }, "Failed to untag photos") {
+                        runBulk("untag", { "Untagged ${photoCountLabel(it)}" }, "Failed to untag photos") {
                             if (api.untagPhotos(personId, it).personDeleted) onPersonGone()
                         }
                     }
                 }
                 // No bulk endpoint: one PATCH per photo, in parallel (the web does the same)
                 Action("mark-ai", BsIcons.FlowerTulip, "Mark AI") {
-                    runBulk("mark-ai", { "${plural(it)} marked as AI" }, "Failed to mark photos as AI") { ids ->
+                    runBulk("mark-ai", { "${photoCountLabel(it)} marked as AI" }, "Failed to mark photos as AI") { ids ->
                         coroutineScope { ids.map { async { api.markAi(it, true) } }.awaitAll() }
                     }
                 }
@@ -210,7 +210,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                     scope.launch {
                         try {
                             Downloads.save(context, selected)
-                            toast.success("Downloading ${plural(selected.size)}")
+                            toast.success("Downloading ${photoCountLabel(selected.size)}")
                             SelectionStore.clear()
                         } catch (_: Exception) {
                             toast.error("Failed to download")
@@ -221,19 +221,19 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                 }
                 if (mode == "archive") {
                     Action("unarchive", BsIcons.Archive, "Unarchive") {
-                        runBulk("unarchive", { "${plural(it)} unarchived" }, "Failed to unarchive photos") { api.flagArchived(it, false) }
+                        runBulk("unarchive", { "${photoCountLabel(it)} unarchived" }, "Failed to unarchive photos") { api.flagArchived(it, false) }
                     }
                 } else {
                     Action("archive", BsIcons.Archive, "Archive") {
                         runBulk(
-                            "archive", { "${plural(it)} archived" }, "Failed to archive photos",
+                            "archive", { "${photoCountLabel(it)} archived" }, "Failed to archive photos",
                             undo = { api.flagArchived(it, false) },
                         ) { api.flagArchived(it, true) }
                     }
                 }
                 Action("delete", BsIcons.Trash, "Bin", danger = true) {
                     runBulk(
-                        "delete", { "${plural(it)} moved to Bin" }, "Failed to move photos to Bin",
+                        "delete", { "${photoCountLabel(it)} moved to Bin" }, "Failed to move photos to Bin",
                         undo = { api.flagDeleted(it, false) },
                     ) { api.flagDeleted(it, true) }
                 }
@@ -284,10 +284,10 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
     if (confirmPurge) {
         ConfirmModal(
             title = "Delete permanently",
-            message = "Permanently delete ${plural(count)}? This cannot be undone.",
+            message = "Permanently delete ${photoCountLabel(count)}? This cannot be undone.",
             confirmLabel = "Delete permanently",
             onConfirm = {
-                runBulk("permanent-delete", { "${plural(it)} permanently deleted" }, "Failed to permanently delete photos") {
+                runBulk("permanent-delete", { "${photoCountLabel(it)} permanently deleted" }, "Failed to permanently delete photos") {
                     api.permanentDelete(it)
                 }
             },
@@ -302,7 +302,7 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
             api.addToAlbum(targetId, ids)
             if (moving && albumId != null) api.removeFromAlbum(albumId, ids)
             PhotoEvents.invalidate("albums")
-            toast.success("${if (moving) "Moved" else "Added"} ${plural(ids.size)} to $label")
+            toast.success("${if (moving) "Moved" else "Added"} ${photoCountLabel(ids.size)} to $label")
             SelectionStore.clear()
         }
         AlbumPickerModal(

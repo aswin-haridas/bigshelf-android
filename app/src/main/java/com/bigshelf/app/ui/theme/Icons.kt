@@ -26,22 +26,16 @@ import com.adamglin.phosphoricons.regular.Image
 import com.adamglin.phosphoricons.regular.GridFour
 import com.adamglin.phosphoricons.regular.Lightning
 import com.adamglin.phosphoricons.regular.FloppyDisk
-import com.adamglin.phosphoricons.regular.ArrowsOut
 import com.adamglin.phosphoricons.regular.VideoCamera
 import com.adamglin.phosphoricons.regular.X
 import com.adamglin.phosphoricons.regular.AirplaneTilt
-import com.adamglin.phosphoricons.regular.Aperture
 import com.adamglin.phosphoricons.regular.ArrowBendUpRight
 import com.adamglin.phosphoricons.regular.CalendarBlank
-import com.adamglin.phosphoricons.regular.Camera
-import com.adamglin.phosphoricons.regular.Crosshair
 import com.adamglin.phosphoricons.regular.DotsThreeVertical
-import com.adamglin.phosphoricons.regular.File
 import com.adamglin.phosphoricons.regular.FolderSimplePlus
 import com.adamglin.phosphoricons.regular.MapPin
 import com.adamglin.phosphoricons.regular.MapTrifold
 import com.adamglin.phosphoricons.regular.MinusCircle
-import com.adamglin.phosphoricons.regular.Palette
 import com.adamglin.phosphoricons.regular.Plus
 import com.adamglin.phosphoricons.regular.Sparkle
 import com.adamglin.phosphoricons.regular.Archive
@@ -49,7 +43,6 @@ import com.adamglin.phosphoricons.regular.Broom
 import com.adamglin.phosphoricons.regular.Star
 import com.adamglin.phosphoricons.regular.SelectionAll
 import com.adamglin.phosphoricons.regular.Prohibit
-import com.adamglin.phosphoricons.regular.GearSix
 import com.adamglin.phosphoricons.regular.Funnel
 import com.adamglin.phosphoricons.regular.FlowArrow
 import com.adamglin.phosphoricons.regular.Copy
@@ -64,7 +57,6 @@ import com.adamglin.phosphoricons.regular.ArrowUUpLeft
 import com.adamglin.phosphoricons.regular.ArrowClockwise
 import com.adamglin.phosphoricons.regular.ArrowCounterClockwise
 import com.adamglin.phosphoricons.regular.ArrowLeft
-import com.adamglin.phosphoricons.regular.ArrowsClockwise
 import com.adamglin.phosphoricons.regular.CaretRight
 import com.adamglin.phosphoricons.regular.Check
 import com.adamglin.phosphoricons.regular.DownloadSimple
@@ -74,11 +66,9 @@ import com.adamglin.phosphoricons.regular.FlowerTulip
 import com.adamglin.phosphoricons.regular.Folder
 import com.adamglin.phosphoricons.regular.Gear
 import com.adamglin.phosphoricons.regular.GitMerge
-import com.adamglin.phosphoricons.regular.Grains
 import com.adamglin.phosphoricons.regular.Heart
 import com.adamglin.phosphoricons.regular.Images
 import com.adamglin.phosphoricons.regular.Info
-import com.adamglin.phosphoricons.regular.List
 import com.adamglin.phosphoricons.regular.MagnifyingGlass
 import com.adamglin.phosphoricons.regular.PencilSimple
 import com.adamglin.phosphoricons.regular.SignOut
@@ -110,25 +100,19 @@ object BsIcons {
     val GridFour: ImageVector get() = PhosphorIcons.Regular.GridFour
     val Lightning: ImageVector get() = PhosphorIcons.Regular.Lightning
     val FloppyDisk: ImageVector get() = PhosphorIcons.Regular.FloppyDisk
-    val ArrowsOut: ImageVector get() = PhosphorIcons.Regular.ArrowsOut
     val VideoCamera: ImageVector get() = PhosphorIcons.Regular.VideoCamera
     val X: ImageVector get() = PhosphorIcons.Regular.X
     val Archive: ImageVector get() = PhosphorIcons.Regular.Archive
     // Search tab, albums, places, events, viewer Info
     val AirplaneTilt: ImageVector get() = PhosphorIcons.Regular.AirplaneTilt
-    val Aperture: ImageVector get() = PhosphorIcons.Regular.Aperture
     val ArrowBendUpRight: ImageVector get() = PhosphorIcons.Regular.ArrowBendUpRight
     val CalendarBlank: ImageVector get() = PhosphorIcons.Regular.CalendarBlank
-    val Camera: ImageVector get() = PhosphorIcons.Regular.Camera
-    val Crosshair: ImageVector get() = PhosphorIcons.Regular.Crosshair
     val DotsThreeVertical: ImageVector get() = PhosphorIcons.Regular.DotsThreeVertical
-    val File: ImageVector get() = PhosphorIcons.Regular.File
     val FolderSimplePlus: ImageVector get() = PhosphorIcons.Regular.FolderSimplePlus
     val MagnifyingGlassFill: ImageVector get() = PhosphorIcons.Fill.FillMagnifyingGlass
     val MapPin: ImageVector get() = PhosphorIcons.Regular.MapPin
     val MapTrifold: ImageVector get() = PhosphorIcons.Regular.MapTrifold
     val MinusCircle: ImageVector get() = PhosphorIcons.Regular.MinusCircle
-    val Palette: ImageVector get() = PhosphorIcons.Regular.Palette
     val Plus: ImageVector get() = PhosphorIcons.Regular.Plus
     val Sparkle: ImageVector get() = PhosphorIcons.Regular.Sparkle
     val ArrowUUpLeft: ImageVector get() = PhosphorIcons.Regular.ArrowUUpLeft
@@ -142,7 +126,6 @@ object BsIcons {
     val Copy: ImageVector get() = PhosphorIcons.Regular.Copy
     val FlowArrow: ImageVector get() = PhosphorIcons.Regular.FlowArrow
     val Funnel: ImageVector get() = PhosphorIcons.Regular.Funnel
-    val GearSix: ImageVector get() = PhosphorIcons.Regular.GearSix
     val Prohibit: ImageVector get() = PhosphorIcons.Regular.Prohibit
     val SelectionAll: ImageVector get() = PhosphorIcons.Regular.SelectionAll
     val Star: ImageVector get() = PhosphorIcons.Regular.Star
@@ -154,7 +137,6 @@ object BsIcons {
     val ArrowClockwise: ImageVector get() = PhosphorIcons.Regular.ArrowClockwise
     val ArrowCounterClockwise: ImageVector get() = PhosphorIcons.Regular.ArrowCounterClockwise
     val ArrowLeft: ImageVector get() = PhosphorIcons.Regular.ArrowLeft
-    val ArrowsClockwise: ImageVector get() = PhosphorIcons.Regular.ArrowsClockwise
     val CaretRight: ImageVector get() = PhosphorIcons.Regular.CaretRight
     val Check: ImageVector get() = PhosphorIcons.Regular.Check
     val CheckCircleFill: ImageVector get() = PhosphorIcons.Fill.FillCheckCircle
@@ -166,14 +148,12 @@ object BsIcons {
     val Folder: ImageVector get() = PhosphorIcons.Regular.Folder
     val Gear: ImageVector get() = PhosphorIcons.Regular.Gear
     val GitMerge: ImageVector get() = PhosphorIcons.Regular.GitMerge
-    val Grains: ImageVector get() = PhosphorIcons.Regular.Grains
     val Heart: ImageVector get() = PhosphorIcons.Regular.Heart
     val HeartFill: ImageVector get() = PhosphorIcons.Fill.FillHeart
     val Images: ImageVector get() = PhosphorIcons.Regular.Images
     val ImagesFill: ImageVector get() = PhosphorIcons.Fill.FillImages
     val Info: ImageVector get() = PhosphorIcons.Regular.Info
     val InfoFill: ImageVector get() = PhosphorIcons.Fill.FillInfo
-    val List: ImageVector get() = PhosphorIcons.Regular.List
     val MagnifyingGlass: ImageVector get() = PhosphorIcons.Regular.MagnifyingGlass
     val PencilSimple: ImageVector get() = PhosphorIcons.Regular.PencilSimple
     val PlayFill: ImageVector get() = PhosphorIcons.Fill.FillPlay

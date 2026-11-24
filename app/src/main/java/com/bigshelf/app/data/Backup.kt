@@ -94,7 +94,7 @@ class Backup(context: Context) {
         ContextCompat.checkSelfPermission(appContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
-    data class Item(val id: Long, val uri: Uri, val fingerprint: String = "")
+    data class Item(val uri: Uri, val fingerprint: String = "")
 
     // A per-account ledger is crash-safe and also notices edits to older MediaStore rows.
     private val ledger = object : android.database.sqlite.SQLiteOpenHelper(appContext, "backup-confirmed.db", null, 1) {
@@ -136,7 +136,7 @@ class Backup(context: Context) {
                 val uri = ContentUris.withAppendedId(collection, id)
                 val generation = if (Build.VERSION.SDK_INT >= 30) c.getLong(5) else 0
                 val fingerprint = "${c.getLong(2)}:${c.getLong(3)}:$generation"
-                if (confirmed[uri.toString()] != fingerprint) items += Item(id, uri, fingerprint)
+                if (confirmed[uri.toString()] != fingerprint) items += Item(uri, fingerprint)
             }
         }
         return items
