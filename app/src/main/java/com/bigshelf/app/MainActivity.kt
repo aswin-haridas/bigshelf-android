@@ -78,8 +78,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun uploadPendingShares() {
-        if (pendingShares.isEmpty()) return
-        UploadStore.start(pendingShares.toList())
+        UploadStore.start(pendingShares.toList()) // empty: just resumes anything still queued
         pendingShares.clear()
     }
 }

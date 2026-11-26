@@ -56,8 +56,13 @@ class StorageUploadException(code: Int) : ApiException(code, "Upload failed")
 class RejectedUploadException(message: String) : ApiException(422, message)
 
 /** Web `getErrorMessage`: the error's message, or [fallback] for non-API failures. */
-fun Throwable.userMessage(fallback: String = "Request failed"): String =
-    if (this is ApiException) message ?: fallback else "Something went wrong"
+fun Throwable.userMessage(fallback: String = "Request failed"): String = when (this) {
+    is ApiException -> message ?: fallback
+    // Couldn't reach the server: offline/DNS, refused or dropped connection, timeout
+    is java.net.UnknownHostException, is java.net.SocketException, is java.io.InterruptedIOException ->
+        "No connection. Check your internet and try again."
+    else -> "Something went wrong"
+}
 
 /** What a status code means when the server sent no `detail` (a proxy's HTML page, an empty body). */
 private fun statusText(code: Int): String = when (code) {
@@ -774,7 +779,10 @@ class Api(context: Context, val baseUrl: String) {
                 if (!c.isNull(1)) size = c.getLong(1)
             }
         }
-        val contentType = resolver.getType(uri) ?: "application/octet-stream"
+        if (uri.scheme == "file") java.io.File(uri.path!!).let { name = it.name; size = it.length() } // UploadQueue copies
+        val contentType = resolver.getType(uri)
+            ?: android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.').lowercase())
+            ?: "application/octet-stream"
         if (size < 1) throw RejectedUploadException("Couldn't determine the size of this file")
         val metadata = buildJsonObject {
             put("filename", name)

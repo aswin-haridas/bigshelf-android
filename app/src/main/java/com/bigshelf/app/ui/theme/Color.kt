@@ -3,7 +3,7 @@ package com.bigshelf.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Colour tokens: true-black, near-monochrome, with purple kept as the one accent (selection,
+ * Colour tokens, shared with the web (bigshelf/DESIGN.md): true-black, near-monochrome, with purple kept as the one accent (selection,
  * switches, progress). Use these for every colour; status colours are success / warning / info / danger.
  */
 object BsColors {
@@ -11,14 +11,14 @@ object BsColors {
     val Surface = Color(0xFF121212)
     val SurfaceHover = Color(0xFF1C1C1C)
     val Border = Color(0xFF1F1F1F)
-    val BorderFocus = Color(0xFF3F3F3F)
-    val ControlBorder = Color(0xFF6D6D6D)
+    val BorderFocus = Color(0xFF82828D) // >= 3:1 on every surface
+    val ControlBorder = Color(0xFF72727D)
     val FocusRing = Color(0xFFC4B5FD)
 
     val Foreground = Color(0xFFFFFFFF)
-    val Muted = Color(0xFF8E8E8E)
+    val Muted = Color(0xFFA3A3A3)
     val MutedSoft = Color(0xFFD4D4D4)
-    val MutedFaint = Color(0xFF898989)
+    val MutedFaint = Color(0xFF909090)
 
     val Primary = Color(0xFF7C3AED)
     val PrimaryDeep = Color(0xFF3B0764)

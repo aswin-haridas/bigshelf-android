@@ -17,6 +17,7 @@ import com.bigshelf.app.data.ViewSettings
 class BigShelfApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
+        instance = this
         api = Api(this, BuildConfig.API_URL)
         settings = ViewSettings(this)
         backup = Backup(this)
@@ -44,6 +45,8 @@ class BigShelfApp : Application(), SingletonImageLoader.Factory {
             .build()
 
     companion object {
+        lateinit var instance: BigShelfApp
+            private set
         lateinit var api: Api
             private set
         lateinit var settings: ViewSettings

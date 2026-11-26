@@ -5,30 +5,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bigshelf.app.BigShelfApp
-import com.bigshelf.app.data.ApiException
-import com.bigshelf.app.data.userMessage
+import com.bigshelf.app.data.UploadQueue
 import com.bigshelf.app.ui.components.toast
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-/** App-wide upload queue. Transfer slots are released as soon as the server queues an import. */
+/**
+ * In-app view of uploads: progress modal, Home previews and toasts. Files are handed to the
+ * durable [UploadQueue], whose worker reports back here while the app process is alive.
+ */
 object UploadStore {
     data class Progress(val fileCount: Int, val checked: Int, val progress: Int)
     data class Preview(val id: String, val uri: Uri, val photoId: String? = null)
+    enum class Outcome { Added, Duplicate, Failed }
 
     var upload by mutableStateOf<Progress?>(null)
         private set
@@ -36,17 +33,25 @@ object UploadStore {
         private set
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val lanes = Semaphore(4)
-    private val importChecks = Semaphore(4)
     private var hideProgress: Job? = null
     private var fileCount = 0
     private var checked = 0
     private var totalBytes = 0L
     private var sentBytes = 0L
+    private val sent = HashMap<String, Long>()
+    private val sizes = HashMap<String, Long>()
+    private var added = 0
+    private var duplicates = 0
+    private var failed = 0
+    private var lastError: String? = null
 
     /** With [albumId], each photo also lands in that album (yours or one shared with you). */
     fun start(uris: List<Uri>, albumId: String? = null) {
-        if (uris.isEmpty()) return
+        val context = BigShelfApp.instance
+        if (uris.isEmpty()) {
+            UploadQueue.start(context) // signed in again: finish anything left from before
+            return
+        }
         val batch = uris.map { Preview(UUID.randomUUID().toString(), it) }
         previews = batch + previews
         hideProgress?.cancel()
@@ -54,71 +59,58 @@ object UploadStore {
         fileCount += batch.size
         report()
         scope.launch {
-            val api = BigShelfApp.api
-            val sizes = withContext(Dispatchers.IO) {
-                uris.map { uri -> runCatching { api.fileSize(uri).coerceAtLeast(1) }.getOrDefault(1L) }
-            }
-            totalBytes += sizes.sum()
-            val sentHashes = HashSet<String>()
-            var added = 0
-            var duplicates = 0
-            var failed = 0
-            var lastError: String? = null
-            batch.zip(sizes).map { (preview, size) ->
-                async {
-                    try {
-                        val jobId = lanes.withPermit {
-                            var sent = 0L
-                            try {
-                                val hash = withContext(Dispatchers.IO) {
-                                    runCatching { BigShelfApp.backup.sha256(preview.uri) }.getOrNull()
-                                }
-                                if (hash != null && !sentHashes.add(hash)) throw ApiException(409, "Duplicate")
-                                api.queueUpload(preview.uri, hash, albumId) { bytes ->
-                                    launch {
-                                        val next = bytes.coerceIn(sent, size)
-                                        if (next == sent) return@launch
-                                        sentBytes += next - sent
-                                        sent = next
-                                        report()
-                                    }
-                                }
-                            } finally {
-                                if (currentCoroutineContext().isActive) {
-                                    sentBytes += size - sent
-                                    sent = size
-                                    checked++
-                                    report()
-                                }
-                            }
-                        }
-                        val photoId = importChecks.withPermit { api.awaitUpload(jobId) }
-                        finishPreview(preview.id, photoId)
-                        added++
-                        PhotoEvents.invalidate("photos", "albums")
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        finishPreview(preview.id)
-                        if (e is ApiException && e.code == 409) duplicates++ else {
-                            failed++
-                            lastError = e.userMessage("Upload failed")
-                        }
-                    }
+            for (preview in batch) {
+                try {
+                    val size = withContext(Dispatchers.IO) { UploadQueue.add(context, preview.id, preview.uri, albumId) }
+                    sizes[preview.id] = size
+                    totalBytes += size
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    onFinished(preview.id, Outcome.Failed, null, "Couldn't read a shared file")
+                    continue
                 }
-            }.awaitAll()
+                report()
+                UploadQueue.start(context) // first files start sending while the rest copy
+            }
+        }
+    }
+
+    /** Whether someone is likely looking at the in-app progress (else the worker notifies). */
+    fun isWatching() = android.app.ActivityManager.RunningAppProcessInfo()
+        .also(android.app.ActivityManager::getMyMemoryState)
+        .importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+
+    internal fun onProgress(id: String, bytes: Long) = scope.launch {
+        val size = sizes[id] ?: return@launch
+        val next = bytes.coerceIn(sent[id] ?: 0L, size)
+        sentBytes += next - (sent[id] ?: 0L)
+        sent[id] = next
+        report()
+    }
+
+    internal fun onFinished(id: String, outcome: Outcome, photoId: String?, error: String?) = scope.launch {
+        if (previews.none { it.id == id }) return@launch // from an earlier app run
+        sizes[id]?.let { sentBytes += it - (sent[id] ?: 0L); sent[id] = it }
+        finishPreview(id, photoId)
+        when (outcome) {
+            Outcome.Added -> added++
+            Outcome.Duplicate -> duplicates++
+            Outcome.Failed -> { failed++; lastError = error }
+        }
+        checked++
+        report()
+        if (checked == fileCount) {
             when {
                 failed > 0 -> toast.error(lastError ?: "$failed upload(s) failed")
                 added > 0 && duplicates > 0 -> toast.success("Added $added file(s), skipped $duplicates duplicate(s)")
                 duplicates > 0 -> toast.info("$duplicates file(s) already in your library")
                 else -> toast.success("Added $added file(s)")
             }
-            // Successful previews usually hand off as soon as Home shows the stored photo.
-            // shortcut: clear older previews too when a large batch has pushed them beyond page one.
-            delay(60_000)
-            val ids = batch.mapTo(HashSet()) { it.id }
-            previews = previews.filterNot { it.id in ids }
         }
+        // Successful previews usually hand off as soon as Home shows the stored photo.
+        delay(60_000)
+        previews = previews.filterNot { it.id == id }
     }
 
     fun removeListedPreviews(photoIds: Set<String>) {
@@ -127,6 +119,7 @@ object UploadStore {
 
     fun clear() {
         scope.coroutineContext.cancelChildren()
+        UploadQueue.clear(BigShelfApp.instance)
         previews = emptyList()
         resetProgress()
         upload = null
@@ -152,6 +145,12 @@ object UploadStore {
     }
 
     private fun resetProgress() {
+        sent.clear()
+        sizes.clear()
+        added = 0
+        duplicates = 0
+        failed = 0
+        lastError = null
         fileCount = 0
         checked = 0
         totalBytes = 0

@@ -3,20 +3,22 @@ package com.bigshelf.app.ui.theme
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.bigshelf.app.R
 
-/** Inter, bundled (Latin subset; other scripts fall back to the system font). */
+/** Figtree, same as the web (bigshelf/DESIGN.md): one bundled variable font, 300-900. */
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class) // variable-font axes
 val Sans = FontFamily(
-    Font(R.font.inter_400, FontWeight.Normal),
-    Font(R.font.inter_500, FontWeight.Medium),
-    Font(R.font.inter_600, FontWeight.SemiBold),
+    listOf(300, 400, 500, 600).map { w ->
+        Font(R.font.figtree, FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))
+    },
 )
 
 /**
- * Type scale in Inter, sized for compact phones (~384dp wide, e.g. Galaxy S23): nothing under
+ * Type scale in Figtree, sized for compact phones (~384dp wide, e.g. Galaxy S23): nothing under
  * 12sp, 14sp secondary text, 15sp body, 22sp page titles. Names follow the web's `--text-*` tokens.
  */
 object BsText {
@@ -42,5 +44,5 @@ object BsWeight {
     val Semibold = FontWeight(600)
 }
 
-/** Counts, timestamps, scores, dimensions: Inter too, so numbers don't break the minimal look. */
+/** Counts, timestamps, scores, dimensions: Figtree too, so numbers don't break the minimal look. */
 val MonoFamily: FontFamily = Sans

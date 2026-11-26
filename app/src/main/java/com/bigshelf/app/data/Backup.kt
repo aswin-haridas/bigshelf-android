@@ -57,7 +57,7 @@ class Backup(context: Context) {
 
     init {
         notifier.createNotificationChannel(
-            NotificationChannelCompat.Builder(CHANNEL, NotificationManagerCompat.IMPORTANCE_LOW).setName("Backup").build(),
+            NotificationChannelCompat.Builder(CHANNEL, NotificationManagerCompat.IMPORTANCE_LOW).setName("Uploads and backup").build(),
         )
     }
 
@@ -158,7 +158,7 @@ class Backup(context: Context) {
 
     // ---------- Notifications ----------
 
-    private fun builder(title: String) = NotificationCompat.Builder(appContext, CHANNEL)
+    internal fun builder(title: String) = NotificationCompat.Builder(appContext, CHANNEL)
         .setSmallIcon(android.R.drawable.stat_sys_upload)
         .setContentTitle(title)
         .setContentIntent(
@@ -183,10 +183,10 @@ class Backup(context: Context) {
     @SuppressLint("MissingPermission")
     fun notify(id: Int, notification: Notification) = notifier.notify(id, notification)
 
-    fun notifyResult(title: String, text: String) =
-        notify(RESULT_ID, builder(title).setContentText(text).setAutoCancel(true).build())
+    fun notifyResult(title: String, text: String, id: Int = RESULT_ID) =
+        notify(id, builder(title).setContentText(text).setAutoCancel(true).build())
 
-    fun cancelProgress() = notifier.cancel(PROGRESS_ID)
+    fun cancelProgress(id: Int = PROGRESS_ID) = notifier.cancel(id)
 
     companion object {
         const val WORK = "backup"
