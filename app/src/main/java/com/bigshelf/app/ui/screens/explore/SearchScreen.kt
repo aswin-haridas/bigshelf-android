@@ -45,6 +45,7 @@ import com.bigshelf.app.data.PlaceNames
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.Routes
 import com.bigshelf.app.ui.components.BsSearchBar
+import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.photos.ImagesGrid
 import com.bigshelf.app.ui.photos.photoCount
@@ -123,24 +124,25 @@ private fun Explore(onNavigate: (String) -> Unit) {
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp + LocalBottomBarInset.current),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp + LocalBottomBarInset.current),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item(key = "albums") {
-            SectionHeader("Albums", actions = listOf("See all" to { onNavigate(Routes.ALBUMS) }))
-            LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                item(key = "new") {
-                    CoverCard("New album", null, null, onClick = { creating = true }, Modifier.width(CARD), icon = BsIcons.Plus)
-                }
-                items(albums.data.orEmpty(), key = { it.id }) { album ->
-                    CoverCard(
-                        album.title,
-                        albumSubtitle(album),
-                        album.coverPhoto,
-                        onClick = { onNavigate(Routes.album(album.id)) },
-                        Modifier.width(CARD),
-                        icon = BsIcons.Stack,
-                    )
+            SectionHeader("Albums", actions = listOf("New album" to { creating = true }, "See all" to { onNavigate(Routes.ALBUMS) }))
+            if (albums.data.isNullOrEmpty()) {
+                BrowseStatus(albums.isLoading, albums.isError, "Loading albums…", "No albums yet", albums::refetch)
+            } else {
+                LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(albums.data.orEmpty(), key = { it.id }) { album ->
+                        CoverCard(
+                            album.title,
+                            albumSubtitle(album),
+                            album.coverPhoto,
+                            onClick = { onNavigate(Routes.album(album.id)) },
+                            Modifier.width(CARD),
+                            icon = BsIcons.Stack,
+                        )
+                    }
                 }
             }
         }
@@ -151,7 +153,7 @@ private fun Explore(onNavigate: (String) -> Unit) {
             )
             val list = places.data.orEmpty()
             if (list.isEmpty()) {
-                Hint(if (places.isLoading) "Finding places…" else "No places yet")
+                BrowseStatus(places.isLoading, places.isError, "Finding places…", "No places yet", places::refetch)
             } else {
                 LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(list.take(15), key = { "${it.name}-${it.latitude}" }) { place ->
@@ -170,7 +172,7 @@ private fun Explore(onNavigate: (String) -> Unit) {
             SectionHeader("Events & trips", actions = listOf("See all" to { onNavigate(Routes.EVENTS) }))
             val list = events.data?.items.orEmpty()
             if (list.isEmpty()) {
-                Hint(if (events.isLoading) "Grouping your photos…" else "No events yet")
+                BrowseStatus(events.isLoading, events.isError, "Grouping your photos…", "No events yet", events::refetch)
             } else {
                 LazyRow(contentPadding = row, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(list, key = { it.id }) { event ->
@@ -232,8 +234,17 @@ private fun Explore(onNavigate: (String) -> Unit) {
 }
 
 @Composable
-private fun Hint(text: String) {
-    Text(text, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = BsText.Xs, color = BsColors.Muted)
+private fun BrowseStatus(loading: Boolean, error: Boolean, loadingText: String, emptyText: String, retry: () -> Unit) {
+    if (error) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).bsClickable(onClick = retry).padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Couldn't load. Try again", style = BsText.Xs, color = BsColors.Muted)
+        }
+    } else {
+        Text(if (loading) loadingText else emptyText, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = BsText.Xs, color = BsColors.Muted)
+    }
 }
 
 /** Query typed: matching people, albums, places and colours as chips over the photo results. */

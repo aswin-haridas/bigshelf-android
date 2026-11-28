@@ -156,7 +156,6 @@ object BsIcons {
     val PencilSimple: ImageVector get() = PhosphorIcons.Regular.PencilSimple
     val PlayFill: ImageVector get() = PhosphorIcons.Fill.FillPlay
     val SignOut: ImageVector get() = PhosphorIcons.Regular.SignOut
-    val Spinner: ImageVector get() = PhosphorIcons.Regular.Spinner
     val SquaresFour: ImageVector get() = PhosphorIcons.Regular.SquaresFour
     val SquaresFourFill: ImageVector get() = PhosphorIcons.Fill.FillSquaresFour
     val Stack: ImageVector get() = PhosphorIcons.Regular.Stack

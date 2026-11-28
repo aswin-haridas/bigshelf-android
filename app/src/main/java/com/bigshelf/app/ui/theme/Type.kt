@@ -46,3 +46,5 @@ object BsWeight {
 
 /** Counts, timestamps, scores, dimensions: Figtree too, so numbers don't break the minimal look. */
 val MonoFamily: FontFamily = Sans
+
+val Script = FontFamily(Font(R.font.dancing_script))

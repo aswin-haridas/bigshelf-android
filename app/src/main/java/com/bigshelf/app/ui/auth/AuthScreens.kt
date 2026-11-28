@@ -5,7 +5,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.semantics.contentType
 import com.bigshelf.app.ui.components.toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +25,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.bigshelf.app.ui.components.BsIconButton
@@ -156,35 +160,42 @@ private fun AuthFooter(prompt: String, linkText: String, onClick: () -> Unit) {
     }
 }
 
-/** `AuthError`: `rounded-lg bg-danger-bg/40 border border-danger-border px-3 py-2 text-xs text-danger`. */
 @Composable
 private fun AuthError(error: String?) {
-    if (error == null) return
-    Text(
-        error,
-        Modifier
-            .fillMaxWidth()
-            .semantics { liveRegion = LiveRegionMode.Polite }
-            .clip(BsShapes.Lg)
-            .background(BsColors.DangerBg.copy(alpha = 0.4f))
-            .border(1.dp, BsColors.DangerBorder, BsShapes.Lg)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        style = BsText.Xs,
-        color = BsColors.Danger,
-    )
+    AnimatedVisibility(
+        visible = !error.isNullOrEmpty(),
+        enter = expandVertically(animationSpec = BsMotion.spec(), expandFrom = Alignment.Top),
+        exit = shrinkVertically(animationSpec = BsMotion.spec(), shrinkTowards = Alignment.Top),
+    ) {
+        Text(
+            error.orEmpty(),
+            Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 12.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+            style = BsText.Xs,
+            color = BsColors.Danger,
+        )
+    }
 }
 
 /** Tall bold pill, the form's one main action. */
 @Composable
-private fun AuthButton(loading: Boolean, onClick: () -> Unit, content: @Composable RowScope.() -> Unit) = BsButton(
-    onClick = onClick,
-    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-    loading = loading,
-    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
-    textStyle = BsText.Base.copy(fontWeight = BsWeight.Semibold),
-    shape = BsShapes.Full,
-    content = content,
-)
+private fun AuthButton(
+    loading: Boolean,
+    onClick: () -> Unit,
+    error: String? = null,
+    content: @Composable RowScope.() -> Unit,
+) = Column {
+    AuthError(error)
+    BsButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        loading = loading,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+        textStyle = BsText.Base.copy(fontWeight = BsWeight.Semibold),
+        shape = BsShapes.Full,
+        content = content,
+    )
+}
 
 /**
  * Borderless filled pill with the label as its placeholder (still read out once filled);
@@ -201,11 +212,17 @@ private fun AuthField(
     imeAction: ImeAction = ImeAction.Next,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     autofill: ContentType? = null,
+    validationError: String? = null,
 ) {
     var show by rememberSaveable { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val fill by animateColorAsState(if (focused) FieldFocused else FieldFill, BsMotion.fast(), label = "authField")
+    val outline by animateColorAsState(
+        if (validationError != null) BsColors.Danger else Color.Transparent,
+        BsMotion.fast(),
+        label = "authFieldOutline",
+    )
     val start = if (password) RoundedCornerShape(topStartPercent = 50, bottomStartPercent = 50) else BsShapes.Full
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth().height(56.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -215,6 +232,7 @@ private fun AuthField(
                 onValueChange = { AuthStore.clearError(); onValueChange(it) },
                 modifier = Modifier.weight(1f).fillMaxHeight().semantics {
                     contentDescription = listOfNotNull(label, hint).joinToString(". ")
+                    if (validationError != null) error(validationError)
                     if (autofill != null) contentType = autofill // password managers fill these
                 },
                 singleLine = true,
@@ -229,7 +247,8 @@ private fun AuthField(
                 interactionSource = interaction,
                 decorationBox = { inner ->
                     Box(
-                        Modifier.fillMaxSize().clip(start).background(fill).padding(horizontal = 24.dp),
+                        Modifier.fillMaxSize().clip(start).background(fill)
+                            .border(1.dp, outline, start).padding(horizontal = 24.dp),
                         contentAlignment = Alignment.CenterStart,
                     ) {
                         if (value.isEmpty()) Text(label, style = BsText.Base, color = BsColors.MutedFaint, maxLines = 1)
@@ -270,18 +289,37 @@ private fun AuthField(
 private val FieldFill = BsColors.SurfaceHover
 private val FieldFocused = lerp(BsColors.SurfaceHover, Color.White, 0.06f)
 
+private enum class LoginField(val missingMessage: String) {
+    Identifier("Enter your username or email."),
+    Password("Enter your password."),
+}
+
 @Composable
 fun LoginScreen(onRegister: () -> Unit) {
     var identifier by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var missingField by rememberSaveable { mutableStateOf<LoginField?>(null) }
     val scope = rememberCoroutineScope()
     val loading = AuthStore.status == AuthStore.Status.Loading
     // Length rules are for new passwords; the server judges this one
     val submit = {
-        if (loading) Unit
-        else if (identifier.isBlank()) AuthStore.error = "Enter your username or email."
-        else if (password.isEmpty()) AuthStore.error = "Enter your password."
-        else scope.launch { AuthStore.login(identifier.trim(), password) }
+        if (!loading) {
+            val missing = when {
+                identifier.isBlank() -> LoginField.Identifier
+                password.isEmpty() -> LoginField.Password
+                else -> null
+            }
+            missingField = missing
+            if (missing != null) {
+                toast.error(missing.missingMessage)
+            } else {
+                scope.launch {
+                    if (!AuthStore.login(identifier.trim(), password)) {
+                        AuthStore.error?.let(toast::error)
+                    }
+                }
+            }
+        }
     }
 
     AuthHeader("Sign in")
@@ -289,18 +327,26 @@ fun LoginScreen(onRegister: () -> Unit) {
         AuthField(
             label = "Username or Email",
             value = identifier,
-            onValueChange = { identifier = it },
+            onValueChange = {
+                identifier = it
+                if (missingField == LoginField.Identifier && it.isNotBlank()) missingField = null
+            },
             keyboardType = KeyboardType.Email,
             autofill = ContentType.Username,
+            validationError = LoginField.Identifier.missingMessage.takeIf { missingField == LoginField.Identifier },
         )
         AuthField(
             label = "Password",
             value = password,
-            onValueChange = { password = it },
+            onValueChange = {
+                password = it
+                if (missingField == LoginField.Password && it.isNotEmpty()) missingField = null
+            },
             password = true,
             imeAction = ImeAction.Done,
             keyboardActions = KeyboardActions(onDone = { submit() }),
             autofill = ContentType.Password,
+            validationError = LoginField.Password.missingMessage.takeIf { missingField == LoginField.Password },
         )
         // No reset flow on the server yet, so say who can help instead of leaving a dead end
         Text(
@@ -312,8 +358,7 @@ fun LoginScreen(onRegister: () -> Unit) {
             style = BsText.Xs,
             color = BsColors.MutedSoft,
         )
-        AuthError(AuthStore.error)
-        AuthButton(loading, { submit() }) {
+        AuthButton(loading, submit) {
             Text(if (loading) "Signing in..." else "Sign in")
         }
     }
@@ -351,8 +396,7 @@ fun RegisterScreen(onLogin: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { submit() }),
             autofill = ContentType.NewPassword,
         )
-        AuthError(AuthStore.error)
-        AuthButton(loading, { submit() }) {
+        AuthButton(loading, { submit() }, AuthStore.error) {
             Text(if (loading) "Signing up..." else "Sign up")
         }
     }

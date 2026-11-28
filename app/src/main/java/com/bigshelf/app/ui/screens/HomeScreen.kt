@@ -29,7 +29,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -55,7 +54,7 @@ import com.bigshelf.app.state.UploadStore
 import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsButton
 import com.bigshelf.app.ui.components.BsIcon
-import com.bigshelf.app.ui.components.BsSearchBar
+import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.EmptyState
 import com.bigshelf.app.ui.components.LoadingText
 import com.bigshelf.app.ui.components.LoadError
@@ -64,12 +63,13 @@ import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.photos.ImagesGrid
 import com.bigshelf.app.state.ViewerList
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
+import com.bigshelf.app.ui.shell.rememberUploadPicker
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
 import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
-import kotlinx.coroutines.delay
+import com.bigshelf.app.ui.theme.Script
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -128,7 +128,7 @@ private fun Modifier.pinchToggle(onPinch: (Boolean) -> Unit) = pointerInput(Unit
 }
 
 /**
- * Photo timeline with an optional swipeable burst feed and ranked search results.
+ * Photo timeline with an optional swipeable burst feed.
  */
 @Composable
 internal fun HomeScreen(
@@ -137,24 +137,10 @@ internal fun HomeScreen(
     feedView: Boolean,
     onFeedViewChange: (Boolean) -> Unit,
     onOpenPhoto: (String) -> Unit,
-    onProfile: () -> Unit,
 ) {
-    val api = BigShelfApp.api
-    val settings = BigShelfApp.settings
-    val showAi = settings.showAi
-    var search by rememberSaveable { mutableStateOf("") }
-    var q by rememberSaveable { mutableStateOf("") }
-    // Debounced 300ms, like the web search box
-    LaunchedEffect(search) {
-        delay(300)
-        q = search.trim()
-    }
-
-    val textSearch = rememberQuery("search", q, invalidatedBy = setOf("photos")) {
-        if (q.isEmpty()) emptyList() else api.searchPhotos(q)
-    }
+    val upload = rememberUploadPicker()
+    val showAi = BigShelfApp.settings.showAi
     val filter: (List<Photo>) -> List<Photo> = { all -> if (showAi) all else all.filterNot { it.isAiImage } }
-    val results = filter(textSearch.data.orEmpty())
     val listedIds = remember(feed.photos) { feed.photos.mapTo(HashSet()) { it.id } }
     val previews = UploadStore.previews.filterNot { it.photoId in listedIds }
     LaunchedEffect(listedIds, UploadStore.previews) {
@@ -165,41 +151,15 @@ internal fun HomeScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
+        Box(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            BsSearchBar(search, { search = it }, Modifier.weight(1f), placeholder = "Search photos")
-            // The signed-in user's initial; opens Settings (upload lives in Library and the share sheet)
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(BsShapes.Full)
-                    .background(BsColors.Surface)
-                    .bsClickable(onClick = onProfile)
-                    .semantics { contentDescription = "Profile and settings" },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    AuthStore.user?.username?.take(1)?.uppercase().orEmpty(),
-                    style = BsText.Sm.copy(fontWeight = BsWeight.Semibold),
-                )
+            Text("bigshelf", style = BsText.Xl2.copy(fontFamily = Script), color = BsColors.Muted)
+            Box(Modifier.align(Alignment.CenterEnd)) {
+                BsIconButton(BsIcons.Plus, "Upload", onClick = upload)
             }
         }
-
-        if (q.isNotEmpty()) {
-            // Ranked by relevance, so a grid rather than time-grouped posts
-            ImagesGrid(
-                photos = results,
-                onOpen = { onOpenPhoto(it.id) },
-                isFetchingNextPage = textSearch.isLoading,
-                isError = textSearch.isError,
-                onRetry = textSearch::refetch,
-                totalCount = if (textSearch.isLoading) null else results.size,
-                explore = true,
-            )
-        } else {
             // Hoisted so the "New photos" button can scroll them to the top
             val gridState = rememberLazyGridState()
             val listState = rememberLazyListState()
@@ -250,7 +210,6 @@ internal fun HomeScreen(
                     ) { scope.launch { jumpToNew() } }
                 }
             }
-        }
     }
 }
 

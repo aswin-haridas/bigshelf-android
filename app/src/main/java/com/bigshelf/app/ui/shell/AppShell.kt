@@ -191,7 +191,7 @@ fun AppShell() {
 val LocalBottomBarInset = staticCompositionLocalOf { 0.dp }
 
 /**
- * Labeled destinations with a distinct upload action in the center.
+ * Labeled destinations for the app's main sections.
  */
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit) {
@@ -204,17 +204,7 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit) {
             .height(64.dp)
             .selectableGroup(),
     ) {
-        val upload = rememberUploadPicker()
-        TABS.forEachIndexed { i, tab ->
-            // Upload sits in the middle, a plus on a surface circle so it reads as an action, not a tab
-            if (i == TABS.size / 2) Column(
-                Modifier.weight(1f).fillMaxHeight().bsClickable(scale = 0.9f, onClick = upload),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-            ) {
-                BsIcon(BsIcons.Plus, size = 24.dp, tint = BsColors.Foreground)
-                Text("Upload", style = BsText.Xs2, color = BsColors.Foreground)
-            }
+        TABS.forEach { tab ->
             val selected = tab.route == active
             val tint by animateColorAsState(if (selected) BsColors.Foreground else BsColors.Muted, BsMotion.fast(), label = "tabTint")
             Column(
@@ -271,7 +261,6 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
                 feedView = homeFeedView.value,
                 onFeedViewChange = { homeFeedView.value = it },
                 onOpenPhoto = openPhoto,
-                onProfile = { nav.navigate(Routes.SETTINGS) },
             )
         }
         composable(Routes.LIBRARY) { LibraryScreen(onNavigate = { nav.navigate(it) }) }

@@ -104,7 +104,7 @@ import com.bigshelf.app.state.PhotoEvents
 import com.bigshelf.app.state.ViewerList
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.ConfirmModal
-import com.bigshelf.app.ui.components.Skeleton
+import com.bigshelf.app.ui.components.Pulse
 import com.bigshelf.app.ui.components.Spinner
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
@@ -170,7 +170,6 @@ fun PhotoScreen(
             pager,
             Modifier.fillMaxSize(),
             key = { list[it].id },
-            beyondViewportPageCount = 1,
             userScrollEnabled = !zoomed && croppingId == null,
         ) { page ->
             val id = list[page].id
@@ -375,8 +374,8 @@ private fun PhotoPage(
         PhotoEvents.invalidations.collect { if ("photo" in it) refresh++ }
     }
 
-    // Until the detail lands, the grid item stands in so a skeleton (not "not found") shows
-    val shown = image ?: gridPhoto.takeIf { it.thumbnailUrl != null }
+    // Reuse the media URL from the grid while the detail request runs.
+    val shown = image ?: gridPhoto.takeIf { it.imageSrc != null }
     val context = LocalContext.current
 
     Box(Modifier.fillMaxSize()) {
@@ -396,28 +395,33 @@ private fun PhotoPage(
         ) {
             when {
                 shown != null -> {
-                    // Photos go straight to the original, never the thumbnail first: a skeleton
-                    // covers the wait (pressing the grid tile prefetches it). Videos show their
-                    // poster frame.
-                    var originalLoaded by remember(shown.url) { mutableStateOf(false) }
-                    if (shown.isVideo) {
-                        shown.thumbnailUrl?.let {
-                            AsyncImage(api.mediaUrl(it), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                        }
-                    } else if (!originalLoaded) {
-                        Skeleton(Modifier.fillMaxSize())
-                    }
-                    if (!shown.isVideo && shown.url != null) {
+                    val original = shown.url?.takeUnless { shown.isVideo }
+                    val thumbnail = shown.thumbnailUrl?.takeUnless { it == original }
+                    var originalLoaded by remember(original) { mutableStateOf(false) }
+                    var originalFailed by remember(original) { mutableStateOf(false) }
+                    val name = shown.title ?: shown.filename
+                    if (thumbnail != null && !originalLoaded) {
                         AsyncImage(
-                            // No crossfade: the skeleton is dropped on success, so a fade-in from
-                            // transparent would flash the black background for its 300ms
-                            ImageRequest.Builder(context).data(api.mediaUrl(shown.url)).crossfade(false).build(),
-                            shown.title ?: shown.filename,
+                            remember(context, thumbnail) {
+                                ImageRequest.Builder(context).data(api.mediaUrl(thumbnail)).crossfade(false).build()
+                            },
+                            if (shown.isVideo) null else name,
+                            Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    } else if (!shown.isVideo && !originalLoaded && !originalFailed) {
+                        Pulse(tint = BsColors.Foreground)
+                    }
+                    if (original != null) {
+                        AsyncImage(
+                            remember(context, original) {
+                                ImageRequest.Builder(context).data(api.mediaUrl(original)).crossfade(false).build()
+                            },
+                            name.takeIf { originalLoaded || thumbnail == null },
                             Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit,
                             onSuccess = { originalLoaded = true },
-                            // Drop the skeleton on a failed load too
-                            onError = { originalLoaded = true },
+                            onError = { originalFailed = true },
                         )
                     }
                     if (shown.isVideo) {
@@ -440,7 +444,7 @@ private fun PhotoPage(
                     }
                 }
                 notFound -> Text("Image not found", color = BsColors.Muted)
-                else -> Skeleton(Modifier.fillMaxSize())
+                else -> Pulse(tint = BsColors.Foreground)
             }
         }
     }

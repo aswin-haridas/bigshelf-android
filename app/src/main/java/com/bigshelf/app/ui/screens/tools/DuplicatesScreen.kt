@@ -43,7 +43,7 @@ import com.bigshelf.app.state.rememberQuery
 import com.bigshelf.app.ui.components.BsIcon
 import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.EmptyState
-import com.bigshelf.app.ui.components.InfinityLoader
+import com.bigshelf.app.ui.components.SquareLoader
 import com.bigshelf.app.ui.components.bsClickable
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.theme.BsColors
@@ -178,7 +178,7 @@ fun DuplicatesScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                InfinityLoader(tint = BsColors.Muted)
+                SquareLoader()
                 ShinyText("Finding duplicates…")
             }
             current == null -> {

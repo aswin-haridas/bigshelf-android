@@ -159,7 +159,7 @@ fun LoadingText(modifier: Modifier = Modifier, text: String? = null) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
-        InfinityLoader(tint = BsColors.Muted)
+        TriangleLoader()
         if (text != null) ShinyText(text, textAlign = TextAlign.Center)
     }
 }
