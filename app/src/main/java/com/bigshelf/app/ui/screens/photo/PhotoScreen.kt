@@ -1,10 +1,11 @@
 package com.bigshelf.app.ui.screens.photo
 
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import android.content.Intent
@@ -36,6 +37,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.input.ImeAction
 import com.bigshelf.app.data.CropBox
+import com.bigshelf.app.data.CropCorner
 import com.bigshelf.app.data.WHOLE_PHOTO_FACE_INDEX
 import com.bigshelf.app.ui.photos.ImageCard
 import com.bigshelf.app.ui.screens.people.PersonList
@@ -218,7 +220,7 @@ fun PhotoScreen(
                     onDeleted = onDeleted,
                 )
             }
-            if (cropping) CropOverlay(current, fixedBox = cropOutBox, onClose = { croppingId = null })
+            if (cropping) CropOverlay(current, initialBox = cropOutBox, onClose = { croppingId = null })
             if (showInfo) {
                 InfoSheet(
                     current, onPerson, onMap,
@@ -655,9 +657,8 @@ private fun PhotoOptionsMenu(
                 }
             }
         }
-        // The 3:4 window needs the dimensions to size itself
         if (image.width != null && image.height != null) {
-            Item(BsIcons.Crop, "Crop to 3:4") {
+            Item(BsIcons.Crop, "Crop") {
                 onDismiss()
                 onCrop()
             }
@@ -1039,28 +1040,27 @@ private fun SimilarPhotos(photoId: String, onOpenPhoto: (String) -> Unit) {
     }
 }
 
-/**
- * Port of crop-overlay.tsx: the 3:4 window the crop keeps, over the photo with everything
- * outside dimmed. It spans the full width or height, so dragging slides it along the other
- * axis. Saving adds a copy; replacing the original is a separate, confirmed action.
- */
+private fun CropBox.fitRect(viewWidth: Float, viewHeight: Float, w: Int, h: Int): Rect {
+    val scale = minOf(viewWidth / w, viewHeight / h)
+    val left = (viewWidth - w * scale) / 2 + x * scale
+    val top = (viewHeight - h * scale) / 2 + y * scale
+    return Rect(left, top, left + width * scale, top + height * scale)
+}
+
+private fun Rect.corner(corner: CropCorner) = Offset(
+    if (corner.left) left else right,
+    if (corner.top) top else bottom,
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = null) {
-    val w = image.width ?: return
-    val h = image.height ?: return
+private fun CropOverlay(image: Photo, onClose: () -> Unit, initialBox: CropBox? = null) {
+    val w = image.width?.takeIf { it > 0 } ?: return
+    val h = image.height?.takeIf { it > 0 } ?: return
     val scope = rememberCoroutineScope()
-    var pos by remember(image.id) { mutableFloatStateOf(0.5f) }
+    var box by remember(image.id, initialBox) { mutableStateOf(initialBox ?: CropBox.portrait(w, h)) }
     var saving by remember { mutableStateOf(false) }
     var confirmReplace by remember { mutableStateOf(false) }
-    // A fixed box (cropping a person out) is only confirmed, not dragged
-    val box = fixedBox ?: CropBox.portrait(w, h, pos)
-    val sideways = box.width < w // wider than 3:4: the window slides left/right
-    val slack = when {
-        fixedBox != null -> 0
-        sideways -> w - box.width
-        else -> h - box.height
-    } // image px the window can travel
     // Back leaves crop mode, not the viewer
     BackHandler { if (!saving) onClose() }
 
@@ -1079,59 +1079,90 @@ private fun CropOverlay(image: Photo, onClose: () -> Unit, fixedBox: CropBox? = 
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-        AsyncImage(BigShelfApp.api.mediaUrl(image.url ?: image.thumbnailUrl), image.filename, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-        Box(
-            Modifier
-                .fillMaxSize()
-                .pointerInput(image.id, slack) {
-                    detectDragGestures { change, drag ->
-                        change.consume()
-                        if (slack <= 0) return@detectDragGestures
-                        // Screen px moved -> image px -> fraction of the travel
-                        val scale = minOf(size.width / w.toFloat(), size.height / h.toFloat())
-                        val moved = if (sideways) drag.x else drag.y
-                        pos = (pos + moved / scale / slack).coerceIn(0f, 1f)
+    Column(
+        Modifier.fillMaxSize().background(Color.Black).navigationBarsPadding().padding(24.dp, 24.dp, 24.dp, 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            AsyncImage(BigShelfApp.api.mediaUrl(image.url ?: image.thumbnailUrl), image.filename, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .semantics {
+                        contentDescription = "Crop selection"
+                        if (!saving) {
+                            val stepX = (w / 20).coerceAtLeast(1)
+                            val stepY = (h / 20).coerceAtLeast(1)
+                            fun adjust(label: String, dx: Int, dy: Int, corner: CropCorner? = null) =
+                                CustomAccessibilityAction(label) {
+                                    box = box.adjust(w, h, dx, dy, corner)
+                                    true
+                                }
+                            customActions = listOf(
+                                adjust("Move left", -stepX, 0), adjust("Move right", stepX, 0),
+                                adjust("Move up", 0, -stepY), adjust("Move down", 0, stepY),
+                                adjust("Expand left edge", -stepX, 0, CropCorner.TopLeft),
+                                adjust("Shrink left edge", stepX, 0, CropCorner.TopLeft),
+                                adjust("Expand right edge", stepX, 0, CropCorner.BottomRight),
+                                adjust("Shrink right edge", -stepX, 0, CropCorner.BottomRight),
+                                adjust("Expand top edge", 0, -stepY, CropCorner.TopLeft),
+                                adjust("Shrink top edge", 0, stepY, CropCorner.TopLeft),
+                                adjust("Expand bottom edge", 0, stepY, CropCorner.BottomRight),
+                                adjust("Shrink bottom edge", 0, -stepY, CropCorner.BottomRight),
+                            )
+                        }
                     }
-                }
-                .drawBehind {
-                    // Where the Fit-scaled photo sits, then the kept window inside it
-                    val scale = minOf(size.width / w, size.height / h)
-                    val left = (size.width - w * scale) / 2 + box.x * scale
-                    val top = (size.height - h * scale) / 2 + box.y * scale
-                    val keep = Rect(left, top, left + box.width * scale, top + box.height * scale)
-                    val dim = Color.Black.copy(alpha = 0.7f)
-                    drawRect(dim, Offset.Zero, Size(size.width, keep.top))
-                    drawRect(dim, Offset(0f, keep.bottom), Size(size.width, size.height - keep.bottom))
-                    drawRect(dim, Offset(0f, keep.top), Size(keep.left, keep.height))
-                    drawRect(dim, Offset(keep.right, keep.top), Size(size.width - keep.right, keep.height))
-                    drawRect(BsColors.Foreground, keep.topLeft, keep.size, style = Stroke(2.dp.toPx()))
-                },
-        )
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(16.dp),
+                    .pointerInput(image.id, initialBox, w, h, saving) {
+                        if (saving) return@pointerInput
+                        val scale = minOf(size.width / w.toFloat(), size.height / h.toFloat())
+                        val reach = 24.dp.toPx()
+                        var startBox = box
+                        var delta = Offset.Zero
+                        var corner: CropCorner? = null
+                        var active = false
+                        detectDragGestures(
+                            onDragStart = { start ->
+                                startBox = box
+                                delta = Offset.Zero
+                                val rect = startBox.fitRect(size.width.toFloat(), size.height.toFloat(), w, h)
+                                corner = CropCorner.entries
+                                    .minBy { (rect.corner(it) - start).getDistanceSquared() }
+                                    .takeIf { (rect.corner(it) - start).getDistanceSquared() <= reach * reach }
+                                active = scale > 0f && (corner != null || rect.contains(start))
+                            },
+                            onDrag = { change, movement ->
+                                if (active) {
+                                    change.consume()
+                                    delta += movement
+                                    box = startBox.adjust(w, h, (delta.x / scale).roundToInt(), (delta.y / scale).roundToInt(), corner)
+                                }
+                            },
+                        )
+                    }
+                    .drawBehind {
+                        val keep = box.fitRect(size.width, size.height, w, h)
+                        val dim = Color.Black.copy(alpha = 0.7f)
+                        drawRect(dim, Offset.Zero, Size(size.width, keep.top))
+                        drawRect(dim, Offset(0f, keep.bottom), Size(size.width, size.height - keep.bottom))
+                        drawRect(dim, Offset(0f, keep.top), Size(keep.left, keep.height))
+                        drawRect(dim, Offset(keep.right, keep.top), Size(size.width - keep.right, keep.height))
+                        drawRect(Color.White, keep.topLeft, keep.size, style = Stroke(2.dp.toPx()))
+                        for (corner in CropCorner.entries) {
+                            val center = keep.corner(corner)
+                            drawCircle(Color.Black.copy(alpha = 0.6f), 7.dp.toPx(), center)
+                            drawCircle(Color.White, 6.dp.toPx(), center)
+                        }
+                    },
+            )
+        }
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (slack > 0) {
-                Column(Modifier.fillMaxWidth().clip(BsShapes.Md).background(BsColors.Surface).padding(horizontal = 12.dp)) {
-                    Text("Crop position", Modifier.padding(top = 8.dp), style = BsText.Sm, color = BsColors.Foreground)
-                    Slider(
-                        value = pos,
-                        onValueChange = { pos = it },
-                        modifier = Modifier.semantics { contentDescription = "Crop position" },
-                        enabled = !saving,
-                    )
-                }
-            }
-            FlowRow(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                BsButton(onClick = onClose, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Cancel") }
-                BsButton(onClick = { confirmReplace = true }, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Replace original") }
-                BsButton(onClick = { save(replace = false) }, loading = saving) { Text("Save a copy") }
-            }
+            BsButton(onClick = onClose, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Cancel") }
+            BsButton(onClick = { confirmReplace = true }, variant = ButtonVariant.Secondary, enabled = !saving) { Text("Replace original") }
+            BsButton(onClick = { save(replace = false) }, loading = saving) { Text("Save a copy") }
         }
     }
     if (confirmReplace) {

@@ -468,17 +468,37 @@ data class PhotoSet(val photos: List<Photo>, val personId: String?, val personNa
 
 // ---------- Editing ----------
 
+enum class CropCorner(val left: Boolean, val top: Boolean) {
+    TopLeft(true, true),
+    TopRight(false, true),
+    BottomLeft(true, false),
+    BottomRight(false, false),
+}
+
 /** A crop window in image pixels. */
 data class CropBox(val x: Int, val y: Int, val width: Int, val height: Int) {
+    fun adjust(imageWidth: Int, imageHeight: Int, dx: Int, dy: Int, corner: CropCorner? = null): CropBox {
+        if (corner == null) {
+            return copy(
+                x = (x + dx).coerceIn(0, imageWidth - width),
+                y = (y + dy).coerceIn(0, imageHeight - height),
+            )
+        }
+        val right = x + width
+        val bottom = y + height
+        val left = if (corner.left) (x + dx).coerceIn(0, right - 1) else x
+        val top = if (corner.top) (y + dy).coerceIn(0, bottom - 1) else y
+        val newRight = if (corner.left) right else (right + dx).coerceIn(left + 1, imageWidth)
+        val newBottom = if (corner.top) bottom else (bottom + dy).coerceIn(top + 1, imageHeight)
+        return CropBox(left, top, newRight - left, newBottom - top)
+    }
+
     companion object {
-        /**
-         * Web `crop3x4Box`: the largest 3:4 (portrait) box in a [width] x [height] image. Wider
-         * than 3:4 trims the sides, taller trims top and bottom; [pos] (0..1) slides it along.
-         */
-        fun portrait(width: Int, height: Int, pos: Float = 0.5f): CropBox {
-            val w = minOf(width, height * 3 / 4)
+        /** The largest centered 3:4 crop that fits the image. */
+        fun portrait(width: Int, height: Int): CropBox {
+            val w = minOf(width, (height * 3 / 4).coerceAtLeast(1))
             val h = minOf(height, width * 4 / 3)
-            return CropBox(Math.round((width - w) * pos), Math.round((height - h) * pos), w, h)
+            return CropBox(Math.round((width - w) / 2f), Math.round((height - h) / 2f), w, h)
         }
 
         /**
