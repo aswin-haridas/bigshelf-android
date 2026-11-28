@@ -21,7 +21,6 @@ import com.adamglin.phosphoricons.regular.ArrowUp
 import com.adamglin.phosphoricons.regular.UserMinus
 import com.adamglin.phosphoricons.regular.Crop
 import com.adamglin.phosphoricons.regular.SquareSplitVertical
-import com.adamglin.phosphoricons.regular.FilmStrip
 import com.adamglin.phosphoricons.regular.Image
 import com.adamglin.phosphoricons.regular.GridFour
 import com.adamglin.phosphoricons.regular.Lightning
@@ -89,13 +88,12 @@ import com.adamglin.phosphoricons.regular.Wrench
  * Sizes stay on the web scale: 12 / 14 / 16 / 20 / 24 / 32 dp.
  */
 object BsIcons {
-    // Tools ported from the web: Triptych, Framer, viewer crop / split, image search
+    // Tools ported from the web: Triptych, viewer crop / split, image search
     val ArrowRight: ImageVector get() = PhosphorIcons.Regular.ArrowRight
     val ArrowUp: ImageVector get() = PhosphorIcons.Regular.ArrowUp
     val UserMinus: ImageVector get() = PhosphorIcons.Regular.UserMinus
     val Crop: ImageVector get() = PhosphorIcons.Regular.Crop
     val SquareSplitVertical: ImageVector get() = PhosphorIcons.Regular.SquareSplitVertical
-    val FilmStrip: ImageVector get() = PhosphorIcons.Regular.FilmStrip
     val Image: ImageVector get() = PhosphorIcons.Regular.Image
     val GridFour: ImageVector get() = PhosphorIcons.Regular.GridFour
     val Lightning: ImageVector get() = PhosphorIcons.Regular.Lightning

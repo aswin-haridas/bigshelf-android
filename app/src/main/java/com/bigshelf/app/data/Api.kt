@@ -195,7 +195,7 @@ class Api(context: Context, val baseUrl: String) {
         body: RequestBody? = null,
     ): String = callWithHeaders(method, path, params, body).first
 
-    // Body text plus response headers (Triptych/Triplets name the set's person in X-Person-*)
+    // Body text plus response headers (Composer names the set's person in X-Person-*)
     private suspend fun callWithHeaders(
         method: String,
         path: String,
@@ -493,15 +493,14 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun suggestName(photoId: String) =
         get("/api/v1/photos/$photoId/suggest-name", SuggestedName.serializer()).suggestedName
 
-    // ---------- Triptych, Triplets, Composer ----------
+    // ---------- Composer ----------
 
     /**
-     * One set from [endpoint] (`/api/v1/triplets`, `/composer`), with the person it
-     * shows from the X-Person-* headers. Each endpoint ignores the params it doesn't use.
+     * One set from [endpoint] (`/api/v1/composer`), with the person it shows from the
+     * X-Person-* headers.
      */
-    suspend fun photoSet(endpoint: String, offset: Int, options: Map<String, Any?>): PhotoSet {
-        // [options] are the endpoint's own query params (setOptions in TriptychScreen)
-        val (text, headers) = callWithHeaders("GET", endpoint, options + ("offset" to offset))
+    suspend fun photoSet(endpoint: String, options: Map<String, Any?>): PhotoSet {
+        val (text, headers) = callWithHeaders("GET", endpoint, options)
         return PhotoSet(
             photos = json.decodeFromString(ListSerializer(Photo.serializer()), text),
             personId = headers["x-person-id"],
@@ -510,39 +509,10 @@ class Api(context: Context, val baseUrl: String) {
         )
     }
 
-    /** Never show this person in Triplets again (undone from Settings). */
+    /** Never show this person in Composer again (undone from Settings). */
     suspend fun skipPerson(personId: String) = sendUnit("POST", "/api/v1/triplets/skip/$personId")
 
     suspend fun unskipPerson(personId: String) = sendUnit("DELETE", "/api/v1/triplets/skip/$personId")
-
-    // ---------- Framer ----------
-
-    /** Scores the video's frames and returns the best [topK] as base64 JPEGs. */
-    suspend fun extractFrames(video: Uri, topK: Int, filename: String? = null, mimeType: String? = null) = json.decodeFromString(
-        FramerResult.serializer(),
-        call("POST", "/api/v1/framer/extract", mapOf("top_k" to topK), filePart(video, filename, mimeType)),
-    )
-
-    /** Downloads a media URL (a library video for Framer) into [file]. */
-    suspend fun fetchToFile(path: String, file: java.io.File) = withContext(Dispatchers.IO) {
-        client.newCall(Request.Builder().url(url(path)).build()).execute().use { res ->
-            if (!res.isSuccessful) throw ApiException(res.code, "Download failed")
-            file.outputStream().use { out -> res.body!!.byteStream().copyTo(out) }
-        }
-    }
-
-    suspend fun saveFrames(frames: List<Frame>) = send(
-        "POST", "/api/v1/framer/save", FramesSaved.serializer(),
-        buildJsonObject {
-            put("frames", JsonArray(frames.map { f ->
-                buildJsonObject {
-                    put("image_data", f.imageData)
-                    put("timestamp_formatted", f.timestampFormatted)
-                    put("title", "Frame ${f.timestampFormatted}")
-                }
-            }))
-        },
-    )
 
     // ---------- Editing ----------
 
@@ -721,19 +691,6 @@ class Api(context: Context, val baseUrl: String) {
     suspend fun resetRating() = send("DELETE", "/api/v1/rating", ClearedResponse.serializer())
 
     // ---------- Sharing ----------
-
-    /** Web address of a share link: the web app serves /s/{token} on the API's origin. */
-    fun shareUrl(token: String) = "$baseUrl/s/$token"
-
-    suspend fun shares() = get("/api/v1/shares", ListSerializer(ShareLink.serializer()))
-
-    /** A public link to [albumId], or to [photoIds] when no album is given. */
-    suspend fun createShare(albumId: String? = null, photoIds: Collection<String> = emptyList()) = send(
-        "POST", "/api/v1/shares", ShareLink.serializer(),
-        buildJsonObject { if (albumId != null) put("album_id", albumId) else put("photo_ids", ids(photoIds)) },
-    )
-
-    suspend fun deleteShare(id: String) = sendUnit("DELETE", "/api/v1/shares/$id")
 
     /** Albums other people shared with you. */
     suspend fun sharedAlbums() = get("/api/v1/albums/shared", AlbumList.serializer()).items

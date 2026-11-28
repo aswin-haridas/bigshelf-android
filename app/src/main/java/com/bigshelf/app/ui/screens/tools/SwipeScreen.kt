@@ -158,7 +158,7 @@ fun SwipeScreen(onBack: () -> Unit) {
         }
     }
 
-    fun refresh() = PhotoEvents.invalidate("photos", "photo", "bin-photos", "people", "triplets")
+    fun refresh() = PhotoEvents.invalidate("photos", "photo", "bin-photos", "people")
 
     fun restore(photo: Photo) {
         queue.add(0, photo)

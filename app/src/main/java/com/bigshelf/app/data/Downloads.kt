@@ -14,30 +14,24 @@ import com.bigshelf.app.ui.components.toast
  * With Archive on download on, the saved photos are then archived.
  */
 object Downloads {
-    suspend fun save(context: Context, photos: Collection<Photo>, repairSet: Boolean = false) {
+    suspend fun save(context: Context, photos: Collection<Photo>) {
         val api = BigShelfApp.api
         val manager = context.getSystemService(DownloadManager::class.java)
         for (listed in photos) {
             // Grid items may omit the original's URL; the detail response always has it
             val photo = if (listed.url != null) listed else api.photo(listed.id)
-            val url = api.mediaUrl(photo.url)
-            if (url == null) {
-                check(!repairSet) { "Repair original URL unavailable" }
-                continue
-            }
-            val prefix = if (!repairSet) "" else if (listed.repairTarget == true) "repair-" else "reference-"
-            val filename = if (repairSet) "$prefix${photo.id}-${photo.filename}" else photo.filename
+            val url = api.mediaUrl(photo.url) ?: continue
             val request = DownloadManager.Request(Uri.parse(url))
                 .setTitle(photo.filename)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "BigShelf/$filename")
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "BigShelf/${photo.filename}")
             // Media served by the API itself (not presigned storage) needs the session
             if (url.startsWith(api.baseUrl)) api.accessToken?.let { request.addRequestHeader("Authorization", "Bearer $it") }
             manager.enqueue(request)
         }
         // Settings > Archive on download (web `archiveDownloaded`): applies to every download
         // button, so downloaded photos leave the library wherever they were saved from
-        if (!repairSet && BigShelfApp.settings.archiveOnDownload && photos.isNotEmpty()) {
+        if (BigShelfApp.settings.archiveOnDownload && photos.isNotEmpty()) {
             try {
                 api.flagArchived(photos.map { it.id }, true)
                 PhotoEvents.invalidateAll()

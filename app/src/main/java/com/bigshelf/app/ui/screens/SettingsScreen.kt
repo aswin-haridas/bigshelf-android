@@ -163,7 +163,7 @@ private fun Section(title: String, hint: String) {
     }
 }
 
-/** People hidden with Skip on Triplets, each with an Unskip to bring them back. */
+/** People hidden with Skip on Composer, each with an Unskip to bring them back. */
 @Composable
 private fun SkippedPeople() {
     val api = BigShelfApp.api
@@ -173,7 +173,7 @@ private fun SkippedPeople() {
     var pending by remember { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Section("Skipped people", "Skipped people never appear in Matches.")
+        Section("Skipped people", "Skipped people never appear in Composer.")
         SettingsCard {
             when {
                 people.isLoading -> Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
@@ -186,7 +186,7 @@ private fun SkippedPeople() {
                     color = BsColors.Muted,
                 )
                 skipped.isEmpty() -> Text(
-                    "No skipped people. Use Skip on the Triplets page to hide someone.",
+                    "No skipped people. Use Skip on the Composer page to hide someone.",
                     Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     style = BsText.Xs,
                     color = BsColors.Muted,
@@ -221,11 +221,6 @@ private fun SkippedPeople() {
     }
 }
 
-/** Port of modules/settings/settings.tsx. */
-private val ORDERS = listOf(
-    TabItem("newest", "Newest"), TabItem("oldest", "Oldest"), TabItem("best", "Best"), TabItem("random", "Shuffle"),
-)
-
 /** Label + hint over a full-width segmented control (sizes, order), a divider above it. */
 @Composable
 private fun TabsRow(label: String, hint: String, content: @Composable () -> Unit) {
@@ -238,52 +233,6 @@ private fun TabsRow(label: String, hint: String, content: @Composable () -> Unit
             Text(hint, style = BsText.Xs, color = BsColors.Muted)
         }
         content()
-    }
-}
-
-/** The Triplets options card, shared by Settings and the gear on the Triplets page. */
-@Composable
-fun TripletSettingsCard() {
-    val settings = BigShelfApp.settings
-    var choosingSize by remember { mutableStateOf(false) }
-    SettingsCard {
-        SettingRow("Match", "Choose what each set has in common.") {}
-        val matches = listOf(
-            Triple("Faces", settings.tripletMatchFaces, settings::updateTripletMatchFaces),
-            Triple("Outfit", settings.tripletOutfit, settings::updateTripletOutfit),
-            Triple("Colors", settings.tripletMatchColors, settings::updateTripletMatchColors),
-            Triple("Scene", settings.tripletMatchScene, settings::updateTripletMatchScene),
-        )
-        matches.chunked(3).forEach { row ->
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (label, checked, change) ->
-                    BsButton(
-                        onClick = { change(!checked) }, modifier = Modifier.weight(1f),
-                        variant = if (checked) ButtonVariant.Primary else ButtonVariant.Secondary,
-                    ) { Text(label) }
-                }
-            }
-        }
-        ToggleRow("AI images", "Include AI images.", settings.includeAi, settings::updateIncludeAi, divider = true)
-        SettingRow("Photos per set", "Strict matching may return fewer photos.") {
-            BsButton(onClick = { choosingSize = true }, variant = ButtonVariant.Secondary) {
-                Text("${settings.tripletCount} photos")
-            }
-        }
-        TabsRow("Order", "How the photos in a set are laid out.") {
-            BsTabs(ORDERS, settings.tripletOrder, settings::updateTripletOrder)
-        }
-    }
-    if (choosingSize) BsModal(title = "Photos per set", onClose = { choosingSize = false }) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            (2..9).forEach { count ->
-                BsButton(
-                    onClick = { settings.updateTripletCount(count); choosingSize = false },
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = if (settings.tripletCount == count) ButtonVariant.Primary else ButtonVariant.Secondary,
-                ) { Text("$count photos") }
-            }
-        }
     }
 }
 
@@ -343,8 +292,10 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Matches", "How Matches finds references for repair originals.")
-            TripletSettingsCard()
+            Section("Composer", "Which photos Composer may pick.")
+            SettingsCard {
+                ToggleRow("AI images", "Include AI images.", settings.includeAi, settings::updateIncludeAi)
+            }
         }
 
         SkippedPeople()

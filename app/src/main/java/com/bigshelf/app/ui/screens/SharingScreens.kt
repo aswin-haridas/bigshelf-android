@@ -3,11 +3,7 @@ package com.bigshelf.app.ui.screens
 import com.bigshelf.app.ui.components.LoadError
 import com.bigshelf.app.ui.components.TriangleLoader
 import com.bigshelf.app.ui.components.ShinyText
-import android.content.Context
 import com.bigshelf.app.ui.shell.LocalBottomBarInset
-import android.content.Intent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,16 +28,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bigshelf.app.BigShelfApp
 import com.bigshelf.app.data.AlbumListItem
-import com.bigshelf.app.data.ShareLink
 import com.bigshelf.app.data.userMessage
 import com.bigshelf.app.state.AuthStore
 import com.bigshelf.app.state.PhotoEvents
@@ -53,28 +44,15 @@ import com.bigshelf.app.ui.components.BsIconButton
 import com.bigshelf.app.ui.components.BsInput
 import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.components.ButtonVariant
-import com.bigshelf.app.ui.components.ConfirmModal
 import com.bigshelf.app.ui.components.PageHeader
 import com.bigshelf.app.ui.components.toast
 import com.bigshelf.app.ui.screens.explore.CoverCard
 import com.bigshelf.app.ui.screens.explore.albumSubtitle
 import com.bigshelf.app.ui.theme.BsColors
 import com.bigshelf.app.ui.theme.BsIcons
-import com.bigshelf.app.ui.theme.BsShapes
 import com.bigshelf.app.ui.theme.BsText
 import com.bigshelf.app.ui.theme.BsWeight
 import kotlinx.coroutines.launch
-
-/** Opens the system share sheet with a link's web address. */
-fun sendLink(context: Context, link: ShareLink) {
-    val send = Intent(Intent.ACTION_SEND)
-        .setType("text/plain")
-        .putExtra(Intent.EXTRA_SUBJECT, link.title)
-        .putExtra(Intent.EXTRA_TEXT, BigShelfApp.api.shareUrl(link.token))
-    context.startActivity(Intent.createChooser(send, link.title))
-}
-
-private fun itemCount(n: Int) = "$n ${if (n == 1) "item" else "items"}"
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
@@ -94,15 +72,11 @@ private fun Hint(text: String) {
     Text(text, Modifier.padding(horizontal = 20.dp), style = BsText.Xs, color = BsColors.MutedFaint)
 }
 
-/** Library > Sharing: albums people shared with you, and your links (share again or revoke). */
+/** Library > Sharing: albums people shared with you. */
 @Composable
 fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
     val api = BigShelfApp.api
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val shared = rememberQuery("albums-shared", invalidatedBy = setOf("albums")) { api.sharedAlbums() }
-    val links = rememberQuery("shares", invalidatedBy = setOf("shares", "albums")) { api.shares() }
-    var revoking by remember { mutableStateOf<ShareLink?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Sharing", leading = { BsIconButton(BsIcons.ArrowLeft, "Back", onClick = onBack, tint = BsColors.Foreground) })
@@ -133,78 +107,18 @@ fun SharingScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                     }
                 }
             }
-            Section("Your links") {
-                val list = links.data.orEmpty()
-                if (links.isError && links.data == null) {
-                    LoadError(links::refetch, what = "your links")
-                } else if (list.isEmpty()) {
-                    if (links.isLoading) ShinyText("Loading…", Modifier.padding(horizontal = 20.dp)) else Hint("No links")
-                } else {
-                    Column(
-                        Modifier
-                            .padding(horizontal = 16.dp)
-                            .fillMaxWidth()
-                            .clip(BsShapes.Xl)
-                            .background(BsColors.Surface.copy(alpha = 0.3f))
-                            .border(1.dp, BsColors.Border, BsShapes.Xl),
-                    ) {
-                        list.forEachIndexed { i, link ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .drawBehind { if (i > 0) drawLine(BsColors.Border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
-                                    .heightIn(min = 64.dp)
-                                    .padding(start = 16.dp, end = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(link.title, style = BsText.Sm, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(
-                                        if (link.albumId != null) "Album · ${itemCount(link.photoCount)}" else itemCount(link.photoCount),
-                                        style = BsText.Xs,
-                                        color = BsColors.Muted,
-                                    )
-                                }
-                                BsIconButton(BsIcons.ShareNetwork, "Share again", onClick = { sendLink(context, link) })
-                                BsIconButton(BsIcons.Trash, "Revoke", onClick = { revoking = link }, tint = BsColors.Danger)
-                            }
-                        }
-                    }
-                }
-            }
         }
-    }
-
-    revoking?.let { link ->
-        ConfirmModal(
-            title = "Revoke link",
-            message = "\"${link.title}\" stops working for everyone who has it.",
-            confirmLabel = "Revoke",
-            onConfirm = {
-                scope.launch {
-                    try {
-                        api.deleteShare(link.id)
-                        PhotoEvents.invalidate("shares")
-                        toast.success("Link revoked")
-                    } catch (e: Exception) {
-                        toast.error(e.userMessage("Couldn't revoke the link"))
-                    }
-                }
-            },
-            onClose = { revoking = null },
-        )
     }
 }
 
 /**
- * An album's sharing sheet: a public link (owner only), uploading photos into it, and the people
- * it's shared with. The owner adds people by username or email and removes them; a member can
- * leave. [onUpload] opens the photo picker, registered by the screen so it outlives this sheet.
+ * An album's sharing sheet: uploading photos into it and the people it's shared with. The owner
+ * adds people by username or email and removes them; a member can leave. [onUpload] opens the
+ * photo picker, registered by the screen so it outlives this sheet.
  */
 @Composable
 fun AlbumSharingModal(album: AlbumListItem, onUpload: () -> Unit, onLeft: () -> Unit, onClose: () -> Unit) {
     val api = BigShelfApp.api
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val me = AuthStore.user?.id
     val owner = album.ownerId == null || album.ownerId == me
@@ -237,28 +151,9 @@ fun AlbumSharingModal(album: AlbumListItem, onUpload: () -> Unit, onLeft: () -> 
 
     BsModal(title = "Share \"${album.title}\"", onClose = onClose) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (owner) {
-                    BsButton(
-                        onClick = {
-                            run("link", "Couldn't create a link") {
-                                // One link per album: reuse it rather than minting another
-                                val link = api.shares().firstOrNull { it.albumId == album.id } ?: api.createShare(albumId = album.id)
-                                PhotoEvents.invalidate("shares")
-                                sendLink(context, link)
-                            }
-                        },
-                        variant = ButtonVariant.Secondary,
-                        loading = busy == "link",
-                    ) {
-                        BsIcon(BsIcons.ShareNetwork, size = 16.dp)
-                        Text("Share link")
-                    }
-                }
-                BsButton(onClick = onUpload, variant = ButtonVariant.Secondary) {
-                    BsIcon(BsIcons.UploadSimple, size = 16.dp)
-                    Text("Upload photos")
-                }
+            BsButton(onClick = onUpload, variant = ButtonVariant.Secondary) {
+                BsIcon(BsIcons.UploadSimple, size = 16.dp)
+                Text("Upload photos")
             }
 
             Text("People", style = BsText.Xs.copy(fontWeight = BsWeight.Medium), color = BsColors.Muted)

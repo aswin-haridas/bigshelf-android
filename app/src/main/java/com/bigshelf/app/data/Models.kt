@@ -76,7 +76,6 @@ data class Photo(
     val exif: CameraInfo? = null,
     // Home feed only (photos(people = true)): named people tagged on it, for the post header
     val people: List<PhotoPersonTag>? = null,
-    @SerialName("repair_target") val repairTarget: Boolean? = null,
     // Organize > Dates only: how taken_at was guessed (filename / scene / upload) and how sure
 ) {
     /** Same fallback as web `withIsAi`: server flag, else the ChatGPT filename rule. */
@@ -435,16 +434,6 @@ data class FaceReviewBatch(
 @Serializable
 data class FaceReview(val batch: FaceReviewBatch? = null, val total: Int = 0)
 
-/** A public link (/s/{token}) to an album or a selection of photos. */
-@Serializable
-data class ShareLink(
-    val id: String,
-    val token: String,
-    val title: String,
-    @SerialName("album_id") val albumId: String? = null,
-    @SerialName("photo_count") val photoCount: Int = 0,
-)
-
 /** Someone in a shared album; role is "owner" or "member". */
 @Serializable
 data class AlbumMember(val id: String, val username: String, val role: String)
@@ -472,41 +461,10 @@ data class MergeGroupResult(
     val invalidate: List<String> = emptyList(),
 )
 
-// ---------- Triptych / Triplets / Composer ----------
+// ---------- Composer ----------
 
 /** One set of photos, and the single person it shows (when it does) so they can be skipped. */
 data class PhotoSet(val photos: List<Photo>, val personId: String?, val personName: String?)
-
-// ---------- Framer ----------
-
-@Serializable
-data class FrameBreakdown(
-    val sharpness: Double = 0.0,
-    val framing: Double = 0.0,
-    val portrait: Double = 0.0,
-    val lighting: Double = 0.0,
-)
-
-/** One extracted frame; [imageData] is a `data:image/jpeg;base64,...` URL. */
-@Serializable
-data class Frame(
-    @SerialName("frame_index") val frameIndex: Int,
-    @SerialName("timestamp_formatted") val timestampFormatted: String = "",
-    val score: Double = 0.0,
-    val breakdown: FrameBreakdown = FrameBreakdown(),
-    val highlights: List<String> = emptyList(),
-    @SerialName("image_data") val imageData: String,
-)
-
-@Serializable
-data class FramerResult(
-    @SerialName("duration_seconds") val durationSeconds: Double = 0.0,
-    @SerialName("analyzed_count") val analyzedCount: Int = 0,
-    val frames: List<Frame> = emptyList(),
-)
-
-@Serializable
-data class FramesSaved(@SerialName("saved_count") val savedCount: Int = 0)
 
 // ---------- Editing ----------
 

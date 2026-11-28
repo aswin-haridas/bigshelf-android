@@ -63,8 +63,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import com.bigshelf.app.ui.screens.sendLink
-import com.bigshelf.app.data.userMessage
 
 
 /**
@@ -187,21 +185,6 @@ fun SelectionActionBar(path: String, onPersonGone: () -> Unit, modifier: Modifie
                 Action("mark-ai", BsIcons.FlowerTulip, "Mark AI") {
                     runBulk("mark-ai", { "${photoCountLabel(it)} marked as AI" }, "Failed to mark photos as AI") { ids ->
                         coroutineScope { ids.map { async { api.markAi(it, true) } }.awaitAll() }
-                    }
-                }
-                Action("share", BsIcons.ShareNetwork, "Share") {
-                    val ids = SelectionStore.ids
-                    pending = "share"
-                    scope.launch {
-                        try {
-                            sendLink(context, api.createShare(photoIds = ids))
-                            PhotoEvents.invalidate("shares")
-                            SelectionStore.clear()
-                        } catch (e: Exception) {
-                            toast.error(e.userMessage("Couldn't create a link"))
-                        } finally {
-                            pending = null
-                        }
                     }
                 }
                 Action("download", BsIcons.DownloadSimple, "Download") {

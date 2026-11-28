@@ -67,7 +67,6 @@ import com.bigshelf.app.ui.screens.HomeScreen
 import com.bigshelf.app.ui.screens.rememberHomeBursts
 import com.bigshelf.app.ui.components.BsModal
 import com.bigshelf.app.ui.screens.SettingsScreen
-import com.bigshelf.app.ui.screens.TripletSettingsCard
 import com.bigshelf.app.ui.screens.SharingScreen
 import com.bigshelf.app.ui.screens.explore.searchGraph
 import com.bigshelf.app.ui.screens.people.FacePhotosScreen
@@ -78,14 +77,10 @@ import com.bigshelf.app.ui.screens.people.PersonScreen
 import com.bigshelf.app.ui.screens.people.UntaggedScreen
 import com.bigshelf.app.ui.screens.photo.PhotoScreen
 import com.bigshelf.app.BigShelfApp
-import com.bigshelf.app.ui.screens.tools.COMPOSER_ENDPOINT
 import com.bigshelf.app.ui.screens.tools.DuplicatesScreen
+import com.bigshelf.app.ui.screens.tools.ComposerScreen
 import com.bigshelf.app.ui.screens.tools.RatingScreen
 import com.bigshelf.app.ui.screens.tools.SwipeScreen
-import com.bigshelf.app.ui.screens.tools.FramerScreen
-import com.bigshelf.app.ui.screens.tools.OUTFIT_SWAP_PROMPT
-import com.bigshelf.app.ui.screens.tools.TRIPLETS_ENDPOINT
-import com.bigshelf.app.ui.screens.tools.TriptychScreen
 import com.bigshelf.app.ui.screens.tools.OrganizeScreen
 import com.bigshelf.app.ui.screens.tools.PipelinesScreen
 import com.bigshelf.app.ui.screens.tools.RunScreen
@@ -312,9 +307,6 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
                 onOpenPhoto = openPhoto,
             )
         }
-        composable(Routes.WARDROBE) {
-            com.bigshelf.app.ui.screens.explore.TagScreen("fashion", onBack, openPhoto, title = "Wardrobe")
-        }
         composable(Routes.SETTINGS) { SettingsScreen(onBack = onBack) }
         composable(Routes.BACKUP) { BackupScreen(onBack = onBack) }
         composable(Routes.SHARING) { SharingScreen(onBack = onBack, onNavigate = { nav.navigate(it) }) }
@@ -331,37 +323,11 @@ private fun AppNavHost(nav: NavHostController, path: String, onTopLevel: (String
                 onPerson = { nav.navigate(Routes.person(it)) },
                 onMap = { lat, lon -> nav.navigate(Routes.map(lat, lon)) },
                 onOpenPhoto = { id -> nav.navigate(Routes.photo(id)) },
-                onFramer = { id -> nav.navigate(Routes.framer(id)) },
                 onDeleted = { if (!nav.popBackStack(sectionFrom, inclusive = false)) onTopLevel(sectionFrom) },
             )
         }
-        composable(Routes.TRIPLETS) {
-            var editingSettings by remember { mutableStateOf(false) }
-            TriptychScreen(
-                "Matches",
-                "Repair photos with ChatGPT",
-                TRIPLETS_ENDPOINT,
-                onBack = onBack, onOpenPhoto = openPhoto,
-                onSettings = { editingSettings = true },
-            )
-            // The same options as the Triplets section of Settings
-            if (editingSettings) {
-                BsModal(title = "Matches settings", onClose = { editingSettings = false }) {
-                    TripletSettingsCard()
-                }
-            }
-        }
         composable(Routes.RATING) { RatingScreen(onBack = onBack, onOpenPhoto = openPhoto) }
         composable(Routes.SWIPE) { SwipeScreen(onBack = onBack) }
-        composable(Routes.COMPOSER) {
-            // A clear-face photo, then the same person in another outfit, with the prompt to swap it in
-            TriptychScreen(
-                "Composer", "A clear face, and an outfit of theirs to swap in", COMPOSER_ENDPOINT,
-                onBack = onBack, onOpenPhoto = openPhoto, prompt = OUTFIT_SWAP_PROMPT,
-            )
-        }
-        composable(Routes.FRAMER, arguments = listOf(navArgument("photo") { type = NavType.StringType; nullable = true })) {
-            FramerScreen(photoId = it.arguments?.getString("photo"), onBack = onBack)
-        }
+        composable(Routes.COMPOSER) { ComposerScreen(onBack = onBack, onOpenPhoto = openPhoto) }
     }
 }

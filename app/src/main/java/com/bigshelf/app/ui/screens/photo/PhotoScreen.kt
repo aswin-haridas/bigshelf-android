@@ -147,7 +147,6 @@ fun PhotoScreen(
     onPerson: (String) -> Unit,
     onMap: (Double, Double) -> Unit,
     onOpenPhoto: (String) -> Unit,
-    onFramer: (String) -> Unit,
     onDeleted: () -> Unit,
 ) {
     // The grid's list if it contains this photo, else just this one
@@ -218,7 +217,6 @@ fun PhotoScreen(
                     onInfo = { showInfo = true },
                     onChanged = { details[it.id] = it },
                     onDeleted = onDeleted,
-                    onFramer = { onFramer(current.id) },
                 )
             }
             if (cropping) CropOverlay(current, fixedBox = cropOutBox, onClose = { croppingId = null })
@@ -522,7 +520,6 @@ private fun ActionBar(
     onInfo: () -> Unit,
     onChanged: (Photo) -> Unit,
     onDeleted: () -> Unit,
-    onFramer: () -> Unit,
 ) {
     val api = BigShelfApp.api
     val scope = rememberCoroutineScope()
@@ -578,8 +575,6 @@ private fun ActionBar(
             modifier = cell,
             loading = busy == "download",
         )
-        // Videos: pick the best frames of this one in Framer
-        if (image.isVideo) Action(BsIcons.FilmStrip, "Framer", onClick = onFramer, modifier = cell)
         Action(BsIcons.Trash, "Delete", onClick = { confirmDelete = true }, modifier = cell, loading = busy == "delete", tint = BsColors.Danger)
     }
 

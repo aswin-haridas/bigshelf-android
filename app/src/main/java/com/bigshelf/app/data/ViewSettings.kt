@@ -64,45 +64,9 @@ class ViewSettings(context: Context) {
 
     fun updateAutosplit(value: Boolean) { autosplit = value }
 
-    // Triplets fill the set with the clothes (garment, cut, pattern) most like the first photo's. Off by default.
-    var tripletOutfit by pref(false)
-        private set
-
-    fun updateTripletOutfit(value: Boolean) { tripletOutfit = value }
-
-    // Let Triplets and Composer pick AI images too
+    // Let Composer pick AI images too
     var includeAi by pref(false)
         private set
 
     fun updateIncludeAi(value: Boolean) { includeAi = value }
-
-    // Photos per random Triplets set (2-9); outfit sets are sized by the outfit
-    var tripletCount by pref(3)
-        private set
-
-    fun updateTripletCount(value: Int) { tripletCount = value }
-
-    // Random Triplets fill the set with the faces most like the first photo's. Off by default.
-    var tripletMatchFaces by pref(false)
-        private set
-
-    fun updateTripletMatchFaces(value: Boolean) { tripletMatchFaces = value }
-
-    // Random Triplets fill the set with the clothes colours most like the first photo's. Off by default.
-    var tripletMatchColors by pref(false)
-        private set
-
-    fun updateTripletMatchColors(value: Boolean) { tripletMatchColors = value }
-
-    // Random Triplets fill the set with the settings most like the first photo's. Off by default.
-    var tripletMatchScene by pref(false)
-        private set
-
-    fun updateTripletMatchScene(value: Boolean) { tripletMatchScene = value }
-
-    // Order of a set's photos (newest / oldest / best / random), random and outfit sets alike
-    var tripletOrder by pref("newest")
-        private set
-
-    fun updateTripletOrder(value: String) { tripletOrder = value }
 }

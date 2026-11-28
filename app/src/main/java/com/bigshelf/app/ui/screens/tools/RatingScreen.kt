@@ -118,7 +118,7 @@ fun RatingScreen(onBack: () -> Unit, onOpenPhoto: (String) -> Unit) {
     }
 
     // Taste score lives on the photo detail; refresh it so it shows the new rating
-    fun refresh() = PhotoEvents.invalidate("photo", "people", "triplets")
+    fun refresh() = PhotoEvents.invalidate("photo", "people")
 
     // The user likes `winner` more: show the next pair at once, the server catches up
     fun pick(pair: RatingPair, winner: Photo) {
